@@ -25,9 +25,14 @@
 
 static ot_udp_context_t ctx;
 
+typedef struct {
+	void *data;
+	size_t len;
+	size_t max_len;
+} ot_pkt_info_t;
+
 static void _recv(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
-	puts("Received");
 	ot_pkt_info_t *recv_info = aContext;
 
     size_t payload_len = otMessageGetLength(aMessage) - otMessageGetOffset(aMessage);

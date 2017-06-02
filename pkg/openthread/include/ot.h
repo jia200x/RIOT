@@ -50,12 +50,6 @@ extern "C" {
 #define OPENTHREAD_NET_SOCKET_CLOSE  (0x2)
 #define OPENTHREAD_NET_SEND          (0x3)
 
-typedef struct {
-	void *data;
-	size_t len;
-	size_t max_len;
-} ot_pkt_info_t;
-
 typedef void (*ot_cb_t)(void*, otMessage*, const otMessageInfo*);
 
 /**
