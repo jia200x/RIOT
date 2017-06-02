@@ -94,7 +94,14 @@ static void _send(char *addr_str, char *port_str, char *data, size_t len)
 	ot_call_command("udp", &ctx, NULL);
 }
 
-int udp_cmd(int argc, char **argv)
+static int state(int argc, char **argv)
+{
+	uint8_t state;
+	ot_call_command("state", NULL, &state);
+	return 0;
+}
+
+static int udp_cmd(int argc, char **argv)
 {
     if (strcmp(argv[1], "send") == 0) {
         _send(argv[2], argv[3], argv[4], strlen(argv[4]));
@@ -108,6 +115,7 @@ int udp_cmd(int argc, char **argv)
 static const shell_command_t shell_commands[] = {
     { "udp", "send data over UDP", udp_cmd },
     { "ipaddr", "print ip addresses", ip_addr },
+    { "state", "print thread state", state },
     { NULL, NULL, NULL }
 };
 
