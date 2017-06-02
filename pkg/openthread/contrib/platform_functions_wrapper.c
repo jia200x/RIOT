@@ -131,7 +131,6 @@ OT_COMMAND ot_udp(otInstance* ot_instance, void* arg, void* answer);
 	switch(arg->type) {
 		case OPENTHREAD_NET_SOCKET_CREATE:
 			DEBUG("Calling OPENTHREAD_NET_SOCKET_CREATE\n");
-			assert(ctx->ot_socket);
 			assert(ctx->cb);
 			_create_udp_socket(ot_instance, ctx->ot_socket, ctx->cb, ctx->port, ctx->info);
 			break;
