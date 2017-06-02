@@ -27,7 +27,24 @@ static ot_udp_context_t ctx;
 
 static void _recv(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
-	puts("It works!");
+	puts("Received");
+	ot_pkt_info_t *recv_info = aContext;
+
+    size_t payload_len = otMessageGetLength(aMessage) - otMessageGetOffset(aMessage);
+
+    if (recv_info->data == NULL || payload_len > recv_info->max_len) {
+        return;
+    }
+
+    otMessageRead(aMessage, otMessageGetOffset(aMessage), recv_info->data, payload_len);
+	recv_info->len = payload_len;
+
+	printf("Received data with len: %i\n ", recv_info->len);
+	for(int i=0;i<payload_len;i++)
+	{
+		printf("%02x ", ((char*) recv_info->data)[i]);
+	}
+	puts(" ");
 }
 
 int ip_addr(int argc, char **argv)
@@ -89,13 +106,18 @@ static const shell_command_t shell_commands[] = {
     { NULL, NULL, NULL }
 };
 
+char rx_buf[100];
+ot_pkt_info_t recv_info;
 int main(void)
 {
 
 	ctx.type = OPENTHREAD_NET_SOCKET_CREATE;
 	ctx.cb = _recv;
 	ctx.port = 1313;
+	recv_info.data = rx_buf;
+	recv_info.max_len = sizeof(rx_buf);
 
+	ctx.rx_ctx = &recv_info;
 	ot_call_command("udp", &ctx, NULL);
 
     char line_buf[SHELL_DEFAULT_BUFSIZE];

@@ -53,6 +53,7 @@ extern "C" {
 typedef struct {
 	void *data;
 	size_t len;
+	size_t max_len;
 } ot_pkt_info_t;
 
 typedef void (*ot_cb_t)(void*, otMessage*, const otMessageInfo*);
@@ -68,7 +69,7 @@ typedef struct {
 	uint16_t port;
 	void *tx_buf;
 	size_t tx_len;
-	ot_pkt_info_t recv_info;
+	void *rx_ctx;
 } ot_udp_context_t;
 
 /**

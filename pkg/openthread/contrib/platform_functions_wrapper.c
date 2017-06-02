@@ -108,7 +108,7 @@ void output_bytes(const char* name, const uint8_t *aBytes, uint8_t aLength)
     DEBUG("\n");
 }
 
-static void _create_udp_socket(otInstance *ot_instance, otUdpSocket *ot_socket, ot_cb_t cb, uint16_t port, ot_pkt_info_t *info)
+static void _create_udp_socket(otInstance *ot_instance, otUdpSocket *ot_socket, ot_cb_t cb, uint16_t port, void *rx_ctx)
 {
     memset(ot_socket, 0, sizeof(otUdpSocket));
 
@@ -117,7 +117,7 @@ static void _create_udp_socket(otInstance *ot_instance, otUdpSocket *ot_socket, 
 
     sockaddr.mPort = port;
 
-    otUdpOpen(ot_instance, ot_socket, cb, info);
+    otUdpOpen(ot_instance, ot_socket, cb, rx_ctx);
     otUdpBind(ot_socket, &sockaddr);
 }
 
@@ -153,7 +153,7 @@ OT_COMMAND ot_udp(otInstance* ot_instance, void* arg, void* answer)
 		case OPENTHREAD_NET_SOCKET_CREATE:
 			DEBUG("Calling OPENTHREAD_NET_SOCKET_CREATE\n");
 			assert(ctx->cb);
-			_create_udp_socket(ot_instance, &ctx->ot_socket, ctx->cb, ctx->port, &ctx->recv_info);
+			_create_udp_socket(ot_instance, &ctx->ot_socket, ctx->cb, ctx->port, ctx->rx_ctx);
 			break;
 		case OPENTHREAD_NET_SOCKET_CLOSE:
 		case OPENTHREAD_NET_SEND:
