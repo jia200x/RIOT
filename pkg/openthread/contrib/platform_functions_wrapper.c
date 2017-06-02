@@ -41,6 +41,7 @@ OT_COMMAND ot_panid(otInstance* ot_instance, void* arg, void* answer);
 OT_COMMAND ot_parent(otInstance* ot_instance, void* arg, void* answer);
 OT_COMMAND ot_state(otInstance* ot_instance, void* arg, void* answer);
 OT_COMMAND ot_thread(otInstance* ot_instance, void* arg, void* answer);
+OT_COMMAND ot_udp(otInstance* ot_instance, void* arg, void* answer);
 
 /**
  * @brief   Struct containing an OpenThread job command
@@ -74,6 +75,8 @@ const ot_command_t otCommands[] =
     { "state", &ot_state },
     /* thread: arg "start"/"stop": start/stop thread operation */
     { "thread", &ot_thread },
+    /* udp: arg ot_udp_context_t: execute udp operation (open and close socket, send data) */
+    { "udp", &ot_udp },
 };
 
 uint8_t ot_exec_command(otInstance *ot_instance, const char* command, void *arg, void* answer) {
@@ -103,6 +106,42 @@ void output_bytes(const char* name, const uint8_t *aBytes, uint8_t aLength)
         DEBUG("%02x", aBytes[i]);
     }
     DEBUG("\n");
+}
+
+static void _create_udp_socket(otInstance *ot_instance, otUdpSocket *ot_socket, ot_cb_t cb, uint16_t port, ot_pkt_info_t *info)
+{
+    memset(ot_socket, 0, sizeof(otUdpSocket));
+
+    otSockAddr sockaddr;
+    memset(&sockaddr, 0, sizeof(otSockAddr));
+
+    sockaddr.mPort = port;
+
+    otUdpOpen(ot_instance, ot_socket, cb, info);
+    otUdpBind(ot_socket, &sockaddr);
+}
+
+OT_COMMAND ot_udp(otInstance* ot_instance, void* arg, void* answer);
+{
+    /* TODO: Error code */
+	if(!arg)
+		return 1;
+
+	ot_udp_context_t *ctx = arg;
+	switch(arg->type) {
+		case OPENTHREAD_NET_SOCKET_CREATE:
+			DEBUG("Calling OPENTHREAD_NET_SOCKET_CREATE\n");
+			assert(ctx->ot_socket);
+			assert(ctx->cb);
+			_create_udp_socket(ot_instance, ctx->ot_socket, ctx->cb, ctx->port, ctx->info);
+			break;
+		case OPENTHREAD_NET_SOCKET_CLOSE:
+		case OPENTHREAD_NET_SEND:
+		default:
+			break;
+
+	}
+	return 0;
 }
 
 OT_COMMAND ot_channel(otInstance* ot_instance, void* arg, void* answer) {
