@@ -30,6 +30,7 @@ extern "C" {
 #include "net/netopt.h"
 #include "net/ieee802154.h"
 #include "net/ethernet.h"
+#include "net/ipv6.h"
 #include "net/gnrc/netdev.h"
 #include "thread.h"
 #include "openthread/types.h"
@@ -63,7 +64,10 @@ typedef struct {
 	uint8_t type;                                             /**< context type (e.g send, close) */
 	otUdpSocket ot_socket;                                      /**< OpenThread UDP socket */
 	ot_cb_t cb;
+	ipv6_addr_t ip_addr;
 	uint16_t port;
+	void *tx_buf;
+	size_t tx_len;
 	ot_pkt_info_t recv_info;
 } ot_udp_context_t;
 
