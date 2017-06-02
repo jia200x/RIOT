@@ -121,18 +121,18 @@ static void _create_udp_socket(otInstance *ot_instance, otUdpSocket *ot_socket, 
     otUdpBind(ot_socket, &sockaddr);
 }
 
-OT_COMMAND ot_udp(otInstance* ot_instance, void* arg, void* answer);
+OT_COMMAND ot_udp(otInstance* ot_instance, void* arg, void* answer)
 {
     /* TODO: Error code */
 	if(!arg)
 		return 1;
 
 	ot_udp_context_t *ctx = arg;
-	switch(arg->type) {
+	switch(ctx->type) {
 		case OPENTHREAD_NET_SOCKET_CREATE:
 			DEBUG("Calling OPENTHREAD_NET_SOCKET_CREATE\n");
 			assert(ctx->cb);
-			_create_udp_socket(ot_instance, ctx->ot_socket, ctx->cb, ctx->port, ctx->info);
+			_create_udp_socket(ot_instance, &ctx->ot_socket, ctx->cb, ctx->port, &ctx->recv_info);
 			break;
 		case OPENTHREAD_NET_SOCKET_CLOSE:
 		case OPENTHREAD_NET_SEND:

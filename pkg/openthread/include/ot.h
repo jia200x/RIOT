@@ -33,6 +33,7 @@ extern "C" {
 #include "net/gnrc/netdev.h"
 #include "thread.h"
 #include "openthread/types.h"
+#include "openthread/udp.h"
 
 #define OPENTHREAD_XTIMER_MSG_TYPE_EVENT (0x2235)        /**< xtimer message receiver event*/
 #define OPENTHREAD_NETDEV_MSG_TYPE_EVENT (0x2236)        /**< message received from driver */
@@ -49,15 +50,17 @@ typedef struct {
 	size_t len;
 } ot_pkt_info_t;
 
+typedef void (*ot_cb_t)(void*, otMessage*, const otMessageInfo*);
+
 /**
  * @brief   Struct containing context for OpenThread UDP
  */
 typedef struct {
 	uint8_t type;                                             /**< context type (e.g send, close) */
-	otUdpSocket ot_sock;                                      /**< OpenThread UDP socket */
-    void cb(void*, otMessage*, const otMessageInfo*)
+	otUdpSocket ot_socket;                                      /**< OpenThread UDP socket */
+	ot_cb_t cb;
 	uint16_t port;
-	ot_pkt_info recv_info;
+	ot_pkt_info_t recv_info;
 } ot_udp_context_t;
 
 /**
