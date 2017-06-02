@@ -121,6 +121,27 @@ static void _create_udp_socket(otInstance *ot_instance, otUdpSocket *ot_socket, 
     otUdpBind(ot_socket, &sockaddr);
 }
 
+static void _send_udp_pkt(otInstance *ot_instance, otUdpSocket *ot_socket, ipv6_addr_t ip_addr, uint16_t port, void *data, size_t len)
+{
+    otMessage *message;
+
+    message = otUdpNewMessage(ot_instance, true);
+
+    /* TODO: Handle errors here */
+    otMessageSetLength(message, len);
+    otMessageWrite(message, 0, data, len);
+
+    otMessageInfo mPeer;
+
+    /* Set dest address */
+    memcpy(&mPeer.mPeerAddr.mFields, &ip_addr, sizeof(ipv6_addr_t));
+
+    /* Set dest port */
+    mPeer.mPeerPort = port;
+
+    otUdpSend(ot_socket, message, &mPeer);
+}
+
 OT_COMMAND ot_udp(otInstance* ot_instance, void* arg, void* answer)
 {
     /* TODO: Error code */
@@ -136,6 +157,9 @@ OT_COMMAND ot_udp(otInstance* ot_instance, void* arg, void* answer)
 			break;
 		case OPENTHREAD_NET_SOCKET_CLOSE:
 		case OPENTHREAD_NET_SEND:
+			DEBUG("Calling OPENTHREAD_NET_SEND\n");
+			_send_udp_pkt(ot_instance, &ctx->ot_socket, ctx->ip_addr, ctx->port, ctx->tx_buf, ctx->tx_len);
+			break;
 		default:
 			break;
 
