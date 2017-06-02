@@ -40,6 +40,26 @@ extern "C" {
 #define OPENTHREAD_MSG_TYPE_RECV         (0x2238)        /**< event for frame reception */
 #define OPENTHREAD_JOB_MSG_TYPE_EVENT    (0x2240)        /**< event indicating an OT_JOB message */
 
+#define OPENTHREAD_NET_SOCKET_CREATE (0x1)
+#define OPENTHREAD_NET_SOCKET_CLOSE  (0x2)
+#define OPENTHREAD_NET_SEND          (0x3)
+
+typedef struct {
+	void *data;
+	size_t len;
+} ot_pkt_info_t;
+
+/**
+ * @brief   Struct containing context for OpenThread UDP
+ */
+typedef struct {
+	uint8_t type;                                             /**< context type (e.g send, close) */
+	otUdpSocket ot_sock;                                      /**< OpenThread UDP socket */
+    void cb(void*, otMessage*, const otMessageInfo*)
+	uint16_t port;
+	ot_pkt_info recv_info;
+} ot_udp_context_t;
+
 /**
  * @brief   Struct containing a serial message
  */
