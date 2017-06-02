@@ -47,6 +47,7 @@ static uint8_t rx_buf[OPENTHREAD_NETDEV_BUFLEN];
 static uint8_t tx_buf[OPENTHREAD_NETDEV_BUFLEN];
 static char ot_thread_stack[2 * THREAD_STACKSIZE_MAIN];
 
+#ifdef MODULE_LIBOPENTHREAD_CLI
 /* init and run OpeanThread's UART simulation (stdio) */
 void openthread_uart_run(void)
 {
@@ -63,6 +64,7 @@ void openthread_uart_run(void)
         msg_send(&msg, openthread_get_pid());
     }
 }
+#endif
 
 void openthread_bootstrap(void)
 {

@@ -73,17 +73,18 @@ void otTaskletsSignalPending(otInstance *aInstance) {
 static void *_openthread_event_loop(void *arg) {
     _pid = thread_getpid();
 
-    /* enable OpenThread UART */
-    otPlatUartEnable();
-
     /* init OpenThread */
     sInstance = otInstanceInit();
+
+#if MODULE_LIBOPENTHREAD_CLI
+    /* enable OpenThread UART */
+    otPlatUartEnable();
+    otCliUartInit(sInstance);
+#endif
 
     msg_init_queue(_queue, OPENTHREAD_QUEUE_LEN);
     netdev_t *dev;
     msg_t msg, reply;
-
-    otCliUartInit(sInstance);
 
 #if OPENTHREAD_ENABLE_DIAG
     diagInit(sInstance);
@@ -99,7 +100,6 @@ static void *_openthread_event_loop(void *arg) {
     /* Start Thread protocol operation */
     otThreadSetEnabled(sInstance, true);
 
-    uint8_t *buf;
     ot_job_t *job;
     while (1) {
         msg_receive(&msg);
@@ -113,11 +113,15 @@ static void *_openthread_event_loop(void *arg) {
                 dev = msg.content.ptr;
                 dev->driver->isr(dev);
                 break;
+#ifdef MODULE_LIBOPENTHREAD_CLI
             case OPENTHREAD_SERIAL_MSG_TYPE_EVENT:
+			{
                 /* Tell OpenThread about the reception of a CLI command */
-                buf = msg.content.ptr;
+                uint8_t *buf = msg.content.ptr;
                 otPlatUartReceived(buf, strlen((char *) buf));
                 break;
+			}
+#endif
             case OPENTHREAD_JOB_MSG_TYPE_EVENT:
                 job = msg.content.ptr;
                 reply.content.value = ot_exec_command(sInstance, job->command, job->arg, job->answer);
