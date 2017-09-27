@@ -1,0 +1,25 @@
+From f9d5b291e829764d2ca2a9100376bbe1eb3bbbbb Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jos=C3=A9=20Alamos?= <jialamos@uc.cl>
+Date: Tue, 8 Nov 2016 12:35:41 -0300
+Subject: [PATCH] fixed old style definitions
+
+---
+ src/mac/LoRaMac.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/mac/LoRaMac.c b/src/mac/LoRaMac.c
+index 5dd68b9..aa30411 100644
+--- a/src/mac/LoRaMac.c
++++ b/src/mac/LoRaMac.c
+@@ -2651,7 +2651,7 @@ LoRaMacStatus_t Send( LoRaMacHeader_t *macHdr, uint8_t fPort, void *fBuffer, uin
+     return status;
+ }
+ 
+-static LoRaMacStatus_t ScheduleTx( )
++static LoRaMacStatus_t ScheduleTx(void)
+ {
+     TimerTime_t dutyCycleTimeOff = 0;
+ 
+-- 
+1.9.1
+

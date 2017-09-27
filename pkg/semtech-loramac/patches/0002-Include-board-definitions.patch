@@ -1,0 +1,39 @@
+From b219c9eb4423e2579036ad46ed984090d8700b65 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jos=C3=A9=20Alamos?= <jialamos@uc.cl>
+Date: Tue, 8 Nov 2016 10:54:26 -0300
+Subject: [PATCH] included board definitions
+
+---
+ src/mac/LoRaMac-api-v3.c | 2 +-
+ src/mac/LoRaMac.c        | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/mac/LoRaMac-api-v3.c b/src/mac/LoRaMac-api-v3.c
+index 9111960..4c08c6f 100644
+--- a/src/mac/LoRaMac-api-v3.c
++++ b/src/mac/LoRaMac-api-v3.c
+@@ -17,7 +17,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
+ 
+ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jäckle ( STACKFORCE )
+ */
+-#include "board.h"
++#include "loramac/board_definitions.h"
+ 
+ #include "LoRaMac-api-v3.h"
+ #include "LoRaMacTest.h"
+diff --git a/src/mac/LoRaMac.c b/src/mac/LoRaMac.c
+index fc8220b..dc9a5bf 100644
+--- a/src/mac/LoRaMac.c
++++ b/src/mac/LoRaMac.c
+@@ -17,7 +17,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
+ 
+ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jäckle ( STACKFORCE )
+ */
+-#include "board.h"
++#include "loramac/board_definitions.h"
+ 
+ #include "LoRaMacCrypto.h"
+ #include "LoRaMac.h"
+-- 
+1.9.1
+
