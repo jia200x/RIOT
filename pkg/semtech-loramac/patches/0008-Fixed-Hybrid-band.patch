@@ -1,0 +1,43 @@
+From 907d00b5f53928162b44a1871e85c718f35c35ba Mon Sep 17 00:00:00 2001
+From: Francisco <femolina@uc.cl>
+Date: Wed, 14 Dec 2016 10:35:39 -0300
+Subject: [PATCH] fixed frquency band difference
+
+---
+ src/mac/LoRaMac.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/mac/LoRaMac.c b/src/mac/LoRaMac.c
+index 080594e..b77f623 100644
+--- a/src/mac/LoRaMac.c
++++ b/src/mac/LoRaMac.c
+@@ -17,7 +17,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
+ 
+ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jäckle ( STACKFORCE )
+ */
+-#include "loramac/board_definitions.h"
++#include "loramac/board_definitions.h"
+ 
+ #include "LoRaMacCrypto.h"
+ #include "LoRaMac.h"
+@@ -2651,7 +2651,7 @@ LoRaMacStatus_t Send( LoRaMacHeader_t *macHdr, uint8_t fPort, void *fBuffer, uin
+     return status;
+ }
+ 
+-static LoRaMacStatus_t ScheduleTx(void)
++static LoRaMacStatus_t ScheduleTx(void)
+ {
+     TimerTime_t dutyCycleTimeOff = 0;
+ 
+@@ -3163,7 +3163,7 @@ LoRaMacStatus_t LoRaMacInitialization( LoRaMacPrimitives_t *primitives, LoRaMacC
+     LoRaMacParamsDefaults.ChannelsMask[4] = 0x00FF;
+     LoRaMacParamsDefaults.ChannelsMask[5] = 0x0000;
+ #elif defined( USE_BAND_915_HYBRID )
+-    LoRaMacParamsDefaults.ChannelsMask[0] = 0x00FF;
++    LoRaMacParamsDefaults.ChannelsMask[0] = 0x3c3c;
+     LoRaMacParamsDefaults.ChannelsMask[1] = 0x0000;
+     LoRaMacParamsDefaults.ChannelsMask[2] = 0x0000;
+     LoRaMacParamsDefaults.ChannelsMask[3] = 0x0000;
+-- 
+2.7.4
+

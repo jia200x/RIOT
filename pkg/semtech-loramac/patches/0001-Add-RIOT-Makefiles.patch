@@ -1,0 +1,34 @@
+From bad4c56e40d5f7773efcbcfed77206e5aacaf9ae Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jos=C3=A9=20Alamos?= <jialamos@uc.cl>
+Date: Fri, 4 Nov 2016 11:19:07 -0300
+Subject: [PATCH] Added RIOT makefiles
+
+---
+ Makefile         | 3 +++
+ src/mac/Makefile | 4 ++++
+ 2 files changed, 7 insertions(+)
+ create mode 100644 Makefile
+ create mode 100644 src/mac/Makefile
+
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..ca957ad
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,3 @@
++DIRS += src/mac
++
++include $(RIOTBASE)/Makefile.base
+diff --git a/src/mac/Makefile b/src/mac/Makefile
+new file mode 100644
+index 0000000..35e8063
+--- /dev/null
++++ b/src/mac/Makefile
+@@ -0,0 +1,4 @@
++MODULE := loramac_mac
++
++include $(RIOTBASE)/Makefile.base
++
+-- 
+1.9.1
+
