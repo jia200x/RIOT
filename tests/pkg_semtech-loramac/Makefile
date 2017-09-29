@@ -1,15 +1,17 @@
-APPLICATION = loramac
+APPLICATION = pkg_semtech-loramac
+include ../Makefile.tests_common
 
-FEATURES_REQUIRED = periph_spi periph_gpio
+BOARD ?= b-l072z-lrwan1
 
-BOARD ?= samr21-xpro
+RIOTBASE ?= $(CURDIR)/../..
 
-CFLAGS += -DUSE_BAND_915_HYBRID
+CFLAGS += -DUSE_BAND_868
 CFLAGS += -DCRYPTO_AES
 CFLAGS += -DDEVELHELP
 CFLAGS += -DDEBUG_ASSERT_VERBOSE
 
-RIOTBASE ?= $(CURDIR)/../..
+FEATURES_REQUIRED += periph_spi
+FEATURES_REQUIRED +=periph_gpio
 
 USEPKG += semtech-loramac
 
@@ -27,7 +29,5 @@ USEMODULE += xtimer
 USEMODULE += loramac_contrib
 USEMODULE += loramac_mac
 USEMODULE += random
-
-
 
 include $(RIOTBASE)/Makefile.include
