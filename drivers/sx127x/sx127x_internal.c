@@ -222,3 +222,82 @@ void sx127x_start_cad(sx127x_t *dev)
             break;
     }
 }
+
+void sx127x_send(sx127x_t *dev, uint8_t *buffer, uint8_t size)
+{
+    if (sx127x_get_state(dev) == SX127X_RF_TX_RUNNING) {
+        DEBUG("[WARNING] Cannot send packet: radio alredy in transmitting "
+              "state.\n");
+        return;
+    }
+
+    switch (dev->settings.modem) {
+        case SX127X_MODEM_FSK:
+            /* todo */
+            break;
+        case SX127X_MODEM_LORA:
+            /* Initializes the payload size */
+            sx127x_set_payload_length(dev, size);
+
+            /* Full buffer used for Tx */
+            sx127x_reg_write(dev, SX127X_REG_LR_FIFOTXBASEADDR, 0x00);
+            sx127x_reg_write(dev, SX127X_REG_LR_FIFOADDRPTR, 0x00);
+
+            /* FIFO operations can not take place in Sleep mode
+             * So wake up the chip */
+            if (sx127x_get_op_mode(dev) == SX127X_RF_OPMODE_SLEEP) {
+                sx127x_set_standby(dev);
+                xtimer_usleep(SX127X_RADIO_WAKEUP_TIME); /* wait for chip wake up */
+            }
+
+            /* Write payload buffer */
+            sx127x_write_fifo(dev, buffer, size);
+            break;
+        default:
+            puts("sx127x_netdev, Unsupported modem");
+            break;
+    }
+
+    /* Enable TXDONE interrupt */
+    sx127x_reg_write(dev, SX127X_REG_LR_IRQFLAGSMASK,
+                     SX127X_RF_LORA_IRQFLAGS_RXTIMEOUT |
+                     SX127X_RF_LORA_IRQFLAGS_RXDONE |
+                     SX127X_RF_LORA_IRQFLAGS_PAYLOADCRCERROR |
+                     SX127X_RF_LORA_IRQFLAGS_VALIDHEADER |
+                     /* SX127X_RF_LORA_IRQFLAGS_TXDONE | */
+                     SX127X_RF_LORA_IRQFLAGS_CADDONE |
+                     SX127X_RF_LORA_IRQFLAGS_FHSSCHANGEDCHANNEL |
+                     SX127X_RF_LORA_IRQFLAGS_CADDETECTED);
+
+    /* Set TXDONE interrupt to the DIO0 line */
+    sx127x_reg_write(dev, SX127X_REG_DIOMAPPING1,
+                     (sx127x_reg_read(dev, SX127X_REG_DIOMAPPING1) &
+                      SX127X_RF_LORA_DIOMAPPING1_DIO0_MASK) |
+                     SX127X_RF_LORA_DIOMAPPING1_DIO0_01);
+
+    /* Start TX timeout timer */
+    xtimer_set(&dev->_internal.tx_timeout_timer, dev->settings.lora.tx_timeout);
+
+    /* Put chip into transfer mode */
+    sx127x_set_state(dev, SX127X_RF_TX_RUNNING);
+    sx127x_set_op_mode(dev, SX127X_RF_OPMODE_TRANSMITTER);
+}
+
+bool sx127x_is_channel_free(sx127x_t *dev, uint32_t freq, int16_t rssi_thresh)
+{
+    int16_t rssi = 0;
+
+    sx127x_set_channel(dev, freq);
+    sx127x_set_op_mode(dev, SX127X_RF_OPMODE_RECEIVER);
+
+    xtimer_usleep(1000); /* wait 1 millisecond */
+
+    rssi = sx127x_read_rssi(dev);
+    sx127x_set_sleep(dev);
+
+    if (rssi > rssi_thresh) {
+        return false;
+    }
+
+    return true;
+}

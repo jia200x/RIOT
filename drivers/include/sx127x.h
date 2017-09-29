@@ -230,10 +230,21 @@ typedef struct {
 } sx127x_radio_settings_t;
 
 /**
+ * @brief   LoRa received PHY packet.
+ */
+typedef struct {
+    uint8_t snr_value;                 /**< Packet's signal-to-noise rate (SNR) */
+    int16_t rssi_value;                /**< Packet's RSSI */
+    uint8_t size;                      /**< Packet's actual size in bytes */
+    uint8_t content[256];              /**< Packet's content */
+} sx127x_rx_packet_t;
+
+/**
  * @brief   SX127X internal data.
  */
 typedef struct {
     /* Data that will be passed to events handler in application */
+    sx127x_rx_packet_t last_packet;    /**< Last packet that was received */
     xtimer_t tx_timeout_timer;         /**< TX operation timeout timer */
     xtimer_t rx_timeout_timer;         /**< RX operation timeout timer */
     uint32_t last_channel;             /**< Last channel in frequency hopping sequence */
@@ -270,6 +281,9 @@ typedef struct {
     sx127x_params_t params;            /**< Device driver parameters */
     sx127x_internal_t _internal;       /**< Internal sx127x data used within the driver */
     sx127x_flags_t irq;                /**< Device IRQ flags */
+    void (*sx127x_event_cb)(void *dev,
+        uint8_t event_type);           /**< Event callback */
+    void *callback_arg;                /**< Event callback arguments */
 } sx127x_t;
 
 /**
@@ -356,6 +370,35 @@ void sx127x_on_dio3(void *arg);
  * @param[in] dev                      The sx127x device descriptor
  */
 void sx127x_start_cad(sx127x_t *dev);
+
+/**
+ * @brief   Sends data from a buffer
+ *
+ * @param[in] dev                      The sx127x device descriptor
+ * @param[in] buffer                   The buffer to send
+ * @param[in] size                     The size of the buffer
+ */
+void sx127x_send(sx127x_t *dev, uint8_t *buffer, uint8_t size);
+
+/**
+ * @brief   Checks that channel is free with specified RSSI threshold.
+ *
+ * @param[in] devThe                   sx1276 device structure pointer
+ * @param[in] freq                     channel RF frequency
+ * @param[in] rssi_thresh              RSSI treshold
+ *
+ * @return true if channel is free, false otherwise
+ */
+bool sx127x_is_channel_free(sx127x_t *dev, uint32_t freq, int16_t rssi_thresh);
+
+/**
+ * @brief   Reads the current RSSI value.
+ *
+ * @param[in] dev                      The sx1276 device structure pointer
+ *
+ * @return the current value of RSSI (in dBm)
+ */
+int16_t sx127x_read_rssi(const sx127x_t *dev);
 
 /**
  * @brief   Gets current state of transceiver.
