@@ -41,8 +41,8 @@
 #include "sx127x.h"
 #include "sx127x_registers.h"
 
-#include "LoRaMac.h"
 #include "loramac/board_definitions.h" 
+#include "LoRaMac.h"
 #include "Comissioning.h"
 
 /*!

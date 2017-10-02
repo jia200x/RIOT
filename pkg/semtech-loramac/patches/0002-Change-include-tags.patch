@@ -1,0 +1,268 @@
+From 263f62ed537450de84f1e38b364d4cd77b746ef9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jos=C3=A9=20Ignacio=20Alamos=20Aste?= <jialamos@uc.cl>
+Date: Wed, 27 Sep 2017 14:44:34 +0200
+Subject: [PATCH] Change include tags
+
+---
+ src/mac/LoRaMac.c                   | 2 +-
+ src/mac/LoRaMacCrypto.c             | 6 +++---
+ src/mac/region/Region.c             | 2 +-
+ src/mac/region/RegionAS923.c        | 4 ++--
+ src/mac/region/RegionAU915.c        | 4 ++--
+ src/mac/region/RegionCN470.c        | 4 ++--
+ src/mac/region/RegionCN779.c        | 4 ++--
+ src/mac/region/RegionCommon.c       | 4 ++--
+ src/mac/region/RegionEU433.c        | 4 ++--
+ src/mac/region/RegionEU868.c        | 4 ++--
+ src/mac/region/RegionIN865.c        | 4 ++--
+ src/mac/region/RegionKR920.c        | 4 ++--
+ src/mac/region/RegionUS915-Hybrid.c | 4 ++--
+ src/mac/region/RegionUS915.c        | 4 ++--
+ src/system/crypto/cmac.c            | 2 +-
+ 15 files changed, 28 insertions(+), 28 deletions(-)
+
+diff --git a/src/mac/LoRaMac.c b/src/mac/LoRaMac.c
+index 0750ee5..6e2d9d5 100644
+--- a/src/mac/LoRaMac.c
++++ b/src/mac/LoRaMac.c
+@@ -17,7 +17,7 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
+ 
+ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jaeckle ( STACKFORCE )
+ */
+-#include "board.h"
++#include "loramac/board.h"
+ 
+ #include "LoRaMac.h"
+ #include "region/Region.h"
+diff --git a/src/mac/LoRaMacCrypto.c b/src/mac/LoRaMacCrypto.c
+index 94026c4..7558da2 100644
+--- a/src/mac/LoRaMacCrypto.c
++++ b/src/mac/LoRaMacCrypto.c
+@@ -19,10 +19,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ */
+ #include <stdlib.h>
+ #include <stdint.h>
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+-#include "aes.h"
+-#include "cmac.h"
++#include "loramac/aes.h"
++#include "loramac/cmac.h"
+ 
+ #include "LoRaMacCrypto.h"
+ 
+diff --git a/src/mac/region/Region.c b/src/mac/region/Region.c
+index 1d0be81..9c7610f 100644
+--- a/src/mac/region/Region.c
++++ b/src/mac/region/Region.c
+@@ -21,7 +21,7 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <string.h>
+ #include <stdint.h>
+ 
+-#include "timer.h"
++#include "loramac/timer.h"
+ #include "LoRaMac.h"
+ 
+ 
+diff --git a/src/mac/region/RegionAS923.c b/src/mac/region/RegionAS923.c
+index 2677d0c..7734eae 100644
+--- a/src/mac/region/RegionAS923.c
++++ b/src/mac/region/RegionAS923.c
+@@ -22,10 +22,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "board.h"
++#include "loramac/board.h"
+ #include "LoRaMac.h"
+ 
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #include "Region.h"
+ #include "RegionCommon.h"
+diff --git a/src/mac/region/RegionAU915.c b/src/mac/region/RegionAU915.c
+index 4c8fc33..7967991 100644
+--- a/src/mac/region/RegionAU915.c
++++ b/src/mac/region/RegionAU915.c
+@@ -22,10 +22,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "board.h"
++#include "loramac/board.h"
+ #include "LoRaMac.h"
+ 
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #include "Region.h"
+ #include "RegionCommon.h"
+diff --git a/src/mac/region/RegionCN470.c b/src/mac/region/RegionCN470.c
+index dbbc745..beb2b9e 100644
+--- a/src/mac/region/RegionCN470.c
++++ b/src/mac/region/RegionCN470.c
+@@ -22,10 +22,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "board.h"
++#include "loramac/board.h"
+ #include "LoRaMac.h"
+ 
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #include "Region.h"
+ #include "RegionCommon.h"
+diff --git a/src/mac/region/RegionCN779.c b/src/mac/region/RegionCN779.c
+index c5d9b7b..87c2e24 100644
+--- a/src/mac/region/RegionCN779.c
++++ b/src/mac/region/RegionCN779.c
+@@ -22,10 +22,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "board.h"
++#include "loramac/board.h"
+ #include "LoRaMac.h"
+ 
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #include "Region.h"
+ #include "RegionCommon.h"
+diff --git a/src/mac/region/RegionCommon.c b/src/mac/region/RegionCommon.c
+index fb0b139..c6f3cb5 100644
+--- a/src/mac/region/RegionCommon.c
++++ b/src/mac/region/RegionCommon.c
+@@ -23,8 +23,8 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "timer.h"
+-#include "utilities.h"
++#include "loramac/timer.h"
++#include "loramac/utilities.h"
+ #include "LoRaMac.h"
+ #include "RegionCommon.h"
+ 
+diff --git a/src/mac/region/RegionEU433.c b/src/mac/region/RegionEU433.c
+index 5446c51..fb97205 100644
+--- a/src/mac/region/RegionEU433.c
++++ b/src/mac/region/RegionEU433.c
+@@ -22,10 +22,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "board.h"
++#include "loramac/board.h"
+ #include "LoRaMac.h"
+ 
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #include "Region.h"
+ #include "RegionCommon.h"
+diff --git a/src/mac/region/RegionEU868.c b/src/mac/region/RegionEU868.c
+index f4385a5..6685f45 100644
+--- a/src/mac/region/RegionEU868.c
++++ b/src/mac/region/RegionEU868.c
+@@ -22,10 +22,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "board.h"
++#include "loramac/board.h"
+ #include "LoRaMac.h"
+ 
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #include "Region.h"
+ #include "RegionCommon.h"
+diff --git a/src/mac/region/RegionIN865.c b/src/mac/region/RegionIN865.c
+index 75e2a4b..54048cf 100644
+--- a/src/mac/region/RegionIN865.c
++++ b/src/mac/region/RegionIN865.c
+@@ -22,10 +22,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "board.h"
++#include "loramac/board.h"
+ #include "LoRaMac.h"
+ 
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #include "Region.h"
+ #include "RegionCommon.h"
+diff --git a/src/mac/region/RegionKR920.c b/src/mac/region/RegionKR920.c
+index eda6652..c901027 100644
+--- a/src/mac/region/RegionKR920.c
++++ b/src/mac/region/RegionKR920.c
+@@ -22,10 +22,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "board.h"
++#include "loramac/board.h"
+ #include "LoRaMac.h"
+ 
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #include "Region.h"
+ #include "RegionCommon.h"
+diff --git a/src/mac/region/RegionUS915-Hybrid.c b/src/mac/region/RegionUS915-Hybrid.c
+index 426e40d..d407a94 100644
+--- a/src/mac/region/RegionUS915-Hybrid.c
++++ b/src/mac/region/RegionUS915-Hybrid.c
+@@ -22,10 +22,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "board.h"
++#include "loramac/board.h"
+ #include "LoRaMac.h"
+ 
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #include "Region.h"
+ #include "RegionCommon.h"
+diff --git a/src/mac/region/RegionUS915.c b/src/mac/region/RegionUS915.c
+index 8aa788a..4190d72 100644
+--- a/src/mac/region/RegionUS915.c
++++ b/src/mac/region/RegionUS915.c
+@@ -22,10 +22,10 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
+ #include <stdint.h>
+ #include <math.h>
+ 
+-#include "board.h"
++#include "loramac/board.h"
+ #include "LoRaMac.h"
+ 
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #include "Region.h"
+ #include "RegionCommon.h"
+diff --git a/src/system/crypto/cmac.c b/src/system/crypto/cmac.c
+index 779b668..773e608 100644
+--- a/src/system/crypto/cmac.c
++++ b/src/system/crypto/cmac.c
+@@ -37,7 +37,7 @@ DEALINGS WITH THE SOFTWARE
+ #include <stdint.h>
+ #include "aes.h"
+ #include "cmac.h"
+-#include "utilities.h"
++#include "loramac/utilities.h"
+ 
+ #define LSHIFT(v, r) do {                                       \
+   int32_t i;                                                  \
+-- 
+2.7.4 (Apple Git-66)
+
