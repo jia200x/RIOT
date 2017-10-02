@@ -43,6 +43,7 @@
 
 #include "loramac/board_definitions.h" 
 #include "LoRaMac.h"
+#include "region/Region.h"
 #include "Comissioning.h"
 
 /*!
