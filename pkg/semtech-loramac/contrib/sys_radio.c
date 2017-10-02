@@ -56,7 +56,7 @@ void SX1276SetChannel(uint32_t freq)
 }
 
 bool SX1276IsChannelFree(RadioModems_t modem, uint32_t freq,
-                         int16_t rssiThresh)
+                         int16_t rssiThresh, uint32_t maxCarrierSenseTime )
 {
     return sx127x_is_channel_free(dev_ptr, freq, rssiThresh);
 }
@@ -190,6 +190,15 @@ bool SX1276CheckRfFrequency(uint32_t frequency)
     return true;
 }
 
+void SX1276SetTxContinuousWave( uint32_t freq, int8_t power, uint16_t time )
+{
+	/* TODO */
+}
+void SX1276SetPublicNetwork( bool enable )
+{
+	/* TODO */
+}
+
 /**
  * LoRa function callbacks
  */
@@ -207,13 +216,15 @@ const struct Radio_s Radio =
     SX1276GetTimeOnAir,
     SX1276Send,
     SX1276SetSleep,
-    SX1276SetStby, 
+    SX1276SetStby,
     SX1276SetRx,
     SX1276StartCad,
+    SX1276SetTxContinuousWave,
     SX1276ReadRssi,
     SX1276Write,
     SX1276Read,
     SX1276WriteBuffer,
     SX1276ReadBuffer,
-    SX1276SetMaxPayloadLength
+    SX1276SetMaxPayloadLength,
+    SX1276SetPublicNetwork
 };

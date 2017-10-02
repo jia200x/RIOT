@@ -1,4 +1,4 @@
-#include "loramac/board_definitions.h"
+#include "loramac/board.h"
 #include "random.h"
 
 void srand1( uint32_t seed )
