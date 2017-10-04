@@ -15,12 +15,18 @@ Maintainer: Miguel Luis and Gregory Cristian
 #include <string.h>
 #include <math.h>
 #include "sx127x.h"
-#include "sx127x_registers.h"
+#include "sx127x_params.h"
+
+#include "loramac/params.h"
 #include "loramac/board.h"
 
 #include "LoRaMac.h"
 #include "region/Region.h"
-#include "Commissioning.h"
+
+#include "net/loramac.h"
+
+#define ENABLE_DEBUG (1)
+#include "debug.h"
 
 static sx127x_t sx127x;
 
@@ -43,7 +49,7 @@ static sx127x_t sx127x;
 /*!
  * LoRaWAN confirmed messages
  */
-#define LORAWAN_CONFIRMED_MSG_ON                    false
+#define LORAWAN_CONFIRMED_MSG_ON                    (LORAMAC_DEFAULT_TX_MODE == LORAMAC_TX_CNF)
 
 /*!
  * LoRaWAN Adaptive Data Rate
@@ -84,6 +90,10 @@ static sx127x_t sx127x;
  */
 #define LORAWAN_APP_PORT                            2
 
+#define LORAWAN_PUBLIC_NETWORK                      true
+
+#define LORAWAN_NETWORK_ID                          1
+
 /*!
  * User application data buffer size
  */
@@ -101,19 +111,19 @@ static sx127x_t sx127x;
 
 #endif
 
-static uint8_t DevEui[] = LORAWAN_DEVICE_EUI;
-static uint8_t AppEui[] = LORAWAN_APPLICATION_EUI;
-static uint8_t AppKey[] = LORAWAN_APPLICATION_KEY;
+static uint8_t DevEui[] = LORAMAC_DEV_EUI_DEFAULT;
+static uint8_t AppEui[] = LORAMAC_APP_EUI_DEFAULT;
+static uint8_t AppKey[] = LORAMAC_APP_KEY_DEFAULT;
 
 #if( OVER_THE_AIR_ACTIVATION == 0 )
 
-static uint8_t NwkSKey[] = LORAWAN_NWKSKEY;
-static uint8_t AppSKey[] = LORAWAN_APPSKEY;
+static uint8_t NwkSKey[] = LORAMAC_NET_SKEY_DEFAULT;
+static uint8_t AppSKey[] = LORAMAC_APP_SKEY_DEFAULT;
 
 /*!
  * Device address
  */
-static uint32_t DevAddr = LORAWAN_DEVICE_ADDRESS;
+static uint32_t DevAddr = LORAMAC_DEV_ADDR_DEFAULT;
 
 #endif
 
@@ -362,6 +372,7 @@ static bool SendFrame( void )
  */
 static void OnTxNextPacketTimerEvent( void )
 {
+    DEBUG("[semtech-loramac] test: TX next packet timer event\n");
     MibRequestConfirm_t mibReq;
     LoRaMacStatus_t status;
 
@@ -407,7 +418,7 @@ static void OnLed2TimerEvent( void )
 /*!
  * \brief   MCPS-Confirm event function
  *
- * \param   [IN] mcpsConfirm - Pointer to the confirm structure,
+ * \param   [IN]  - Pointer to the confirm structure,
  *               containing confirm attributes.
  */
 static void McpsConfirm( McpsConfirm_t *mcpsConfirm )
@@ -753,6 +764,7 @@ int main( void )
     LoRaMacCallback_t LoRaMacCallbacks;
     MibRequestConfirm_t mibReq;
 
+    sx127x_setup(&sx127x, &sx127x_params[0]);
     radio_set_ptr(&sx127x);
     xtimer_init();
     sx127x.sx127x_event_cb = event_handler_thread;
@@ -765,6 +777,7 @@ int main( void )
         {
             case DEVICE_STATE_INIT:
             {
+                DEBUG("[semtech-loramac] test: initializing loramac\n");
                 LoRaMacPrimitives.MacMcpsConfirm = McpsConfirm;
                 LoRaMacPrimitives.MacMcpsIndication = McpsIndication;
                 LoRaMacPrimitives.MacMlmeConfirm = MlmeConfirm;
@@ -831,7 +844,11 @@ int main( void )
             }
             case DEVICE_STATE_JOIN:
             {
-#if( OVER_THE_AIR_ACTIVATION != 0 )
+#if (LORAMAC_DEFAULT_JOIN_PROCEDURE == LORAMAC_JOIN_OTAA)
+                (void) NwkSKey;
+                (void) AppSKey;
+                (void) DevAddr;
+                DEBUG("[semtech-loramac] test: starting OTAA join\n");
                 MlmeReq_t mlmeReq;
 
                 // Initialize LoRaMac device unique ID
@@ -850,16 +867,7 @@ int main( void )
                 }
                 DeviceState = DEVICE_STATE_SLEEP;
 #else
-                // Choose a random device address if not already defined in Commissioning.h
-                if( DevAddr == 0 )
-                {
-                    // Random seed initialization
-                    srand1( BoardGetRandomSeed( ) );
-
-                    // Choose a random device address
-                    DevAddr = randr( 0, 0x01FFFFFF );
-                }
-
+                DEBUG("[semtech-loramac] test: starting ABP join\n");
                 mibReq.Type = MIB_NET_ID;
                 mibReq.Param.NetID = LORAWAN_NETWORK_ID;
                 LoRaMacMibSetRequestConfirm( &mibReq );
@@ -886,6 +894,7 @@ int main( void )
             }
             case DEVICE_STATE_SEND:
             {
+                DEBUG("[semtech-loramac] test: sending frame\n");
                 if( NextTx == true )
                 {
                     PrepareTxFrame( AppPort );
@@ -907,6 +916,7 @@ int main( void )
             }
             case DEVICE_STATE_CYCLE:
             {
+                DEBUG("[semtech-loramac] test: schedule next TX\n");
                 DeviceState = DEVICE_STATE_SLEEP;
 
                 // Schedule next packet transmission
@@ -916,8 +926,9 @@ int main( void )
             }
             case DEVICE_STATE_SLEEP:
             {
+                // DEBUG("[semtech-loramac] test: going to sleep\n");
                 // Wake up through events
-                TimerLowPowerHandler( );
+                // TimerLowPowerHandler( );
                 break;
             }
             default:
