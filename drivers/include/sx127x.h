@@ -281,9 +281,9 @@ typedef struct {
     sx127x_params_t params;            /**< Device driver parameters */
     sx127x_internal_t _internal;       /**< Internal sx127x data used within the driver */
     sx127x_flags_t irq;                /**< Device IRQ flags */
-    void (*sx127x_event_cb)(void *dev,
-        uint8_t event_type);           /**< Event callback */
-    void *callback_arg;                /**< Event callback arguments */
+    // void (*sx127x_event_cb)(void *dev,
+    //     uint8_t event_type);           /**< Event callback */
+    // void *callback_arg;                /**< Event callback arguments */
 } sx127x_t;
 
 /**
