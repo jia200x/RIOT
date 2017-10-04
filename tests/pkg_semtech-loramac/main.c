@@ -1,74 +1,33 @@
 /*
- * Copyright (C) Inria Chile 2016
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
- */
+ / _____)             _              | |
+( (____  _____ ____ _| |_ _____  ____| |__
+ \____ \| ___ |    (_   _) ___ |/ ___)  _ \
+ _____) ) ____| | | || |_| ____( (___| | | |
+(______/|_____)_|_|_| \__)_____)\____)_| |_|
+    (C)2013 Semtech
+Description: LoRaMac classA device implementation
+License: Revised BSD License, see LICENSE.TXT file include in the project
+Maintainer: Miguel Luis and Gregory Cristian
+*/
 
-/**
- * @ingroup     examples
- * @{
- *
- * @file
- * @brief       Test for raw IPv6 connections
- *
- * @author      Martine Lenders <mlenders@inf.fu-berlin.de>
- *
- * This test application tests the gnrc_conn_ip module. If you select protocol 58 you can also
- * test if gnrc is able to deal with multiple subscribers to ICMPv6 (gnrc_icmpv6 and this
- * application).
- *
- * @}
- */
+/*! \file classA/LoRaMote/main.c */
 
-#include <errno.h>
-#include <stdio.h>
-#include <math.h>
-#include <stdlib.h>
 #include <string.h>
-
-#include "shell.h"
-#include "shell_commands.h"
-#include "thread.h"
-#include "xtimer.h"
-// #include "lpm.h"
-#include "periph/rtc.h"
-
-#include "common.h"
-#include "board.h"
-
+#include <math.h>
 #include "sx127x.h"
 #include "sx127x_registers.h"
+#include "loramac/board.h"
 
-#include "loramac/board_definitions.h" 
 #include "LoRaMac.h"
 #include "region/Region.h"
-#include "Comissioning.h"
-
-/*!
- * Thread Variables and packet count
- */
+#include "Commissioning.h"
 
 static sx127x_t sx127x;
-
-LoRaMacPrimitives_t LoRaMacPrimitives;
-LoRaMacCallback_t LoRaMacCallbacks;
-MibRequestConfirm_t mibReq;
-
-uint32_t count = 0;
-
-/*!
- * Unique Devices IDs register set ( STM32L1xxx )
- */
-#define         ID1                                 ( 0x1FF800D0 )
-#define         ID2                                 ( 0x1FF800D4 )
-#define         ID3                                 ( 0x1FF800E4 )
 
 /*!
  * Defines the application data transmission duty cycle. 5s, value in [ms].
  */
-#define APP_TX_DUTYCYCLE                            10000
+#define APP_TX_DUTYCYCLE                            5000
 
 /*!
  * Defines a random delay for application data transmission duty cycle. 1s,
@@ -79,7 +38,7 @@ uint32_t count = 0;
 /*!
  * Default datarate
  */
-#define LORAWAN_DEFAULT_DATARATE                    DR_1
+#define LORAWAN_DEFAULT_DATARATE                    DR_0
 
 /*!
  * LoRaWAN confirmed messages
@@ -91,9 +50,9 @@ uint32_t count = 0;
  *
  * \remark Please note that when ADR is enabled the end-device should be static
  */
-#define LORAWAN_ADR_ON                              0
+#define LORAWAN_ADR_ON                              1
 
-#if defined( USE_BAND_868 )
+#if defined( REGION_EU868 )
 
 #include "LoRaMacTest.h"
 
@@ -106,15 +65,15 @@ uint32_t count = 0;
 
 #define USE_SEMTECH_DEFAULT_CHANNEL_LINEUP          1
 
-#if( USE_SEMTECH_DEFAULT_CHANNEL_LINEUP == 1 ) 
+#if( USE_SEMTECH_DEFAULT_CHANNEL_LINEUP == 1 )
 
-#define LC4                { 867100000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
-#define LC5                { 867300000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
-#define LC6                { 867500000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
-#define LC7                { 867700000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
-#define LC8                { 867900000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
-#define LC9                { 868800000, { ( ( DR_7 << 4 ) | DR_7 ) }, 2 }
-#define LC10               { 868300000, { ( ( DR_6 << 4 ) | DR_6 ) }, 1 }
+#define LC4                { 867100000, 0, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
+#define LC5                { 867300000, 0, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
+#define LC6                { 867500000, 0, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
+#define LC7                { 867700000, 0, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
+#define LC8                { 867900000, 0, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
+#define LC9                { 868800000, 0, { ( ( DR_7 << 4 ) | DR_7 ) }, 2 }
+#define LC10               { 868300000, 0, { ( ( DR_6 << 4 ) | DR_6 ) }, 1 }
 
 #endif
 
@@ -123,18 +82,22 @@ uint32_t count = 0;
 /*!
  * LoRaWAN application port
  */
-#define LORAWAN_APP_PORT                            1
+#define LORAWAN_APP_PORT                            2
 
 /*!
  * User application data buffer size
  */
-#if defined( USE_BAND_433 ) || defined( USE_BAND_780 ) || defined( USE_BAND_868 )
+#if defined( REGION_CN779 ) || defined( REGION_EU868 ) || defined( REGION_IN865 ) || defined( REGION_KR920 )
 
 #define LORAWAN_APP_DATA_SIZE                       16
 
-#elif defined( USE_BAND_915 ) || defined( USE_BAND_915_HYBRID )
+#elif defined( REGION_AS923 ) || defined( REGION_AU915 ) || defined( REGION_US915 ) || defined( REGION_US915_HYBRID )
 
-#define LORAWAN_APP_DATA_SIZE                       53
+#define LORAWAN_APP_DATA_SIZE                       11
+
+#else
+
+#error "Please define a region in the compiler options."
 
 #endif
 
@@ -167,7 +130,7 @@ static uint8_t AppDataSize = LORAWAN_APP_DATA_SIZE;
 /*!
  * User application data buffer size
  */
-#define LORAWAN_APP_DATA_MAX_SIZE                           64
+#define LORAWAN_APP_DATA_MAX_SIZE                           242
 
 /*!
  * User application data
@@ -212,7 +175,7 @@ static bool NextTx = true;
 /*!
  * Device states
  */
-static enum eDevicState
+static enum eDeviceState
 {
     DEVICE_STATE_INIT,
     DEVICE_STATE_JOIN,
@@ -238,36 +201,14 @@ struct ComplianceTest_s
     uint8_t NbGateways;
 }ComplianceTest;
 
-/*!
-*   Thread for MAC iteration Handling
-*/
-void *MAC_thread_handler(void *arg);
-
-
-uint32_t BoardGetRandomSeed( void )
-{
-    return ( ( *( uint32_t* )ID1 ) ^ ( *( uint32_t* )ID2 ) ^ ( *( uint32_t* )ID3 ) );
-}
-
 void BoardGetUniqueId( uint8_t *id )
 {
-    printf("ID1 %lu ", (unsigned long) ( *( uint32_t* )ID1 ));
-    printf("ID2 %lu ", (unsigned long) ( *( uint32_t* )ID2 ));
-    printf("ID3 %lu \n", (unsigned long) ( *( uint32_t* )ID3 ));
-
-
-    id[7] = ( ( *( uint32_t* )ID1 )+ ( *( uint32_t* )ID3 ) ) >> 24;
-    id[6] = ( ( *( uint32_t* )ID1 )+ ( *( uint32_t* )ID3 ) ) >> 16;
-    id[5] = ( ( *( uint32_t* )ID1 )+ ( *( uint32_t* )ID3 ) ) >> 8;
-    id[4] = ( ( *( uint32_t* )ID1 )+ ( *( uint32_t* )ID3 ) );
-    id[3] = ( ( *( uint32_t* )ID2 ) ) >> 24;
-    id[2] = ( ( *( uint32_t* )ID2 ) ) >> 16;
-    id[1] = ( ( *( uint32_t* )ID2 ) ) >> 8;
-    id[0] = ( ( *( uint32_t* )ID2 ) );
+	/* TODO */
 }
 
 uint8_t BoardGetBatteryLevel ( void ){
-    return 50;
+	/* TODO */
+	return 50;
 }
 
 /*!
@@ -277,58 +218,66 @@ static void PrepareTxFrame( uint8_t port )
 {
     switch( port )
     {
-    case 1:
-        {
-#if defined( USE_BAND_433 ) || defined( USE_BAND_780 ) || defined( USE_BAND_868 )
-            AppData[0] = 'T';
-            AppData[1] = 'E';
-            AppData[2] = 'S';
-            AppData[3] = 'T';
-#elif defined( USE_BAND_915 ) || defined( USE_BAND_915_HYBRID )
-            AppData[0] = '\\';
-            AppData[1] = '!';            
-            AppData[2] = '#';
-            AppData[3] = '3';
-            AppData[4] = '#';
-            AppData[5] = 'T';
-            AppData[6] = '/';
-            AppData[7] = '2';
-            AppData[8] = '2';
-            AppData[9] = '.';
-            AppData[10] = '0';
-            AppData[11] = '0';
-            AppData[12] = '0';
-            AppData[13] = '0';
-            AppData[14] = '0';
-            AppData[15] = '0';
-#endif
-        }
-
     case 2:
         {
-#if defined( USE_BAND_433 ) || defined( USE_BAND_780 ) || defined( USE_BAND_868 )
-            AppData[0] = 'T';
-            AppData[1] = 'E';
-            AppData[2] = 'S';
-            AppData[3] = 'T';
-#elif defined( USE_BAND_915 ) || defined( USE_BAND_915_HYBRID )
-            puts("Appsend");
-            AppData[0] = '\\';
-            AppData[1] = '!';            
-            AppData[2] = '#';
-            AppData[3] = '3';
-            AppData[4] = '#';
-            AppData[5] = 'T';
-            AppData[6] = '/';
-            AppData[7] = '2';
-            AppData[8] = '2';
-            AppData[9] = '.';
-            AppData[10] = '0';
-            AppData[11] = '0';
-            AppData[12] = '0';
-            AppData[13] = '0';
-            AppData[14] = '0';
-            AppData[15] = '0';
+#if defined( REGION_CN779 ) || defined( REGION_EU868 ) || defined( REGION_IN865 ) || defined( REGION_KR920 )
+            uint16_t pressure = 0;
+            int16_t altitudeBar = 0;
+            int16_t temperature = 0;
+            int32_t latitude = 0, longitude = 0;
+            int16_t altitudeGps = 0xFFFF;
+            uint8_t batteryLevel = 0;
+
+			/*
+            pressure = ( uint16_t )( MPL3115ReadPressure( ) / 10 );             // in hPa / 10
+            temperature = ( int16_t )( MPL3115ReadTemperature( ) * 100 );       // in °C * 100
+            altitudeBar = ( int16_t )( MPL3115ReadAltitude( ) * 10 );           // in m * 10
+            batteryLevel = BoardGetBatteryLevel( );                             // 1 (very low) to 254 (fully charged)
+            GpsGetLatestGpsPositionBinary( &latitude, &longitude );
+            altitudeGps = GpsGetLatestGpsAltitude( );                           // in m
+			*/
+
+            AppData[0] = AppLedStateOn;
+            AppData[1] = ( pressure >> 8 ) & 0xFF;
+            AppData[2] = pressure & 0xFF;
+            AppData[3] = ( temperature >> 8 ) & 0xFF;
+            AppData[4] = temperature & 0xFF;
+            AppData[5] = ( altitudeBar >> 8 ) & 0xFF;
+            AppData[6] = altitudeBar & 0xFF;
+            AppData[7] = batteryLevel;
+            AppData[8] = ( latitude >> 16 ) & 0xFF;
+            AppData[9] = ( latitude >> 8 ) & 0xFF;
+            AppData[10] = latitude & 0xFF;
+            AppData[11] = ( longitude >> 16 ) & 0xFF;
+            AppData[12] = ( longitude >> 8 ) & 0xFF;
+            AppData[13] = longitude & 0xFF;
+            AppData[14] = ( altitudeGps >> 8 ) & 0xFF;
+            AppData[15] = altitudeGps & 0xFF;
+#elif defined( REGION_AS923 ) || defined( REGION_AU915 ) || defined( REGION_US915 ) || defined( REGION_US915_HYBRID )
+            int16_t temperature = 0;
+            int32_t latitude, longitude = 0;
+            uint16_t altitudeGps = 0xFFFF;
+            uint8_t batteryLevel = 0;
+
+			/*
+            temperature = ( int16_t )( MPL3115ReadTemperature( ) * 100 );       // in °C * 100
+
+            batteryLevel = BoardGetBatteryLevel( );                             // 1 (very low) to 254 (fully charged)
+            GpsGetLatestGpsPositionBinary( &latitude, &longitude );
+            altitudeGps = GpsGetLatestGpsAltitude( );                           // in m
+			*/
+
+            AppData[0] = AppLedStateOn;
+            AppData[1] = temperature;                                           // Signed degrees celsius in half degree units. So,  +/-63 C
+            AppData[2] = batteryLevel;                                          // Per LoRaWAN spec; 0=Charging; 1...254 = level, 255 = N/A
+            AppData[3] = ( latitude >> 16 ) & 0xFF;
+            AppData[4] = ( latitude >> 8 ) & 0xFF;
+            AppData[5] = latitude & 0xFF;
+            AppData[6] = ( longitude >> 16 ) & 0xFF;
+            AppData[7] = ( longitude >> 8 ) & 0xFF;
+            AppData[8] = longitude & 0xFF;
+            AppData[9] = ( altitudeGps >> 8 ) & 0xFF;
+            AppData[10] = altitudeGps & 0xFF;
 #endif
         }
         break;
@@ -371,7 +320,7 @@ static bool SendFrame( void )
 {
     McpsReq_t mcpsReq;
     LoRaMacTxInfo_t txInfo;
-    
+
     if( LoRaMacQueryTxPossible( AppDataSize, &txInfo ) != LORAMAC_STATUS_OK )
     {
         // Send empty frame in order to flush MAC commands
@@ -400,6 +349,7 @@ static bool SendFrame( void )
             mcpsReq.Req.Confirmed.Datarate = LORAWAN_DEFAULT_DATARATE;
         }
     }
+
     if( LoRaMacMcpsRequest( &mcpsReq ) == LORAMAC_STATUS_OK )
     {
         return false;
@@ -412,7 +362,6 @@ static bool SendFrame( void )
  */
 static void OnTxNextPacketTimerEvent( void )
 {
-    puts("Next Event");
     MibRequestConfirm_t mibReq;
     LoRaMacStatus_t status;
 
@@ -441,8 +390,8 @@ static void OnTxNextPacketTimerEvent( void )
 static void OnLed1TimerEvent( void )
 {
     TimerStop( &Led1Timer );
-    LED0_TOGGLE;
     // Switch LED 1 OFF
+    //GpioWrite( &Led1, 1 );
 }
 
 /*!
@@ -452,6 +401,7 @@ static void OnLed2TimerEvent( void )
 {
     TimerStop( &Led2Timer );
     // Switch LED 2 OFF
+    //GpioWrite( &Led2, 1 );
 }
 
 /*!
@@ -489,6 +439,7 @@ static void McpsConfirm( McpsConfirm_t *mcpsConfirm )
         }
 
         // Switch LED 1 ON
+        //GpioWrite( &Led1, 0 );
         TimerStart( &Led1Timer );
     }
     NextTx = true;
@@ -548,18 +499,12 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
     {
         switch( mcpsIndication->Port )
         {
-        case 1:
-            if( mcpsIndication->BufferSize == 1 )
-            {
-                AppLedStateOn = mcpsIndication->Buffer[0] & 0x01;
-                gpio_write( LED0_PIN, ( ( AppLedStateOn & 0x01 ) != 0 ) ? 0 : 1 );
-            }
-            break;
+        case 1: // The application LED can be controlled on port 1 or 2
         case 2:
             if( mcpsIndication->BufferSize == 1 )
             {
                 AppLedStateOn = mcpsIndication->Buffer[0] & 0x01;
-                gpio_write( LED0_PIN, ( ( AppLedStateOn & 0x01 ) != 0 ) ? 0 : 1 );
+                //GpioWrite( &Led3, ( ( AppLedStateOn & 0x01 ) != 0 ) ? 0 : 1 );
             }
             break;
         case 224:
@@ -581,15 +526,16 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                     ComplianceTest.NbGateways = 0;
                     ComplianceTest.Running = true;
                     ComplianceTest.State = 1;
-                    
+
                     MibRequestConfirm_t mibReq;
                     mibReq.Type = MIB_ADR;
                     mibReq.Param.AdrEnable = true;
                     LoRaMacMibSetRequestConfirm( &mibReq );
 
-#if defined( USE_BAND_868 )
+#if defined( REGION_EU868 )
                     LoRaMacTestSetDutyCycleOn( false );
 #endif
+                    //GpsStop( );
                 }
             }
             else
@@ -603,14 +549,15 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                     AppDataSize = LORAWAN_APP_DATA_SIZE;
                     ComplianceTest.DownLinkCounter = 0;
                     ComplianceTest.Running = false;
-                    
+
                     MibRequestConfirm_t mibReq;
                     mibReq.Type = MIB_ADR;
                     mibReq.Param.AdrEnable = LORAWAN_ADR_ON;
                     LoRaMacMibSetRequestConfirm( &mibReq );
-#if defined( USE_BAND_868 )
+#if defined( REGION_EU868 )
                     LoRaMacTestSetDutyCycleOn( LORAWAN_DUTYCYCLE_ON );
 #endif
+                    //GpsStart( );
                     break;
                 case 1: // (iii, iv)
                     AppDataSize = 2;
@@ -627,7 +574,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                     AppDataSize = mcpsIndication->BufferSize;
 
                     AppData[0] = 4;
-                    for( uint8_t i = 1; i < AppDataSize; i++ )
+                    for( uint8_t i = 1; i < MIN( AppDataSize, LORAWAN_APP_DATA_MAX_SIZE ); i++ )
                     {
                         AppData[i] = mcpsIndication->Buffer[i] + 1;
                     }
@@ -643,14 +590,52 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                     {
                         MlmeReq_t mlmeReq;
 
+                        // Disable TestMode and revert back to normal operation
+                        IsTxConfirmed = LORAWAN_CONFIRMED_MSG_ON;
+                        AppPort = LORAWAN_APP_PORT;
+                        AppDataSize = LORAWAN_APP_DATA_SIZE;
+                        ComplianceTest.DownLinkCounter = 0;
+                        ComplianceTest.Running = false;
+
+                        MibRequestConfirm_t mibReq;
+                        mibReq.Type = MIB_ADR;
+                        mibReq.Param.AdrEnable = LORAWAN_ADR_ON;
+                        LoRaMacMibSetRequestConfirm( &mibReq );
+#if defined( REGION_EU868 )
+                        LoRaMacTestSetDutyCycleOn( LORAWAN_DUTYCYCLE_ON );
+#endif
+                        //GpsStart( );
+
                         mlmeReq.Type = MLME_JOIN;
 
                         mlmeReq.Req.Join.DevEui = DevEui;
                         mlmeReq.Req.Join.AppEui = AppEui;
                         mlmeReq.Req.Join.AppKey = AppKey;
+                        mlmeReq.Req.Join.NbTrials = 3;
 
                         LoRaMacMlmeRequest( &mlmeReq );
                         DeviceState = DEVICE_STATE_SLEEP;
+                    }
+                    break;
+                case 7: // (x)
+                    {
+                        if( mcpsIndication->BufferSize == 3 )
+                        {
+                            MlmeReq_t mlmeReq;
+                            mlmeReq.Type = MLME_TXCW;
+                            mlmeReq.Req.TxCw.Timeout = ( uint16_t )( ( mcpsIndication->Buffer[1] << 8 ) | mcpsIndication->Buffer[2] );
+                            LoRaMacMlmeRequest( &mlmeReq );
+                        }
+                        else if( mcpsIndication->BufferSize == 7 )
+                        {
+                            MlmeReq_t mlmeReq;
+                            mlmeReq.Type = MLME_TXCW_1;
+                            mlmeReq.Req.TxCw.Timeout = ( uint16_t )( ( mcpsIndication->Buffer[1] << 8 ) | mcpsIndication->Buffer[2] );
+                            mlmeReq.Req.TxCw.Frequency = ( uint32_t )( ( mcpsIndication->Buffer[3] << 16 ) | ( mcpsIndication->Buffer[4] << 8 ) | mcpsIndication->Buffer[5] ) * 100;
+                            mlmeReq.Req.TxCw.Power = mcpsIndication->Buffer[6];
+                            LoRaMacMlmeRequest( &mlmeReq );
+                        }
+                        ComplianceTest.State = 1;
                     }
                     break;
                 default:
@@ -664,6 +649,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
     }
 
     // Switch LED 2 ON for each received downlink
+    //GpioWrite( &Led2, 0 );
     TimerStart( &Led2Timer );
 }
 
@@ -675,18 +661,25 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
  */
 static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
 {
-    if( mlmeConfirm->Status == LORAMAC_EVENT_INFO_STATUS_OK )
+    switch( mlmeConfirm->MlmeRequest )
     {
-        switch( mlmeConfirm->MlmeRequest )
+        case MLME_JOIN:
         {
-            case MLME_JOIN:
+            if( mlmeConfirm->Status == LORAMAC_EVENT_INFO_STATUS_OK )
             {
                 // Status is OK, node has joined the network
                 DeviceState = DEVICE_STATE_SEND;
-                NextTx = true;
-                break;
             }
-            case MLME_LINK_CHECK:
+            else
+            {
+                // Join was not successful. Try to join again
+                DeviceState = DEVICE_STATE_JOIN;
+            }
+            break;
+        }
+        case MLME_LINK_CHECK:
+        {
+            if( mlmeConfirm->Status == LORAMAC_EVENT_INFO_STATUS_OK )
             {
                 // Check DemodMargin
                 // Check NbGateways
@@ -696,15 +689,15 @@ static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
                     ComplianceTest.DemodMargin = mlmeConfirm->DemodMargin;
                     ComplianceTest.NbGateways = mlmeConfirm->NbGateways;
                 }
-                break;
             }
-            default:
-                break;
+            break;
         }
+        default:
+            break;
     }
     NextTx = true;
 }
-
+long count = 0;
 void event_handler_thread(void *arg, uint8_t event_type)
 {
     sx127x_rx_packet_t *packet = (sx127x_rx_packet_t *) &sx127x._internal.last_packet;
@@ -751,16 +744,22 @@ void event_handler_thread(void *arg, uint8_t event_type)
             break;
     }
 }
-
-int main(void)
+/**
+ * Main application entry point.
+ */
+int main( void )
 {
+    LoRaMacPrimitives_t LoRaMacPrimitives;
+    LoRaMacCallback_t LoRaMacCallbacks;
+    MibRequestConfirm_t mibReq;
+
     radio_set_ptr(&sx127x);
     xtimer_init();
     sx127x.sx127x_event_cb = event_handler_thread;
 
     DeviceState = DEVICE_STATE_INIT;
 
-while(1)
+    while( 1 )
     {
         switch( DeviceState )
         {
@@ -770,8 +769,25 @@ while(1)
                 LoRaMacPrimitives.MacMcpsIndication = McpsIndication;
                 LoRaMacPrimitives.MacMlmeConfirm = MlmeConfirm;
                 LoRaMacCallbacks.GetBatteryLevel = BoardGetBatteryLevel;
-                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks );
-
+#if defined( REGION_AS923 )
+                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks, LORAMAC_REGION_AS923 );
+#elif defined( REGION_AU915 )
+                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks, LORAMAC_REGION_AU915 );
+#elif defined( REGION_CN779 )
+                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks, LORAMAC_REGION_CN779 );
+#elif defined( REGION_EU868 )
+                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks, LORAMAC_REGION_EU868 );
+#elif defined( REGION_IN865 )
+                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks, LORAMAC_REGION_IN865 );
+#elif defined( REGION_KR920 )
+                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks, LORAMAC_REGION_KR920 );
+#elif defined( REGION_US915 )
+                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks, LORAMAC_REGION_US915 );
+#elif defined( REGION_US915_HYBRID )
+                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks, LORAMAC_REGION_US915_HYBRID );
+#else
+    #error "Please define a region in the compiler options."
+#endif
                 TimerInit( &TxNextPacketTimer, OnTxNextPacketTimerEvent );
 
                 TimerInit( &Led1Timer, OnLed1TimerEvent );
@@ -788,55 +804,58 @@ while(1)
                 mibReq.Param.EnablePublicNetwork = LORAWAN_PUBLIC_NETWORK;
                 LoRaMacMibSetRequestConfirm( &mibReq );
 
-#if defined( USE_BAND_868 )
+#if defined( REGION_EU868 )
                 LoRaMacTestSetDutyCycleOn( LORAWAN_DUTYCYCLE_ON );
 
-#if( USE_SEMTECH_DEFAULT_CHANNEL_LINEUP == 1 ) 
-               LoRaMacChannelAdd( 3, ( ChannelParams_t )LC4 );
-               LoRaMacChannelAdd( 4, ( ChannelParams_t )LC5 );
-               LoRaMacChannelAdd( 5, ( ChannelParams_t )LC6 );
-               LoRaMacChannelAdd( 6, ( ChannelParams_t )LC7 );
-               LoRaMacChannelAdd( 7, ( ChannelParams_t )LC8 );
-               LoRaMacChannelAdd( 8, ( ChannelParams_t )LC9 );
-               LoRaMacChannelAdd( 9, ( ChannelParams_t )LC10 );
+#if( USE_SEMTECH_DEFAULT_CHANNEL_LINEUP == 1 )
+                LoRaMacChannelAdd( 3, ( ChannelParams_t )LC4 );
+                LoRaMacChannelAdd( 4, ( ChannelParams_t )LC5 );
+                LoRaMacChannelAdd( 5, ( ChannelParams_t )LC6 );
+                LoRaMacChannelAdd( 6, ( ChannelParams_t )LC7 );
+                LoRaMacChannelAdd( 7, ( ChannelParams_t )LC8 );
+                LoRaMacChannelAdd( 8, ( ChannelParams_t )LC9 );
+                LoRaMacChannelAdd( 9, ( ChannelParams_t )LC10 );
+
+                mibReq.Type = MIB_RX2_DEFAULT_CHANNEL;
+                mibReq.Param.Rx2DefaultChannel = ( Rx2ChannelParams_t ){ 869525000, DR_3 };
+                LoRaMacMibSetRequestConfirm( &mibReq );
+
+                mibReq.Type = MIB_RX2_CHANNEL;
+                mibReq.Param.Rx2Channel = ( Rx2ChannelParams_t ){ 869525000, DR_3 };
+                LoRaMacMibSetRequestConfirm( &mibReq );
 #endif
 
 #endif
                 DeviceState = DEVICE_STATE_JOIN;
-                puts("INIT");
                 break;
             }
             case DEVICE_STATE_JOIN:
             {
 #if( OVER_THE_AIR_ACTIVATION != 0 )
-                puts("OA");
                 MlmeReq_t mlmeReq;
-                // Initialize LoRaMac device unique ID
 
-                #ifdef NZ32_SC151
+                // Initialize LoRaMac device unique ID
                 BoardGetUniqueId( DevEui );
-                #endif
 
                 mlmeReq.Type = MLME_JOIN;
 
                 mlmeReq.Req.Join.DevEui = DevEui;
                 mlmeReq.Req.Join.AppEui = AppEui;
                 mlmeReq.Req.Join.AppKey = AppKey;
+                mlmeReq.Req.Join.NbTrials = 3;
 
                 if( NextTx == true )
                 {
                     LoRaMacMlmeRequest( &mlmeReq );
                 }
                 DeviceState = DEVICE_STATE_SLEEP;
-
 #else
-                puts("ACP");
-                // Choose a random device address if not already defined in Comissioning.h
+                // Choose a random device address if not already defined in Commissioning.h
                 if( DevAddr == 0 )
                 {
                     // Random seed initialization
                     srand1( BoardGetRandomSeed( ) );
-                    //srand1( 4);
+
                     // Choose a random device address
                     DevAddr = randr( 0, 0x01FFFFFF );
                 }
@@ -862,9 +881,6 @@ while(1)
                 LoRaMacMibSetRequestConfirm( &mibReq );
 
                 DeviceState = DEVICE_STATE_SEND;
-
-                if(mibReq.Param.IsNetworkJoined)
-                    puts("JOINED");
 #endif
                 break;
             }
@@ -873,12 +889,13 @@ while(1)
                 if( NextTx == true )
                 {
                     PrepareTxFrame( AppPort );
+
                     NextTx = SendFrame( );
                 }
                 if( ComplianceTest.Running == true )
                 {
                     // Schedule next packet transmission
-                    TxDutyCycleTime = APP_TX_DUTYCYCLE; // 5000 ms
+                    TxDutyCycleTime = 5000; // 5000 ms
                 }
                 else
                 {
@@ -910,8 +927,4 @@ while(1)
             }
         }
     }
-
-    return 0;
 }
-
-
