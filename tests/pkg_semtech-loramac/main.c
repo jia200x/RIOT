@@ -14,8 +14,8 @@ Maintainer: Miguel Luis and Gregory Cristian
 
 #include <string.h>
 #include <math.h>
-#include "sx127x.h"
-#include "sx127x_params.h"
+
+#include "msg.h"
 
 #include "loramac/params.h"
 #include "loramac/board.h"
@@ -23,12 +23,28 @@ Maintainer: Miguel Luis and Gregory Cristian
 #include "LoRaMac.h"
 #include "region/Region.h"
 
+#include "net/netdev.h"
 #include "net/loramac.h"
+
+#include "sx127x.h"
+#include "sx127x_params.h"
+#include "sx127x_netdev.h"
 
 #define ENABLE_DEBUG (1)
 #include "debug.h"
 
+#define LORAMAC_MSG_QUEUE       (16U)
+#define LORAMAC_STACKSIZE       (THREAD_STACKSIZE_DEFAULT)
+
+#define MSG_TYPE_ISR            (0x3456)
+
+static char message[250];
+
+static char stack[LORAMAC_STACKSIZE];
+static kernel_pid_t _loop_pid;
+
 static sx127x_t sx127x;
+static netdev_t *netdev;
 
 /*!
  * Defines the application data transmission duty cycle. 5s, value in [ms].
@@ -93,6 +109,8 @@ static sx127x_t sx127x;
 #define LORAWAN_PUBLIC_NETWORK                      true
 
 #define LORAWAN_NETWORK_ID                          1
+
+#define LORAMAC_USE_OTAA   (LORAMAC_DEFAULT_JOIN_PROCEDURE != LORAMAC_JOIN_OTAA)
 
 /*!
  * User application data buffer size
@@ -170,12 +188,12 @@ static bool AppLedStateOn = false;
 /*!
  * Timer to handle the state of LED1
  */
-static TimerEvent_t Led1Timer;
+// static TimerEvent_t Led1Timer;
 
 /*!
  * Timer to handle the state of LED2
  */
-static TimerEvent_t Led2Timer;
+// static TimerEvent_t Led2Timer;
 
 /*!
  * Indicates if a new packet can be sent
@@ -372,7 +390,7 @@ static bool SendFrame( void )
  */
 static void OnTxNextPacketTimerEvent( void )
 {
-    DEBUG("[semtech-loramac] test: TX next packet timer event\n");
+    // DEBUG("[semtech-loramac] test: TX next packet timer event\n");
     MibRequestConfirm_t mibReq;
     LoRaMacStatus_t status;
 
@@ -385,11 +403,13 @@ static void OnTxNextPacketTimerEvent( void )
     {
         if( mibReq.Param.IsNetworkJoined == true )
         {
+            // DEBUG("[semtech-loramac] test: TX next packet: joined\n");
             DeviceState = DEVICE_STATE_SEND;
             NextTx = true;
         }
         else
         {
+            // DEBUG("[semtech-loramac] test: TX next packet: not joined\n");
             DeviceState = DEVICE_STATE_JOIN;
         }
     }
@@ -398,22 +418,22 @@ static void OnTxNextPacketTimerEvent( void )
 /*!
  * \brief Function executed on Led 1 Timeout event
  */
-static void OnLed1TimerEvent( void )
-{
-    TimerStop( &Led1Timer );
-    // Switch LED 1 OFF
-    //GpioWrite( &Led1, 1 );
-}
+// static void OnLed1TimerEvent( void )
+// {
+//     TimerStop( &Led1Timer );
+//     // Switch LED 1 OFF
+//     //GpioWrite( &Led1, 1 );
+// }
 
 /*!
  * \brief Function executed on Led 2 Timeout event
  */
-static void OnLed2TimerEvent( void )
-{
-    TimerStop( &Led2Timer );
-    // Switch LED 2 OFF
-    //GpioWrite( &Led2, 1 );
-}
+// static void OnLed2TimerEvent( void )
+// {
+//     // TimerStop( &Led2Timer );
+//     // Switch LED 2 OFF
+//     //GpioWrite( &Led2, 1 );
+// }
 
 /*!
  * \brief   MCPS-Confirm event function
@@ -451,7 +471,7 @@ static void McpsConfirm( McpsConfirm_t *mcpsConfirm )
 
         // Switch LED 1 ON
         //GpioWrite( &Led1, 0 );
-        TimerStart( &Led1Timer );
+        // TimerStart( &Led1Timer );
     }
     NextTx = true;
 }
@@ -661,7 +681,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
 
     // Switch LED 2 ON for each received downlink
     //GpioWrite( &Led2, 0 );
-    TimerStart( &Led2Timer );
+    // TimerStart( &Led2Timer );
 }
 
 /*!
@@ -708,53 +728,94 @@ static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
     }
     NextTx = true;
 }
-long count = 0;
-void event_handler_thread(void *arg, uint8_t event_type)
+
+static void _event_cb(netdev_t *dev, netdev_event_t event)
 {
+    size_t len;
+    netdev_sx127x_lora_packet_info_t packet_info;
     sx127x_rx_packet_t *packet = (sx127x_rx_packet_t *) &sx127x._internal.last_packet;
     RadioEvents_t *events = radio_get_event_ptr();
-    switch (event_type) {
 
-        case SX127X_TX_DONE:
-            //puts("sx1276: TX done");
-            printf("TX done, COUNT : %lu \r\n",count);
-            count++;
-            events->TxDone();
+    switch (event) {
+        case NETDEV_EVENT_ISR:
+        {
+            msg_t msg;
+
+            msg.type = MSG_TYPE_ISR;
+            msg.content.ptr = dev;
+
+            if (msg_send(&msg, _loop_pid) <= 0) {
+                puts("gnrc_netdev: possibly lost interrupt.");
+            }
+        }
             break;
 
-        case SX127X_TX_TIMEOUT:
-            puts("sx127x: TX timeout");
+        case NETDEV_EVENT_TX_COMPLETE:
+            events->TxDone();
+            puts("Transmission completed");
+            break;
+
+        case NETDEV_EVENT_TX_TIMEOUT:
+            DEBUG("[semtech-loramac] test: TX timeout\n");
             events->TxTimeout();
             break;
 
-        case SX127X_RX_DONE:
-            puts("sx127x: RX Done");
+        case NETDEV_EVENT_RX_COMPLETE:
             events->RxDone(packet->content, packet->size,
                            packet->rssi_value, packet->snr_value);
+            len = dev->driver->recv(dev, NULL, 0, 0);
+            dev->driver->recv(dev, message, len, &packet_info);
+            printf("{Payload: \"%s\" (%d bytes), RSSI: %i, SNR: %i, TOA: %i}\n",
+                   message, (int)len,
+                   packet_info.rssi, (int)packet_info.snr,
+                   (int)packet_info.time_on_air);
             break;
 
-        case SX127X_RX_TIMEOUT:
-            puts("sx127x: RX timeout");
+        case NETDEV_EVENT_RX_TIMEOUT:
+            DEBUG("[semtech-loramac] test: RX timeout\n");
             events->RxTimeout();
             break;
 
-        case SX127X_RX_ERROR_CRC:
-            puts("sx127x: RX CRC_ERROR");
+        case NETDEV_EVENT_CRC_ERROR:
+            DEBUG("[semtech-loramac] test: RX CRC error\n");
             events->RxError();
             break;
 
-        case SX127X_FHSS_CHANGE_CHANNEL:
+        case NETDEV_EVENT_FHSS_CHANGE_CHANNEL:
+            DEBUG("[semtech-loramac] test: FHSS channel change\n");
             events->FhssChangeChannel(sx127x._internal.last_channel);
             break;
 
-        case SX127X_CAD_DONE:
+        case NETDEV_EVENT_CAD_DONE:
+            DEBUG("[semtech-loramac] test: CAD done\n");
             events->CadDone(sx127x._internal.is_last_cad_success);
             break;
 
         default:
+            DEBUG("[semtech-loramac] test: unexpected netdev event "
+                  "received: %d\n", event);
             break;
     }
 }
+
+void *_event_loop(void *arg)
+{
+    static msg_t _msg_q[LORAMAC_MSG_QUEUE];
+    msg_init_queue(_msg_q, LORAMAC_MSG_QUEUE);
+
+    while (1) {
+        msg_t msg;
+        msg_receive(&msg);
+        if (msg.type == MSG_TYPE_ISR) {
+            netdev_t *dev = msg.content.ptr;
+            dev->driver->isr(dev);
+        }
+        else {
+            puts("Unexpected msg type");
+        }
+    }
+}
+
 /**
  * Main application entry point.
  */
@@ -765,9 +826,22 @@ int main( void )
     MibRequestConfirm_t mibReq;
 
     sx127x_setup(&sx127x, &sx127x_params[0]);
+    netdev = (netdev_t*) &sx127x;
+    netdev->driver = &sx127x_driver;
+    netdev->driver->init(netdev);
+    netdev->event_callback = _event_cb;
+
+    _loop_pid = thread_create(stack, sizeof(stack), THREAD_PRIORITY_MAIN - 1,
+                              THREAD_CREATE_STACKTEST, _event_loop, NULL,
+                              "recv_thread");
+
+    if (_loop_pid <= KERNEL_PID_UNDEF) {
+        puts("Creation of receiver thread failed");
+        return -1;
+    }
+
     radio_set_ptr(&sx127x);
     xtimer_init();
-    sx127x.sx127x_event_cb = event_handler_thread;
 
     DeviceState = DEVICE_STATE_INIT;
 
@@ -803,11 +877,11 @@ int main( void )
 #endif
                 TimerInit( &TxNextPacketTimer, OnTxNextPacketTimerEvent );
 
-                TimerInit( &Led1Timer, OnLed1TimerEvent );
-                TimerSetValue( &Led1Timer, 25 );
+                // TimerInit( &Led1Timer, OnLed1TimerEvent );
+                // TimerSetValue( &Led1Timer, 25 );
 
-                TimerInit( &Led2Timer, OnLed2TimerEvent );
-                TimerSetValue( &Led2Timer, 25 );
+                // TimerInit( &Led2Timer, OnLed2TimerEvent );
+                // TimerSetValue( &Led2Timer, 25 );
 
                 mibReq.Type = MIB_ADR;
                 mibReq.Param.AdrEnable = LORAWAN_ADR_ON;
@@ -844,7 +918,7 @@ int main( void )
             }
             case DEVICE_STATE_JOIN:
             {
-#if (LORAMAC_DEFAULT_JOIN_PROCEDURE == LORAMAC_JOIN_OTAA)
+#if (LORAMAC_USE_OTAA)
                 (void) NwkSKey;
                 (void) AppSKey;
                 (void) DevAddr;
@@ -925,17 +999,13 @@ int main( void )
                 break;
             }
             case DEVICE_STATE_SLEEP:
-            {
-                // DEBUG("[semtech-loramac] test: going to sleep\n");
-                // Wake up through events
-                // TimerLowPowerHandler( );
+                /* Wake up through events */
                 break;
-            }
+
             default:
-            {
                 DeviceState = DEVICE_STATE_INIT;
                 break;
-            }
         }
+        xtimer_usleep(1);
     }
 }
