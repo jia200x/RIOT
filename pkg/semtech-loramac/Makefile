@@ -6,6 +6,6 @@ PKG_BUILDDIR ?= $(BINDIRBASE)/pkg/$(BOARD)/$(PKG_NAME)
 .PHONY: all
 
 all: git-download
-	$(MAKE) -C $(PKG_BUILDDIR)
+	"$(MAKE)" -C $(PKG_BUILDDIR)
 
 include $(RIOTBASE)/pkg/pkg.mk
