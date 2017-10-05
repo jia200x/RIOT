@@ -37,6 +37,8 @@ Maintainer: Miguel Luis and Gregory Cristian
 #define LORAMAC_STACKSIZE       (THREAD_STACKSIZE_DEFAULT)
 
 #define MSG_TYPE_ISR            (0x3456)
+#define MSG_TYPE_RX_TIMEOUT            (0x3457)
+#define MSG_TYPE_TX_TIMEOUT            (0x3458)
 
 static char message[250];
 
@@ -110,7 +112,7 @@ static netdev_t *netdev;
 
 #define LORAWAN_NETWORK_ID                          1
 
-#define LORAMAC_USE_OTAA   (LORAMAC_DEFAULT_JOIN_PROCEDURE != LORAMAC_JOIN_OTAA)
+#define LORAMAC_USE_OTAA   (LORAMAC_DEFAULT_JOIN_PROCEDURE == LORAMAC_JOIN_OTAA)
 
 /*!
  * User application data buffer size
@@ -735,14 +737,13 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
     netdev_sx127x_lora_packet_info_t packet_info;
     sx127x_rx_packet_t *packet = (sx127x_rx_packet_t *) &sx127x._internal.last_packet;
     RadioEvents_t *events = radio_get_event_ptr();
+	msg_t msg;
+	msg.content.ptr = dev;
 
     switch (event) {
         case NETDEV_EVENT_ISR:
         {
-            msg_t msg;
-
             msg.type = MSG_TYPE_ISR;
-            msg.content.ptr = dev;
 
             if (msg_send(&msg, _loop_pid) <= 0) {
                 puts("gnrc_netdev: possibly lost interrupt.");
@@ -756,10 +757,14 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
             break;
 
         case NETDEV_EVENT_TX_TIMEOUT:
-            DEBUG("[semtech-loramac] test: TX timeout\n");
-            events->TxTimeout();
-            break;
+		{
+			msg.type = MSG_TYPE_TX_TIMEOUT;
 
+			if (msg_send(&msg, _loop_pid) <= 0) {
+				puts("gnrc_netdev: possibly lost interrupt.");
+			}
+			break;
+		}
         case NETDEV_EVENT_RX_COMPLETE:
             events->RxDone(packet->content, packet->size,
                            packet->rssi_value, packet->snr_value);
@@ -772,9 +777,14 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
             break;
 
         case NETDEV_EVENT_RX_TIMEOUT:
-            DEBUG("[semtech-loramac] test: RX timeout\n");
-            events->RxTimeout();
-            break;
+		{
+			msg.type = MSG_TYPE_RX_TIMEOUT;
+
+			if (msg_send(&msg, _loop_pid) <= 0) {
+				puts("gnrc_netdev: possibly lost interrupt.");
+			}
+			break;
+		}
 
         case NETDEV_EVENT_CRC_ERROR:
             DEBUG("[semtech-loramac] test: RX CRC error\n");
@@ -802,14 +812,24 @@ void *_event_loop(void *arg)
 {
     static msg_t _msg_q[LORAMAC_MSG_QUEUE];
     msg_init_queue(_msg_q, LORAMAC_MSG_QUEUE);
+    RadioEvents_t *events;
 
     while (1) {
         msg_t msg;
         msg_receive(&msg);
+		events = radio_get_event_ptr();
         if (msg.type == MSG_TYPE_ISR) {
             netdev_t *dev = msg.content.ptr;
             dev->driver->isr(dev);
         }
+		else if (msg.type == MSG_TYPE_RX_TIMEOUT) {
+            DEBUG("[semtech-loramac] test: RX timeout\n");
+            events->RxTimeout();
+		}
+		else if (msg.type == MSG_TYPE_TX_TIMEOUT) {
+            DEBUG("[semtech-loramac] test: TX timeout\n");
+            events->TxTimeout();
+		}
         else {
             puts("Unexpected msg type");
         }
@@ -831,6 +851,12 @@ int main( void )
     //netdev->driver->init(netdev);
     netdev->event_callback = _event_cb;
 
+
+    radio_set_ptr(&sx127x);
+    xtimer_init();
+
+    DeviceState = DEVICE_STATE_INIT;
+
     _loop_pid = thread_create(stack, sizeof(stack), THREAD_PRIORITY_MAIN - 1,
                               THREAD_CREATE_STACKTEST, _event_loop, NULL,
                               "recv_thread");
@@ -839,12 +865,6 @@ int main( void )
         puts("Creation of receiver thread failed");
         return -1;
     }
-
-    radio_set_ptr(&sx127x);
-    xtimer_init();
-
-    DeviceState = DEVICE_STATE_INIT;
-
     while( 1 )
     {
         switch( DeviceState )
