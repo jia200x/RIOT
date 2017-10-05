@@ -44,26 +44,20 @@
 /**
  * @brief   Default device address
  */
-#define LORAMAC_DEV_ADDR_DEFAULT                    (uint32_t)0x166fb58e
+#define LORAMAC_DEV_ADDR_DEFAULT                    (uint32_t)0x2601174B
 
 /**
  * @brief   Default network session key
  *
  *          16 bytes key, only required for ABP join procedure type.
  */
-#define LORAMAC_NET_SKEY_DEFAULT                    { 0x00, 0x00, 0x00, 0x00, \
-                                                      0x00, 0x00, 0x00, 0x00, \
-                                                      0x00, 0x00, 0x00, 0x00, \
-                                                      0x00, 0x00, 0x00, 0x00 }
+#define LORAMAC_NET_SKEY_DEFAULT                    { 0x7F, 0x20, 0x50, 0x32, 0x38, 0x0A, 0xD0, 0x54, 0x8F, 0x09, 0x8F, 0x96, 0x4C, 0x78, 0x8A, 0x1E }
 
 /**
  * @brief   Default application session key
  *
  *          16 bytes key, only required for ABP join procedure type
  */
-#define LORAMAC_APP_SKEY_DEFAULT                    { 0x00, 0x00, 0x00, 0x00, \
-                                                      0x00, 0x00, 0x00, 0x00, \
-                                                      0x00, 0x00, 0x00, 0x00, \
-                                                      0x00, 0x00, 0x00, 0x00 }
+#define LORAMAC_APP_SKEY_DEFAULT                    { 0xA3, 0xBF, 0xEC, 0xC8, 0xD6, 0x99, 0xCC, 0x79, 0x8A, 0x0D, 0xE4, 0x04, 0xA1, 0xE6, 0xAF, 0x73 }
 
 #endif /* LORAMAC_PARAMS_H */
