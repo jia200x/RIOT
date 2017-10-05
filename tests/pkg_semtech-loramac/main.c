@@ -828,7 +828,7 @@ int main( void )
     sx127x_setup(&sx127x, &sx127x_params[0]);
     netdev = (netdev_t*) &sx127x;
     netdev->driver = &sx127x_driver;
-    netdev->driver->init(netdev);
+    //netdev->driver->init(netdev);
     netdev->event_callback = _event_cb;
 
     _loop_pid = thread_create(stack, sizeof(stack), THREAD_PRIORITY_MAIN - 1,
