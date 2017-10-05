@@ -102,7 +102,7 @@ void SX1276SetTxConfig(RadioModems_t modem, int8_t power, uint32_t fdev,
                        uint8_t hopPeriod, bool iqInverted, uint32_t timeout)
 {
     (void) fdev;
-    sx127x_set_modem(dev_ptr, modem);
+   // sx127x_set_modem(dev_ptr, modem);
     sx127x_set_freq_hop(dev_ptr, freqHopOn);
     sx127x_set_bandwidth(dev_ptr, bandwidth);
     sx127x_set_coding_rate(dev_ptr, coding_rate);
