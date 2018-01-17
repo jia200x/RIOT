@@ -16,6 +16,7 @@
  *
  * @author          José Ignacio Alamos <jialamos@uc.cl>
  * @author          Alexandre Abadie <alexandre.abadie@inria.fr>
+ * @author          Francisco Molina <francisco.molina@inria.cl>
  */
 
 #ifndef SEMTECH_LORAMAC_TIMER_H

@@ -15,6 +15,7 @@
  *
  * @author      Jose Ignacio Alamos <jialamos@uc.cl>
  * @author      Alexandre Abadie <alexandre.abadie@inria.fr>
+ * @author      Francisco Molina <francisco.molina@inria.cl>
  * @}
  */
 
