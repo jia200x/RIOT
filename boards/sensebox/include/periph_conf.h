@@ -131,6 +131,28 @@ static const uart_conf_t uart_config[] = {
 #define UART_NUMOF          (sizeof(uart_config) / sizeof(uart_config[0]))
 /** @} */
 
+/**
+ * @name    SPI configuration
+ * @{
+ */
+static const spi_conf_t spi_config[] = {
+    {
+        .dev      = &SERCOM1->SPI,
+        .miso_pin = GPIO_PIN(PA, 19),
+        .mosi_pin = GPIO_PIN(PA, 16),
+        .clk_pin  = GPIO_PIN(PA, 17),
+        .miso_mux = GPIO_MUX_C,
+        .mosi_mux = GPIO_MUX_C,
+        .clk_mux  = GPIO_MUX_C,
+        .miso_pad = SPI_PAD_MISO_3,
+        .mosi_pad = SPI_PAD_MOSI_0_SCK_1
+    }
+};
+
+#define SPI_NUMOF           (sizeof(spi_config) / sizeof(spi_config[0]))
+
+/** @} */
+
 #if 0
 /**
  * @name    PWM configuration
@@ -166,6 +188,8 @@ static const pwm_conf_t pwm_config[] = {
 /* number of devices that are actually defined */
 #define PWM_NUMOF           (0U)
 /** @} */
+#endif
+#if 0
 
 /**
  * @name    ADC configuration
