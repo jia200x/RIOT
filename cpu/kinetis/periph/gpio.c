@@ -31,6 +31,12 @@
 #include "bit.h"
 #include "periph/gpio.h"
 
+/* Single-port MCU*/
+#if !defined(PORTA_BASE) && defined(PORT_BASE)
+#  define PORTA_BASE PORT_BASE
+#  define PORTA PORT
+#endif
+
 #ifndef PORT_PCR_ODE_MASK
 /* For compatibility with Kinetis CPUs without open drain GPIOs (e.g. KW41Z) */
 #define PORT_PCR_ODE_MASK 0
@@ -91,6 +97,7 @@
  */
 #define CTX_NUMOF           (8U)
 
+#ifdef KINETIS_HAVE_PCR
 /**
  * @brief   Interrupt context data
  */
@@ -114,6 +121,7 @@ static isr_ctx_t isr_ctx[CTX_NUMOF];
 static uint32_t isr_map[ISR_MAP_SIZE];
 
 static const uint8_t port_irqs[] = PORT_IRQS;
+#endif
 
 static inline PORT_Type *port(gpio_t pin)
 {
@@ -137,9 +145,16 @@ static inline int pin_num(gpio_t pin)
 
 static inline void clk_en(gpio_t pin)
 {
+#if defined(SIM_SCGC5_PORTA_SHIFT)
     bit_set32(&SIM->SCGC5, SIM_SCGC5_PORTA_SHIFT + port_num(pin));
+#else
+    /* In some cases GPIO is always clocked */
+    (void) pin;
+#endif
+
 }
 
+#ifdef KINETIS_HAVE_PCR
 /**
  * @brief   Get context for a specific pin
  */
@@ -176,13 +191,17 @@ static void write_map(int port, int pin, int ctx)
 static void ctx_clear(int port, int pin)
 {
     int ctx = get_ctx(port, pin);
+
     write_map(port, pin, ctx);
 }
+#endif
 
 int gpio_init(gpio_t pin, gpio_mode_t mode)
 {
+#ifdef KINETIS_HAVE_PCR
     /* set pin to analog mode while configuring it */
     gpio_init_port(pin, GPIO_AF_ANALOG);
+#endif
 
     /* set pin direction */
     if (mode & MODE_OUT) {
@@ -192,11 +211,14 @@ int gpio_init(gpio_t pin, gpio_mode_t mode)
         gpio(pin)->PDDR &= ~(1 << pin_num(pin));
     }
 
+#ifdef KINETIS_HAVE_PCR
     /* enable GPIO function */
     port(pin)->PCR[pin_num(pin)] = (GPIO_AF_GPIO | (mode & MODE_PCR_MASK));
+#endif
     return 0;
 }
 
+#ifdef KINETIS_HAVE_PCR
 int gpio_init_int(gpio_t pin, gpio_mode_t mode, gpio_flank_t flank,
                   gpio_cb_t cb, void *arg)
 {
@@ -226,15 +248,17 @@ int gpio_init_int(gpio_t pin, gpio_mode_t mode, gpio_flank_t flank,
     port(pin)->PCR[pin_num(pin)] |= flank;
     return 0;
 }
+#endif
 
+#ifdef KINETIS_HAVE_PCR
 void gpio_init_port(gpio_t pin, uint32_t pcr)
 {
     /* enable PORT clock in case it was not active before */
     clk_en(pin);
 
     /* if the given interrupt was previously configured as interrupt source, we
-     * need to free its interrupt context. We to this only after we
-     * re-configured the pin in case an event is happening just in between... */
+    * need to free its interrupt context. We to this only after we
+    * re-configured the pin in case an event is happening just in between... */
     uint32_t isr_state = port(pin)->PCR[pin_num(pin)];
     /* set new PCR value */
     port(pin)->PCR[pin_num(pin)] = pcr;
@@ -247,15 +271,18 @@ void gpio_init_port(gpio_t pin, uint32_t pcr)
 void gpio_irq_enable(gpio_t pin)
 {
     int ctx = get_ctx(port_num(pin), pin_num(pin));
+
     port(pin)->PCR[pin_num(pin)] |= isr_ctx[ctx].state;
 }
 
 void gpio_irq_disable(gpio_t pin)
 {
     int ctx = get_ctx(port_num(pin), pin_num(pin));
+
     isr_ctx[ctx].state = port(pin)->PCR[pin_num(pin)] & PORT_PCR_IRQC_MASK;
     port(pin)->PCR[pin_num(pin)] &= ~(PORT_PCR_IRQC_MASK);
 }
+#endif
 
 int gpio_read(gpio_t pin)
 {
@@ -292,6 +319,7 @@ void gpio_write(gpio_t pin, int value)
     }
 }
 
+#ifdef KINETIS_HAVE_PCR
 static inline void irq_handler(PORT_Type *port, int port_num)
 {
     /* take interrupt flags only from pins which interrupt is enabled */
@@ -364,3 +392,4 @@ void isr_portb_portc(void)
     irq_handler(PORTC, 2);
 }
 #endif
+#endif //KINETIS_HAVE_PCR

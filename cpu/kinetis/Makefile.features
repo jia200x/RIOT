@@ -1,6 +1,11 @@
 FEATURES_PROVIDED += periph_cpuid
 FEATURES_PROVIDED += periph_hwrng
 FEATURES_PROVIDED += periph_gpio
+ifneq (EA,$(KINETIS_SERIES))
 FEATURES_PROVIDED += periph_mcg
+endif
+ifeq (EA,$(KINETIS_SERIES))
+FEATURES_PROVIDED += periph_ics
+endif
 
 include $(RIOTCPU)/cortexm_common/Makefile.features
