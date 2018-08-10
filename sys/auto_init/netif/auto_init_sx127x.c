@@ -21,7 +21,7 @@
 
 #include "log.h"
 #include "board.h"
-#include "net/gnrc/netif/raw.h"
+#include "net/gnrc/netif/lorawan.h"
 #include "net/gnrc.h"
 
 #include "sx127x.h"
@@ -56,7 +56,7 @@ void auto_init_sx127x(void)
 #endif
 
         sx127x_setup(&sx127x_devs[i], &sx127x_params[i]);
-        gnrc_netif_raw_create(sx127x_stacks[i], SX127X_STACKSIZE, SX127X_PRIO,
+        gnrc_netif_lorawan_create(sx127x_stacks[i], SX127X_STACKSIZE, SX127X_PRIO,
                               "sx127x", (netdev_t *)&sx127x_devs[i]);
     }
 }
