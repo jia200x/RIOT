@@ -554,6 +554,14 @@ typedef enum {
      */
     NETOPT_PHY_BUSY,
 
+    /**
+     * @brief   Get the join status in a network
+     *
+     * When set, the MAC layer will try to join the corresponding network
+     */
+
+    NETOPT_JOIN,
+
     /* add more options if needed */
 
     /**
