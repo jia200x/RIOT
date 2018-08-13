@@ -559,8 +559,27 @@ typedef enum {
      *
      * When set, the MAC layer will try to join the corresponding network
      */
-
     NETOPT_JOIN,
+
+    /**
+     * @brief   (uint8_t*) application EUI (8 bytes length)
+     */
+    NETOPT_APPEUI,
+
+    /**
+     * @brief   (uint8_t*) application key (16 bytes length)
+     */
+    NETOPT_APPKEY,
+
+    /**
+     * @brief   (uint8_t*) application session key (16 bytes length)
+     */
+    NETOPT_APPSKEY,
+
+    /**
+     * @brief   (uint8_t*) network session key (16 bytes length)
+     */
+    NETOPT_NWKSKEY,
 
     /* add more options if needed */
 
