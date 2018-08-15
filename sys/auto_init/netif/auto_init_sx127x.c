@@ -21,7 +21,7 @@
 
 #include "log.h"
 #include "board.h"
-#include "net/gnrc/netif/lorawan.h"
+#include "net/gnrc/netif/lorawan_base.h"
 #include "net/gnrc.h"
 
 #include "sx127x.h"
