@@ -34,6 +34,9 @@
 #include "net/gnrc/netapi.h"
 #include "net/gnrc/pkt.h"
 #include "net/gnrc/netif/conf.h"
+#ifdef MODULE_GNRC_LORAWAN
+#include "net/gnrc/netif/lorawan.h"
+#endif
 #ifdef MODULE_GNRC_SIXLOWPAN
 #include "net/gnrc/netif/6lo.h"
 #endif
@@ -63,6 +66,9 @@ typedef struct {
     const gnrc_netif_ops_t *ops;            /**< Operations of the network interface */
     netdev_t *dev;                          /**< Network device of the network interface */
     rmutex_t mutex;                         /**< Mutex of the interface */
+#if defined(MODULE_GNRC_LORAWAN) || DOXYGEN
+    gnrc_netif_lorawan_t lorawan;           /**< LoRaWAN component */
+#endif
 #if defined(MODULE_GNRC_IPV6) || DOXYGEN
     gnrc_netif_ipv6_t ipv6;                 /**< IPv6 component */
 #endif
