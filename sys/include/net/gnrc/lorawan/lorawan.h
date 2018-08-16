@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "net/lora.h"
 #include "net/gnrc/netif.h"
 
 #ifdef __cplusplus
@@ -45,6 +46,7 @@ extern "C" {
 #define JOIN_REQUEST_SIZE 23
 #define MIC_SIZE 4
 
+
 uint32_t calculate_mic(uint8_t *buf, size_t size, uint8_t *appkey);
 uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, uint8_t* msg, size_t size, uint8_t *nwkskey);
 void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey, uint8_t *out);
@@ -53,6 +55,7 @@ void generate_session_keys(uint8_t *app_nonce, uint8_t *dev_nonce, uint8_t *appk
 void gnrc_lorawan_send_join_request(gnrc_netif_t *netif);
 void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif);
 void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size);
+int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate);
 
 #ifdef __cplusplus
 }

@@ -586,6 +586,7 @@ typedef enum {
      */
     NETOPT_SYNCWORD,
     NETOPT_RANDOM,
+    NETOPT_DATARATE,
 
     /* add more options if needed */
 

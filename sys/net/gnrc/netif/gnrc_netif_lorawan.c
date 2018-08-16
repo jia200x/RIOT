@@ -103,13 +103,7 @@ void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)
     netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
     //sx127x_set_iq_invert(&sx127x, true);
 
-    uint8_t bw = LORA_BW_125_KHZ;
-    uint8_t sf = LORA_SF7;
-    //uint8_t cr = LORA_CR_4_5;
-    netdev->driver->set(netdev, NETOPT_BANDWIDTH, &bw, sizeof(bw));
-    netdev->driver->set(netdev, NETOPT_SPREADING_FACTOR, &sf, sizeof(sf));
-    //netdev->driver->set(netdev, NETOPT_CODING_RATE, &cr, sizeof(cr));
-    //sx127x_set_channel(&sx127x, 869525000);
+    gnrc_lorawan_set_dr(netif, 5);
 
     /* Switch to continuous listen mode */
     const netopt_enable_t single = true;
@@ -206,11 +200,8 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     netdev_t *netdev = netif->dev;
     (void) pkt;
     uint32_t chan = 868300000;
-    uint8_t bw = LORA_BW_125_KHZ;
-    uint8_t sf = LORA_SF7;
+
     netdev->driver->set(netdev, NETOPT_CHANNEL_FREQUENCY, &chan, sizeof(chan));
-    netdev->driver->set(netdev, NETOPT_BANDWIDTH, &bw, sizeof(bw));
-    netdev->driver->set(netdev, NETOPT_SPREADING_FACTOR, &sf, sizeof(sf));
 
     netopt_enable_t iq_invert = false;
     netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
@@ -268,7 +259,6 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
     switch(opt->opt) {
         case NETOPT_JOIN:
             gnrc_lorawan_send_join_request(netif);
-            puts("Good luck!");
             break;
         case NETOPT_ADDRESS_LONG:
             memcpy(&netif->lorawan.deveui, opt->data, opt->data_len);
@@ -278,6 +268,10 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
             break;
         case NETOPT_APPKEY:
             memcpy(&netif->lorawan.appkey, opt->data, opt->data_len);
+            break;
+        case NETOPT_DATARATE:
+            assert(opt->data_len == sizeof(uint8_t));
+            gnrc_lorawan_set_dr(netif, *(uint8_t*) opt->data);  
             break;
         default:
             netif->dev->driver->get(netif->dev, opt->opt, opt->data, opt->data_len);

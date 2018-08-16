@@ -5,6 +5,11 @@
 #include "net/gnrc/lorawan/lorawan.h"
 #include "errno.h"
 
+#define GNRC_LORAWAN_NUMOF_DATARATES 7
+
+static uint8_t dr_sf[GNRC_LORAWAN_NUMOF_DATARATES] = {LORA_SF12, LORA_SF11, LORA_SF10, LORA_SF9, LORA_SF8, LORA_SF7, LORA_SF7};
+static uint8_t dr_bw[GNRC_LORAWAN_NUMOF_DATARATES] = {LORA_BW_125_KHZ, LORA_BW_125_KHZ, LORA_BW_125_KHZ, LORA_BW_125_KHZ, LORA_BW_125_KHZ, LORA_BW_125_KHZ, LORA_BW_250_KHZ};
+
 static int _compare_mic(uint32_t expected_mic, uint8_t *mic_buf)
 {
    uint32_t mic = mic_buf[0] | (mic_buf[1] << 8) |
@@ -59,6 +64,22 @@ static void _process_join_accept(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
     printf("\n");
 }
 
+int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate)
+{
+    netdev_t *dev = netif->dev;
+    if(datarate > GNRC_LORAWAN_NUMOF_DATARATES) {
+        //TODO
+        return -1;
+    }
+    uint8_t bw = dr_bw[datarate];
+    uint8_t sf = dr_sf[datarate];
+
+    dev->driver->set(dev, NETOPT_BANDWIDTH, &bw, sizeof(bw));
+    dev->driver->set(dev, NETOPT_SPREADING_FACTOR, &sf, sizeof(sf));
+
+    return 0;
+}
+
 void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
 {
     (void) size;
@@ -111,15 +132,10 @@ void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
     uint8_t buf[24];
 
     uint32_t channel_freq = 868300000;
-    //TODO
-    uint8_t bw = LORA_BW_125_KHZ;
-    uint8_t sf = LORA_SF7;
-    uint8_t cr = LORA_CR_4_5;
+    
+    gnrc_lorawan_set_dr(netif, 5);
 
     dev->driver->set(dev, NETOPT_CHANNEL_FREQUENCY, &channel_freq, sizeof(channel_freq));
-    dev->driver->set(dev, NETOPT_BANDWIDTH, &bw, sizeof(bw));
-    dev->driver->set(dev, NETOPT_SPREADING_FACTOR, &sf, sizeof(sf));
-    dev->driver->set(dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
 
     /* Dev Nonce */
     uint32_t random_number;
