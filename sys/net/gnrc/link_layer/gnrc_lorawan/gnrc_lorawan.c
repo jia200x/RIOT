@@ -62,6 +62,7 @@ static void _process_join_accept(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
         printf("%02x ", netif->lorawan.appskey[i]);
     }
     printf("\n");
+    netif->lorawan.joined = true;
 }
 
 int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate)

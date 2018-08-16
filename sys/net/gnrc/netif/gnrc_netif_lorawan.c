@@ -86,6 +86,8 @@ static void _init(gnrc_netif_t *netif)
     netif->dev->event_callback = _event_cb;
     uint8_t cr = LORA_CR_4_5;
     netif->dev->driver->set(netif->dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
+
+    netif->lorawan.joined = false;
 }
 
 gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize,
@@ -197,6 +199,10 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
 
 static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
+    if(!netif->lorawan.joined) {
+        puts("LoRaWAN not joined!");
+        return 0;
+    }
     netdev_t *netdev = netif->dev;
     (void) pkt;
     uint32_t chan = 868300000;

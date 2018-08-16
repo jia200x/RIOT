@@ -43,6 +43,7 @@ typedef struct {
     xtimer_t rx_1;
     xtimer_t rx_2;
     msg_t msg;
+    uint8_t joined;
 } gnrc_netif_lorawan_t;
 
 #ifdef __cplusplus
