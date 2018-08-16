@@ -98,73 +98,6 @@ gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize,
                              &lorawan_ops);
 }
 
-void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)
-{
-    netdev_t *netdev = netif->dev;
-    netopt_enable_t iq_invert = true;
-    netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
-    //sx127x_set_iq_invert(&sx127x, true);
-
-    gnrc_lorawan_set_dr(netif, 5);
-
-    /* Switch to continuous listen mode */
-    const netopt_enable_t single = true;
-    netdev->driver->set(netdev, NETOPT_SINGLE_RECEIVE, &single, sizeof(single));
-    const uint32_t timeout = 25;
-    netdev->driver->set(netdev, NETOPT_RX_TIMEOUT, &timeout, sizeof(timeout));
-
-    /* Switch to RX state */
-    uint8_t state = NETOPT_STATE_RX;
-    netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
-}
-
-uint8_t pkt_buf[50];
-
-size_t build_uplink(gnrc_netif_t *netif)
-{
-    uint8_t *p = pkt_buf;
-    uint8_t mhdr = 0;
-
-    /* Message type */
-    mhdr &= ~MTYPE_MASK;
-    mhdr |= MTYPE_UNCNF_UPLINK << 5;
-
-    /* Major */
-    mhdr &= ~MAJOR_MASK;
-    mhdr |= MAJOR_LRWAN_R1;
-
-    PKT_WRITE_BYTE(p, mhdr);
-    PKT_WRITE(p, netif->lorawan.dev_addr, 4);
-
-    /* No options */
-    PKT_WRITE_BYTE(p, 0);
-
-    /* Frame counter */
-    PKT_WRITE_BYTE(p, netif->lorawan.fcnt & 0xFF);
-    PKT_WRITE_BYTE(p, (netif->lorawan.fcnt >> 8) & 0xFF);
-
-    /* Port */
-    PKT_WRITE_BYTE(p, 1);
-
-    uint8_t payload[] = "RIOT";
-
-    /* Encrypt payload */
-    uint8_t enc_payload[4];
-    encrypt_payload(payload, sizeof(payload), netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.appskey, enc_payload);
-    PKT_WRITE(p, enc_payload, sizeof(payload) - 1);
-
-    /* Now calculate MIC */
-    /* TODO: */
-    uint32_t mic = calculate_pkt_mic(0, netif->lorawan.dev_addr, netif->lorawan.fcnt, pkt_buf, p-pkt_buf, netif->lorawan.nwkskey);
-
-    PKT_WRITE_BYTE(p, mic & 0xFF);
-    PKT_WRITE_BYTE(p, (mic >> 8) & 0xFF);
-    PKT_WRITE_BYTE(p, (mic >> 16) & 0xFF);
-    PKT_WRITE_BYTE(p, (mic >> 24) & 0xFF);
-
-    return p-pkt_buf;
-}
-
 static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
 {
     netdev_t *dev = netif->dev;
@@ -186,7 +119,6 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
         return NULL;
     }
 
-    //TODO: Remove sx127x info
     /* TODO: Time On Air from netdev! */
 
     printf("{Payload: \"%s\" (%d bytes), RSSI: %i, SNR: %i, TOA: %lu}\n",
@@ -196,6 +128,8 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
     gnrc_lorawan_process_pkt(netif, pkt->data, pkt->size);
     return NULL;
 }
+
+uint8_t pkt_buf[50];
 
 static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
@@ -213,7 +147,7 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
 
     /* build join request */
-    size_t pkt_size = build_uplink(netif);
+    size_t pkt_size = gnrc_lorawan_build_uplink(netif, pkt_buf);
 
     iolist_t iolist = {
         .iol_base = pkt_buf,

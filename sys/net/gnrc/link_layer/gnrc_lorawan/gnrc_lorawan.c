@@ -96,6 +96,71 @@ void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
     }
 }
 
+size_t gnrc_lorawan_build_uplink(gnrc_netif_t *netif, uint8_t *pkt_buf)
+{
+    uint8_t *p = pkt_buf;
+    uint8_t mhdr = 0;
+
+    /* Message type */
+    mhdr &= ~MTYPE_MASK;
+    mhdr |= MTYPE_UNCNF_UPLINK << 5;
+
+    /* Major */
+    mhdr &= ~MAJOR_MASK;
+    mhdr |= MAJOR_LRWAN_R1;
+
+    PKT_WRITE_BYTE(p, mhdr);
+    PKT_WRITE(p, netif->lorawan.dev_addr, 4);
+
+    /* No options */
+    PKT_WRITE_BYTE(p, 0);
+
+    /* Frame counter */
+    PKT_WRITE_BYTE(p, netif->lorawan.fcnt & 0xFF);
+    PKT_WRITE_BYTE(p, (netif->lorawan.fcnt >> 8) & 0xFF);
+
+    /* Port */
+    PKT_WRITE_BYTE(p, 1);
+
+    uint8_t payload[] = "RIOT";
+
+    /* Encrypt payload */
+    uint8_t enc_payload[4];
+    encrypt_payload(payload, sizeof(payload), netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.appskey, enc_payload);
+    PKT_WRITE(p, enc_payload, sizeof(payload) - 1);
+
+    /* Now calculate MIC */
+    /* TODO: */
+    uint32_t mic = calculate_pkt_mic(0, netif->lorawan.dev_addr, netif->lorawan.fcnt, pkt_buf, p-pkt_buf, netif->lorawan.nwkskey);
+
+    PKT_WRITE_BYTE(p, mic & 0xFF);
+    PKT_WRITE_BYTE(p, (mic >> 8) & 0xFF);
+    PKT_WRITE_BYTE(p, (mic >> 16) & 0xFF);
+    PKT_WRITE_BYTE(p, (mic >> 24) & 0xFF);
+
+    return p-pkt_buf;
+}
+
+void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)
+{
+    netdev_t *netdev = netif->dev;
+    netopt_enable_t iq_invert = true;
+    netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
+    //sx127x_set_iq_invert(&sx127x, true);
+
+    gnrc_lorawan_set_dr(netif, 5);
+
+    /* Switch to continuous listen mode */
+    const netopt_enable_t single = true;
+    netdev->driver->set(netdev, NETOPT_SINGLE_RECEIVE, &single, sizeof(single));
+    const uint32_t timeout = 25;
+    netdev->driver->set(netdev, NETOPT_RX_TIMEOUT, &timeout, sizeof(timeout));
+
+    /* Switch to RX state */
+    uint8_t state = NETOPT_STATE_RX;
+    netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+}
+
 static size_t _build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *appkey, uint8_t *dev_nonce, uint8_t *packet)
 {
     uint8_t *p = packet;
