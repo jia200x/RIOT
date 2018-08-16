@@ -194,7 +194,16 @@ static size_t _build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *app
 void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif)
 {
     netif->lorawan.msg.type = MSG_TYPE_TIMEOUT;
-    xtimer_set_msg(&netif->lorawan.rx_1, 4950000, &netif->lorawan.msg, netif->pid);
+    /* This logic might change */
+    if(!netif->lorawan.joined) {
+        /* Join request */
+        xtimer_set_msg(&netif->lorawan.rx_1, 4950000, &netif->lorawan.msg, netif->pid);
+    }
+    else {
+        puts("It's joined");
+        xtimer_set_msg(&netif->lorawan.rx_1, 950000, &netif->lorawan.msg, netif->pid);
+    }
+
 
     /* TODO: Sleep interface */
 }

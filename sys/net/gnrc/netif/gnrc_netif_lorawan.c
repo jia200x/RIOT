@@ -162,9 +162,8 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
         puts("Cannot send: radio is still transmitting");
     }
     
+    /* TODO:! */
     netif->lorawan.fcnt += 1;
-    xtimer_sleep(3);
-    puts("Let's pray!");
     return 0;
 }
 
