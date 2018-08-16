@@ -18,6 +18,8 @@
 #ifndef NET_GNRC_NETIF_LORAWAN_H
 #define NET_GNRC_NETIF_LORAWAN_H
 
+#include "xtimer.h"
+
 #define GNRC_LORAWAN_EUI_LEN 8
 #define GNRC_LORAWAN_KEY_LEN 16
 
@@ -26,9 +28,13 @@ extern "C" {
 #endif
 
 typedef struct {
-    uint8_t *deveui[GNRC_LORAWAN_EUI_LEN];
-    uint8_t *appeui[GNRC_LORAWAN_EUI_LEN];
-    uint8_t *appkey[GNRC_LORAWAN_KEY_LEN];
+    uint8_t deveui[GNRC_LORAWAN_EUI_LEN];
+    uint8_t appeui[GNRC_LORAWAN_EUI_LEN];
+    uint8_t appkey[GNRC_LORAWAN_KEY_LEN];
+    uint8_t state;
+    uint8_t dev_nonce[2];
+    xtimer_t rx_1;
+    xtimer_t rx_2;
 } gnrc_netif_lorawan_t;
 
 #ifdef __cplusplus
