@@ -84,6 +84,8 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
 static void _init(gnrc_netif_t *netif)
 {
     netif->dev->event_callback = _event_cb;
+    uint8_t cr = LORA_CR_4_5;
+    netif->dev->driver->set(netif->dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
 }
 
 gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize,
@@ -103,10 +105,10 @@ void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)
 
     uint8_t bw = LORA_BW_125_KHZ;
     uint8_t sf = LORA_SF7;
-    uint8_t cr = LORA_CR_4_5;
+    //uint8_t cr = LORA_CR_4_5;
     netdev->driver->set(netdev, NETOPT_BANDWIDTH, &bw, sizeof(bw));
     netdev->driver->set(netdev, NETOPT_SPREADING_FACTOR, &sf, sizeof(sf));
-    netdev->driver->set(netdev, NETOPT_CODING_RATE, &cr, sizeof(cr));
+    //netdev->driver->set(netdev, NETOPT_CODING_RATE, &cr, sizeof(cr));
     //sx127x_set_channel(&sx127x, 869525000);
 
     /* Switch to continuous listen mode */
@@ -206,11 +208,9 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     uint32_t chan = 868300000;
     uint8_t bw = LORA_BW_125_KHZ;
     uint8_t sf = LORA_SF7;
-    uint8_t cr = LORA_CR_4_5;
     netdev->driver->set(netdev, NETOPT_CHANNEL_FREQUENCY, &chan, sizeof(chan));
     netdev->driver->set(netdev, NETOPT_BANDWIDTH, &bw, sizeof(bw));
     netdev->driver->set(netdev, NETOPT_SPREADING_FACTOR, &sf, sizeof(sf));
-    netdev->driver->set(netdev, NETOPT_CODING_RATE, &cr, sizeof(cr));
 
     netopt_enable_t iq_invert = false;
     netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
