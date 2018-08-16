@@ -5,41 +5,74 @@
 #include "net/gnrc/lorawan/lorawan.h"
 #include "errno.h"
 
-#define PKT_WRITE_BYTE(CURSOR, BYTE) *(CURSOR++) = BYTE
+static int _compare_mic(uint32_t expected_mic, uint8_t *mic_buf)
+{
+   uint32_t mic = mic_buf[0] | (mic_buf[1] << 8) |
+       (mic_buf[2] << 16) | (mic_buf[3] << 24);
+   return expected_mic == mic;
+}
 
-#define PKT_WRITE(CURSOR, SRC, LEN) do {\
-    memcpy(CURSOR, SRC, LEN); \
-    CURSOR += LEN; \
-} while (0);
+static void _process_join_accept(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
+{
+    /* TODO: PACKET < 33 */
 
-#define MTYPE_MASK           0b11100000
-#define MTYPE_JOIN_REQUEST   0b000
-#define MTYPE_JOIN_ACCEPT    0b001
-#define MTYPE_UNCNF_UPLINK   0b010
-#define MTYPE_UNCNF_DOWNLINK 0b011
-#define MTYPE_CNF_UPLINK     0b100
-#define MTYPE_CNF_DOWNLINK   0b101
-#define MTYPE_REJOIN_REQ     0b110
-#define MTYPE_PROPIETARY     0b111
+    /* Decrypt packet */
+    uint8_t out[32];
+    decrypt_join_accept(netif->lorawan.appkey, pkt+1, (size-1) >= 16, out);
+    memcpy(pkt+1, out, size-1);
 
-#define MAJOR_MASK     0b11
-#define MAJOR_LRWAN_R1 0b00
+    /* Validate packet */
 
-#define DEV_ADDR_LEN 4
-#define FCTRL_LEN 1
-#define FCNT_LEN 2
-#define FOPTS_MAX_LEN 16
+    uint32_t mic = calculate_mic(pkt, size-MIC_SIZE, netif->lorawan.appkey);
+    if(!_compare_mic(mic, pkt+size-MIC_SIZE)) {
+        printf("BAD MIC!");
+        return;
+    }
 
+    netif->lorawan.fcnt = 0;
+    generate_session_keys(pkt+1, netif->lorawan.dev_nonce, netif->lorawan.appkey, netif->lorawan.nwkskey, netif->lorawan.appskey);
 
-#define ADR_MASK 0x80
-#define ADR_ACK_REQ_MASK 0x40
-#define ACK_MASK 0x20
-#define FPENDING_MASK 0x10
-#define FOPTS_MASK 0x0F
+    for(int i=0;i<33;i++) {
+        printf("%02x ", pkt[i]);
+    }
+    printf("\n");
 
+    /* Copy devaddr */
+    memcpy(netif->lorawan.dev_addr, pkt+7, 4);
 
-#define JOIN_REQUEST_SIZE 23
-#define MIC_SIZE 4
+    netif->lorawan.dl_settings = *(pkt+11);
+    netif->lorawan.rx_delay = *(pkt+12);
+
+    printf("dl_settings: %i\n", netif->lorawan.dl_settings);
+    printf("rx_delay: %i\n", netif->lorawan.rx_delay);
+
+    printf("NWKSKEY: ");
+    for(int i=0;i<16;i++) {
+        printf("%02x ", netif->lorawan.nwkskey[i]);
+    }
+    printf("\n");
+
+    printf("APPSKEY: ");
+    for(int i=0;i<16;i++) {
+        printf("%02x ", netif->lorawan.appskey[i]);
+    }
+    printf("\n");
+}
+
+void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
+{
+    (void) size;
+    uint8_t *p = pkt;
+
+    uint8_t mtype = (*p & MTYPE_MASK) >> 5;
+    switch(mtype) {
+        case MTYPE_JOIN_ACCEPT:
+            _process_join_accept(netif, pkt, size);
+            break;
+        default:
+            break;
+    }
+}
 
 static size_t build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *appkey, uint8_t *dev_nonce, uint8_t *packet)
 {
