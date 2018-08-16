@@ -96,7 +96,7 @@ void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
     }
 }
 
-static size_t build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *appkey, uint8_t *dev_nonce, uint8_t *packet)
+static size_t _build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *appkey, uint8_t *dev_nonce, uint8_t *packet)
 {
     uint8_t *p = packet;
 
@@ -147,7 +147,7 @@ void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
     netif->lorawan.dev_nonce[1] = (random_number >> 8) & 0xFF;
 
     /* build join request */
-    size_t pkt_size = build_join_req_pkt(netif->lorawan.appeui, netif->lorawan.deveui, netif->lorawan.appkey, netif->lorawan.dev_nonce, buf);
+    size_t pkt_size = _build_join_req_pkt(netif->lorawan.appeui, netif->lorawan.deveui, netif->lorawan.appkey, netif->lorawan.dev_nonce, buf);
 
     iolist_t iolist = {
         .iol_base = buf,
