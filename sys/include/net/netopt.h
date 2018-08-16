@@ -581,6 +581,12 @@ typedef enum {
      */
     NETOPT_NWKSKEY,
 
+    /**
+     * @brief   (uint8_t*) phy layer syncword
+     */
+    NETOPT_SYNCWORD,
+    NETOPT_RANDOM,
+
     /* add more options if needed */
 
     /**
