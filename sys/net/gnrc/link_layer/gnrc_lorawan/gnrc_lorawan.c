@@ -89,8 +89,6 @@ void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
     dev->driver->set(dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
 
     /* Dev Nonce */
-    /* TODO */
-    //uint16_t random_number = (unsigned int) sx127x_random(&sx127x);
     uint32_t random_number;
     dev->driver->get(dev, NETOPT_RANDOM, &random_number, sizeof(random_number));
     printf("Random: %i\n", (unsigned) random_number);
