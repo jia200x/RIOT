@@ -191,6 +191,13 @@ static size_t _build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *app
     return JOIN_REQUEST_SIZE;
 }
 
+void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif)
+{
+    netif->lorawan.msg.type = MSG_TYPE_TIMEOUT;
+    xtimer_set_msg(&netif->lorawan.rx_1, 4950000, &netif->lorawan.msg, netif->pid);
+
+    /* TODO: Sleep interface */
+}
 void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
 {
     netdev_t *dev = netif->dev;

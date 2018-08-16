@@ -25,8 +25,6 @@
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 
-#define MSG_TYPE_TIMEOUT            (0x3457)
-
 static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt);
 static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif);
 static void _msg_handler(gnrc_netif_t *netif, msg_t *msg);
@@ -71,9 +69,7 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
             case NETDEV_EVENT_TX_COMPLETE:
                 /* we are the only ones supposed to touch this variable,
                  * so no acquire necessary */
-                netif->lorawan.msg.type = MSG_TYPE_TIMEOUT;
-                xtimer_set_msg(&netif->lorawan.rx_1, 4950000, &netif->lorawan.msg, netif->pid);
-                //sx127x_set_sleep(&sx127x);
+                gnrc_lorawan_event_tx_complete(netif);
                 puts("Transmission completed");
                 break;
             default:
