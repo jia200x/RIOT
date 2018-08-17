@@ -83,6 +83,10 @@ static void _init(gnrc_netif_t *netif)
     uint8_t cr = LORA_CR_4_5;
     netif->dev->driver->set(netif->dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
 
+    uint8_t syncword = LORA_SYNCWORD_PUBLIC;
+    netif->dev->driver->set(netif->dev, NETOPT_SYNCWORD, &syncword, sizeof(syncword));
+
+
     netif->lorawan.joined = false;
 }
 

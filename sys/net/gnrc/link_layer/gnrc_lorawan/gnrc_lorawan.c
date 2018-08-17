@@ -227,10 +227,6 @@ void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
         printf("%02x ", buf[i]);
     }
     printf("\n");*/
-    uint8_t syncword = LORA_SYNCWORD_PUBLIC;
-
-    dev->driver->set(dev, NETOPT_SYNCWORD, &syncword, sizeof(syncword));
-
     if (dev->driver->send(dev, &iolist) == -ENOTSUP) {
         puts("Cannot send: radio is still transmitting");
     }
