@@ -157,30 +157,23 @@ void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)
 
 static size_t _build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *appkey, uint8_t *dev_nonce, uint8_t *packet)
 {
-    uint8_t *p = packet;
+    lorawan_join_request_t *hdr = (lorawan_join_request_t*) packet;
 
-    uint8_t mhdr = 0;
+    lorawan_hdr_set_mtype((lorawan_hdr_t*) hdr, MTYPE_JOIN_REQUEST);
+    lorawan_hdr_set_maj((lorawan_hdr_t*) hdr, MAJOR_LRWAN_R1);
 
-    /* Message type */
-    mhdr &= ~MTYPE_MASK;
-    mhdr |= MTYPE_JOIN_REQUEST << 5;
+    le_uint64_t l_appeui = *((le_uint64_t*) appeui);
+    le_uint64_t l_deveui = *((le_uint64_t*) deveui);
 
-    /* Major */
-    mhdr &= ~MAJOR_MASK;
-    mhdr |= MAJOR_LRWAN_R1;
+    hdr->app_eui = l_appeui;
+    hdr->dev_eui = l_deveui;
 
-    PKT_WRITE_BYTE(p, mhdr);
-    PKT_WRITE(p, appeui, 8);
-    PKT_WRITE(p, deveui, 8);
-
-    PKT_WRITE(p, dev_nonce, 2);
+    le_uint16_t l_dev_nonce = *((le_uint16_t*) dev_nonce);
+    hdr->dev_nonce = l_dev_nonce;
 
     uint32_t mic = calculate_mic(packet, JOIN_REQUEST_SIZE-MIC_SIZE, appkey);
 
-    PKT_WRITE_BYTE(p, mic & 0xFF);
-    PKT_WRITE_BYTE(p, (mic >> 8) & 0xFF);
-    PKT_WRITE_BYTE(p, (mic >> 16) & 0xFF);
-    PKT_WRITE_BYTE(p, (mic >> 24) & 0xFF);
+    hdr->mic = byteorder_btoll(byteorder_htonl(mic));
 
     return JOIN_REQUEST_SIZE;
 }
