@@ -4,6 +4,7 @@
 #include "net/lora.h"
 #include "net/gnrc/lorawan/lorawan.h"
 #include "errno.h"
+#include "net/gnrc/pktbuf.h"
 
 #include "net/lorawan/hdr.h"
 
@@ -155,9 +156,10 @@ void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)
     netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
 }
 
-static size_t _build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *appkey, uint8_t *dev_nonce, uint8_t *packet)
+static gnrc_pktsnip_t *_build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *appkey, uint8_t *dev_nonce)
 {
-    lorawan_join_request_t *hdr = (lorawan_join_request_t*) packet;
+    gnrc_pktsnip_t *pkt = gnrc_pktbuf_add(NULL, NULL, sizeof(lorawan_join_request_t), GNRC_NETTYPE_UNDEF);
+    lorawan_join_request_t *hdr = (lorawan_join_request_t*) pkt->data;
 
     lorawan_hdr_set_mtype((lorawan_hdr_t*) hdr, MTYPE_JOIN_REQUEST);
     lorawan_hdr_set_maj((lorawan_hdr_t*) hdr, MAJOR_LRWAN_R1);
@@ -171,11 +173,11 @@ static size_t _build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *app
     le_uint16_t l_dev_nonce = *((le_uint16_t*) dev_nonce);
     hdr->dev_nonce = l_dev_nonce;
 
-    uint32_t mic = calculate_mic(packet, JOIN_REQUEST_SIZE-MIC_SIZE, appkey);
+    uint32_t mic = calculate_mic(pkt->data, JOIN_REQUEST_SIZE-MIC_SIZE, appkey);
 
     hdr->mic = byteorder_btoll(byteorder_htonl(mic));
 
-    return JOIN_REQUEST_SIZE;
+    return pkt;
 }
 
 void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif)
@@ -198,8 +200,6 @@ void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
 {
     netdev_t *dev = netif->dev;
 
-    uint8_t buf[24];
-
     uint32_t channel_freq = 868300000;
     
     gnrc_lorawan_set_dr(netif, 5);
@@ -215,17 +215,18 @@ void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
     netif->lorawan.dev_nonce[1] = (random_number >> 8) & 0xFF;
 
     /* build join request */
-    size_t pkt_size = _build_join_req_pkt(netif->lorawan.appeui, netif->lorawan.deveui, netif->lorawan.appkey, netif->lorawan.dev_nonce, buf);
+    gnrc_pktsnip_t *pkt = _build_join_req_pkt(netif->lorawan.appeui, netif->lorawan.deveui, netif->lorawan.appkey, netif->lorawan.dev_nonce);
 
     iolist_t iolist = {
-        .iol_base = buf,
-        .iol_len = pkt_size
+        .iol_next = (iolist_t *)pkt->next,
+        .iol_base = pkt->data,
+        .iol_len = pkt->size
     };
 
-    for(unsigned int i=0;i<pkt_size;i++) {
+   /* for(unsigned int i=0;i<pkt_size;i++) {
         printf("%02x ", buf[i]);
     }
-    printf("\n");
+    printf("\n");*/
     uint8_t syncword = LORA_SYNCWORD_PUBLIC;
 
     dev->driver->set(dev, NETOPT_SYNCWORD, &syncword, sizeof(syncword));
@@ -233,5 +234,6 @@ void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
     if (dev->driver->send(dev, &iolist) == -ENOTSUP) {
         puts("Cannot send: radio is still transmitting");
     }
+    gnrc_pktbuf_release(pkt);
     puts("Sent");
 }
