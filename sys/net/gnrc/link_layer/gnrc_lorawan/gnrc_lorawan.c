@@ -102,40 +102,23 @@ size_t gnrc_lorawan_build_uplink(gnrc_netif_t *netif, uint8_t *pkt_buf)
 {
     lorawan_hdr_t *hdr = (lorawan_hdr_t*) pkt_buf;
 
-    /* Message type */
-
-    //mhdr &= ~MTYPE_MASK;
-    //mhdr |= MTYPE_UNCNF_UPLINK << 5;
-
-    /* Major */
-    //mhdr &= ~MAJOR_MASK;
-    //mhdr |= MAJOR_LRWAN_R1;
-
     lorawan_hdr_set_mtype(hdr, MTYPE_UNCNF_UPLINK);
     lorawan_hdr_set_maj(hdr, MAJOR_LRWAN_R1);
 
-    //PKT_WRITE_BYTE(p, mhdr);
+    /* TODO: */
+    /* De-hack!*/
 
     le_uint32_t dev_addr = *((le_uint32_t*) netif->lorawan.dev_addr); 
     hdr->addr = dev_addr;
 
-    //PKT_WRITE(p, netif->lorawan.dev_addr, 4);
-
     /* No options */
-    //PKT_WRITE_BYTE(p, 0);
     hdr->fctrl = 0;
 
     le_uint16_t fcnt = *((le_uint16_t*) &netif->lorawan.fcnt);
-    /* Frame counter */
-    //PKT_WRITE_BYTE(p, netif->lorawan.fcnt & 0xFF);
-    //PKT_WRITE_BYTE(p, (netif->lorawan.fcnt >> 8) & 0xFF);
     hdr->fcnt = fcnt;
-
-    /* Port */
-    //PKT_WRITE_BYTE(p, 1);
     hdr->port = 1;
-    uint8_t *p=(pkt_buf+sizeof(lorawan_hdr_t));
 
+    uint8_t *p=(pkt_buf+sizeof(lorawan_hdr_t));
     uint8_t payload[] = "RIOT";
 
     /* Encrypt payload */
@@ -144,13 +127,10 @@ size_t gnrc_lorawan_build_uplink(gnrc_netif_t *netif, uint8_t *pkt_buf)
     PKT_WRITE(p, enc_payload, sizeof(payload) - 1);
 
     /* Now calculate MIC */
-    /* TODO: */
     uint32_t mic = calculate_pkt_mic(0, netif->lorawan.dev_addr, netif->lorawan.fcnt, pkt_buf, p-pkt_buf, netif->lorawan.nwkskey);
 
-    PKT_WRITE_BYTE(p, mic & 0xFF);
-    PKT_WRITE_BYTE(p, (mic >> 8) & 0xFF);
-    PKT_WRITE_BYTE(p, (mic >> 16) & 0xFF);
-    PKT_WRITE_BYTE(p, (mic >> 24) & 0xFF);
+    *((le_uint32_t*) p) = byteorder_btoll(byteorder_htonl(mic));
+    p+=4;
 
     return p-pkt_buf;
 }
