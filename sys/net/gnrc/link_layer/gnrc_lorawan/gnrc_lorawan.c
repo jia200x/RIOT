@@ -5,6 +5,8 @@
 #include "net/gnrc/lorawan/lorawan.h"
 #include "errno.h"
 
+#include "net/lorawan/hdr.h"
+
 #define GNRC_LORAWAN_NUMOF_DATARATES 7
 
 static uint8_t dr_sf[GNRC_LORAWAN_NUMOF_DATARATES] = {LORA_SF12, LORA_SF11, LORA_SF10, LORA_SF9, LORA_SF8, LORA_SF7, LORA_SF7};
@@ -98,29 +100,41 @@ void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
 
 size_t gnrc_lorawan_build_uplink(gnrc_netif_t *netif, uint8_t *pkt_buf)
 {
-    uint8_t *p = pkt_buf;
-    uint8_t mhdr = 0;
+    lorawan_hdr_t *hdr = (lorawan_hdr_t*) pkt_buf;
 
     /* Message type */
-    mhdr &= ~MTYPE_MASK;
-    mhdr |= MTYPE_UNCNF_UPLINK << 5;
+
+    //mhdr &= ~MTYPE_MASK;
+    //mhdr |= MTYPE_UNCNF_UPLINK << 5;
 
     /* Major */
-    mhdr &= ~MAJOR_MASK;
-    mhdr |= MAJOR_LRWAN_R1;
+    //mhdr &= ~MAJOR_MASK;
+    //mhdr |= MAJOR_LRWAN_R1;
 
-    PKT_WRITE_BYTE(p, mhdr);
-    PKT_WRITE(p, netif->lorawan.dev_addr, 4);
+    lorawan_hdr_set_mtype(hdr, MTYPE_UNCNF_UPLINK);
+    lorawan_hdr_set_maj(hdr, MAJOR_LRWAN_R1);
+
+    //PKT_WRITE_BYTE(p, mhdr);
+
+    le_uint32_t dev_addr = *((le_uint32_t*) netif->lorawan.dev_addr); 
+    hdr->addr = dev_addr;
+
+    //PKT_WRITE(p, netif->lorawan.dev_addr, 4);
 
     /* No options */
-    PKT_WRITE_BYTE(p, 0);
+    //PKT_WRITE_BYTE(p, 0);
+    hdr->fctrl = 0;
 
+    le_uint16_t fcnt = *((le_uint16_t*) &netif->lorawan.fcnt);
     /* Frame counter */
-    PKT_WRITE_BYTE(p, netif->lorawan.fcnt & 0xFF);
-    PKT_WRITE_BYTE(p, (netif->lorawan.fcnt >> 8) & 0xFF);
+    //PKT_WRITE_BYTE(p, netif->lorawan.fcnt & 0xFF);
+    //PKT_WRITE_BYTE(p, (netif->lorawan.fcnt >> 8) & 0xFF);
+    hdr->fcnt = fcnt;
 
     /* Port */
-    PKT_WRITE_BYTE(p, 1);
+    //PKT_WRITE_BYTE(p, 1);
+    hdr->port = 1;
+    uint8_t *p=(pkt_buf+sizeof(lorawan_hdr_t));
 
     uint8_t payload[] = "RIOT";
 
