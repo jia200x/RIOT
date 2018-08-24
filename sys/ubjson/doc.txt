@@ -1,0 +1,6 @@
+/**
+ * @defgroup sys_ubjson  Universal Binary JSON deserializer
+ * @ingroup  pkg
+ * @ingroup  sys_serialization
+ * @brief    Provides a BSON deserializer library to RIOT
+ */
