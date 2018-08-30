@@ -1,0 +1,28 @@
+APPLICATION += gnrc_lorawan
+
+BOARD ?= b-l072z-lrwan1
+
+RIOTBASE = $(CURDIR)/../../
+
+USEMODULE += od
+USEMODULE += shell
+USEMODULE += shell_commands
+USEMODULE += ps
+USEMODULE += xtimer
+USEMODULE += random
+USEMODULE += gnrc_netdev_default
+USEMODULE += auto_init_gnrc_netif
+USEMODULE += gnrc_lorawan
+
+DRIVER ?= sx1276
+
+# use SX1276 by default
+USEMODULE += $(DRIVER)
+
+USEMODULE += hashes
+USEMODULE += crypto
+CFLAGS += -DCRYPTO_AES
+
+INCLUDES += $(CURDIR)
+
+include $(RIOTBASE)/Makefile.include
