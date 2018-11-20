@@ -58,7 +58,7 @@ void gnrc_lorawan_send_join_request(gnrc_netif_t *netif);
 void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif);
 void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size);
 int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate);
-size_t gnrc_lorawan_build_uplink(gnrc_netif_t *netif, uint8_t *pkt_buf);
+gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *payload);
 void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif);
 
 #ifdef __cplusplus

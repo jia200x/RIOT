@@ -99,9 +99,11 @@ void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
     }
 }
 
-size_t gnrc_lorawan_build_uplink(gnrc_netif_t *netif, uint8_t *pkt_buf)
+/*TODO: REFACTOR */
+gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
 {
-    lorawan_hdr_t *hdr = (lorawan_hdr_t*) pkt_buf;
+    gnrc_pktsnip_t *enc_payload = gnrc_pktbuf_add(NULL, NULL, sizeof(lorawan_hdr_t)+payload->size+4, GNRC_NETTYPE_UNDEF);
+    lorawan_hdr_t *hdr = enc_payload->data;
 
     lorawan_hdr_set_mtype(hdr, MTYPE_UNCNF_UPLINK);
     lorawan_hdr_set_maj(hdr, MAJOR_LRWAN_R1);
@@ -119,21 +121,19 @@ size_t gnrc_lorawan_build_uplink(gnrc_netif_t *netif, uint8_t *pkt_buf)
     hdr->fcnt = fcnt;
     hdr->port = 1;
 
-    uint8_t *p=(pkt_buf+sizeof(lorawan_hdr_t));
-    uint8_t payload[] = "RIOT";
-
     /* Encrypt payload */
-    uint8_t enc_payload[4];
-    encrypt_payload(payload, sizeof(payload), netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.appskey, enc_payload);
-    PKT_WRITE(p, enc_payload, sizeof(payload) - 1);
+    /*TODO*/
+    uint8_t *p = enc_payload->data + sizeof(lorawan_hdr_t);
+    encrypt_payload(payload->data, payload->size, netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.appskey, p);
+    //PKT_WRITE(p, enc_payload, sizeof(payload) - 1);
+    p += payload->size;
 
     /* Now calculate MIC */
-    uint32_t mic = calculate_pkt_mic(0, netif->lorawan.dev_addr, netif->lorawan.fcnt, pkt_buf, p-pkt_buf, netif->lorawan.nwkskey);
+    uint32_t mic = calculate_pkt_mic(0, netif->lorawan.dev_addr, netif->lorawan.fcnt, enc_payload->data, p-((uint8_t*) enc_payload->data), netif->lorawan.nwkskey);
 
     *((le_uint32_t*) p) = byteorder_btoll(byteorder_htonl(mic));
-    p+=4;
 
-    return p-pkt_buf;
+    return enc_payload;
 }
 
 void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)

@@ -131,14 +131,13 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
 
 uint8_t pkt_buf[50];
 
-static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
+static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
 {
     if(!netif->lorawan.joined) {
         puts("LoRaWAN not joined!");
         return 0;
     }
     netdev_t *netdev = netif->dev;
-    (void) pkt;
     uint32_t chan = 868300000;
 
     netdev->driver->set(netdev, NETOPT_CHANNEL_FREQUENCY, &chan, sizeof(chan));
@@ -147,17 +146,18 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
 
     /* build join request */
-    size_t pkt_size = gnrc_lorawan_build_uplink(netif, pkt_buf);
+    gnrc_pktsnip_t *pkt = gnrc_lorawan_build_uplink(netif, payload);
 
     iolist_t iolist = {
-        .iol_base = pkt_buf,
-        .iol_len = pkt_size
+        .iol_base = pkt->data,
+        .iol_len = pkt->size,
+        .iol_next = (iolist_t*) pkt->next
     };
 
-    for(unsigned int i=0;i<pkt_size;i++) {
+    /*for(unsigned int i=0;i<pkt_size;i++) {
         printf("%02x ", pkt_buf[i]);
     }
-    printf("\n");
+    printf("\n");*/
 
     uint8_t syncword = LORA_SYNCWORD_PUBLIC;
     netdev->driver->set(netdev, NETOPT_SYNCWORD, &syncword, sizeof(syncword));
