@@ -102,38 +102,41 @@ void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
 /*TODO: REFACTOR */
 gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
 {
-    gnrc_pktsnip_t *enc_payload = gnrc_pktbuf_add(NULL, NULL, sizeof(lorawan_hdr_t)+payload->size+4, GNRC_NETTYPE_UNDEF);
-    lorawan_hdr_t *hdr = enc_payload->data;
+    gnrc_pktsnip_t *enc_payload = gnrc_pktbuf_add(NULL, NULL, payload->size, GNRC_NETTYPE_UNDEF);
+    gnrc_pktsnip_t *hdr = gnrc_pktbuf_add(enc_payload, NULL, sizeof(lorawan_hdr_t), GNRC_NETTYPE_UNDEF);
 
-    lorawan_hdr_set_mtype(hdr, MTYPE_UNCNF_UPLINK);
-    lorawan_hdr_set_maj(hdr, MAJOR_LRWAN_R1);
+    lorawan_hdr_t *lw_hdr = hdr->data;
+
+    lorawan_hdr_set_mtype(lw_hdr, MTYPE_UNCNF_UPLINK);
+    lorawan_hdr_set_maj(lw_hdr, MAJOR_LRWAN_R1);
 
     /* TODO: */
     /* De-hack!*/
 
     le_uint32_t dev_addr = *((le_uint32_t*) netif->lorawan.dev_addr); 
-    hdr->addr = dev_addr;
+    lw_hdr->addr = dev_addr;
 
     /* No options */
-    hdr->fctrl = 0;
+    lw_hdr->fctrl = 0;
 
     le_uint16_t fcnt = *((le_uint16_t*) &netif->lorawan.fcnt);
-    hdr->fcnt = fcnt;
-    hdr->port = 1;
+    lw_hdr->fcnt = fcnt;
+
+    /* Hardcoded port is 1 */
+    lw_hdr->port = 1;
 
     /* Encrypt payload */
     /*TODO*/
-    uint8_t *p = enc_payload->data + sizeof(lorawan_hdr_t);
-    encrypt_payload(payload->data, payload->size, netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.appskey, p);
-    //PKT_WRITE(p, enc_payload, sizeof(payload) - 1);
-    p += payload->size;
+    encrypt_payload(payload->data, payload->size, netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.appskey, enc_payload->data);
 
     /* Now calculate MIC */
-    uint32_t mic = calculate_pkt_mic(0, netif->lorawan.dev_addr, netif->lorawan.fcnt, enc_payload->data, p-((uint8_t*) enc_payload->data), netif->lorawan.nwkskey);
+    gnrc_pktsnip_t *mic = gnrc_pktbuf_add(NULL, NULL, 4, GNRC_NETTYPE_UNDEF);
+    uint32_t u32_mic = calculate_pkt_mic(0, netif->lorawan.dev_addr, netif->lorawan.fcnt, hdr, netif->lorawan.nwkskey);
 
-    *((le_uint32_t*) p) = byteorder_btoll(byteorder_htonl(mic));
+    *((le_uint32_t*) mic->data) = byteorder_btoll(byteorder_htonl(u32_mic));
+    LL_APPEND(enc_payload, mic);
 
-    return enc_payload;
+    return hdr;
 }
 
 void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)

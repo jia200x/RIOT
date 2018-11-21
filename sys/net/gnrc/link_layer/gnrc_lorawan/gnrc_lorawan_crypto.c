@@ -19,7 +19,7 @@ static uint8_t digest[16];
 static cipher_t AesContext;
 
 
-uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, uint8_t* msg, size_t size, uint8_t *nwkskey)
+uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey)
 {
     /* Block */
     uint8_t block[16];
@@ -41,11 +41,15 @@ uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, uint8_
     /* More pad */
     PKT_WRITE_BYTE(p, 0);
 
-    PKT_WRITE_BYTE(p, size);
+    /* TODO: Length of packet snip */
+    PKT_WRITE_BYTE(p, gnrc_pkt_len(pkt));
 
     cmac_init(&CmacContext, nwkskey, 16);
     cmac_update(&CmacContext, block, sizeof(block) );
-    cmac_update(&CmacContext, msg, size);
+    while(pkt != NULL) {
+        cmac_update(&CmacContext, pkt->data, pkt->size);
+        pkt = pkt->next;
+    }
     cmac_final(&CmacContext, digest);
 
     return ( uint32_t )( ( uint32_t )digest[3] << 24 | ( uint32_t )digest[2] << 16 | ( uint32_t )digest[1] << 8 | ( uint32_t )digest[0] );

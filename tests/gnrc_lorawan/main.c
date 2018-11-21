@@ -334,7 +334,7 @@ int send_something_cmd(int argc, char **argv)
     uint8_t dr = atoi(argv[1]);
     gnrc_pktsnip_t *pkt;
     gnrc_netapi_set(3, NETOPT_DATARATE, 0, &dr, sizeof(dr));
-    pkt = gnrc_pktbuf_add(NULL, "RIOTRIOT", 8, GNRC_NETTYPE_UNDEF);
+    pkt = gnrc_pktbuf_add(NULL, "RIOT", 4, GNRC_NETTYPE_UNDEF);
     gnrc_netapi_send(3, pkt);
     return 0;
 }

@@ -50,7 +50,7 @@ extern "C" {
 
 
 uint32_t calculate_mic(uint8_t *buf, size_t size, uint8_t *appkey);
-uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, uint8_t* msg, size_t size, uint8_t *nwkskey);
+uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
 void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey, uint8_t *out);
 void decrypt_join_accept(uint8_t *key, uint8_t *pkt, int has_clist, uint8_t *out);
 void generate_session_keys(uint8_t *app_nonce, uint8_t *dev_nonce, uint8_t *appkey, uint8_t *nwkskey, uint8_t *appskey);
