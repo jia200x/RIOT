@@ -120,7 +120,6 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
     }
 
     /* TODO: Time On Air from netdev! */
-
     printf("{Payload: \"%s\" (%d bytes), RSSI: %i, SNR: %i, TOA: %lu}\n",
            (char*) pkt->data, (int) pkt->size,
            rx_info.rssi, (int)rx_info.snr,

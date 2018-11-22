@@ -22,14 +22,13 @@ static int _compare_mic(uint32_t expected_mic, uint8_t *mic_buf)
 
 static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
-    /* Decrypt packet */
+    /* TODO: Validate packet size */
+
     /* TODO: Proper handling */
     uint8_t out[32];
     decrypt_join_accept(netif->lorawan.appkey, ((uint8_t*) pkt->data)+1,
             (pkt->size-1) >= 16, out);
     memcpy(((uint8_t*) pkt->data)+1, out, pkt->size-1);
-
-    /* Validate packet */
 
     uint32_t mic = calculate_mic(pkt->data, pkt->size-MIC_SIZE, netif->lorawan.appkey);
     if(!_compare_mic(mic, ((uint8_t*) pkt->data)+pkt->size-MIC_SIZE)) {
@@ -38,13 +37,14 @@ static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     }
 
     netif->lorawan.fcnt = 0;
-    generate_session_keys(((uint8_t*)pkt->data)+1, netif->lorawan.dev_nonce, netif->lorawan.appkey, netif->lorawan.nwkskey, netif->lorawan.appskey);
+    lorawan_join_accept_t *ja_hdr = (lorawan_join_accept_t*) out;
+    generate_session_keys(ja_hdr->app_nonce, netif->lorawan.dev_nonce, netif->lorawan.appkey, netif->lorawan.nwkskey, netif->lorawan.appskey);
 
     /* Copy devaddr */
-    memcpy(netif->lorawan.dev_addr, ((uint8_t*) pkt->data)+7, 4);
+    memcpy(netif->lorawan.dev_addr, ja_hdr->dev_addr, 4);
 
-    netif->lorawan.dl_settings = *(((uint8_t*) pkt->data)+11);
-    netif->lorawan.rx_delay = *(((uint8_t*) pkt->data)+12);
+    netif->lorawan.dl_settings = ja_hdr->dl_settings;
+    netif->lorawan.rx_delay = ja_hdr->rx_delay;
 
     printf("dl_settings: %i\n", netif->lorawan.dl_settings);
     printf("rx_delay: %i\n", netif->lorawan.rx_delay);
