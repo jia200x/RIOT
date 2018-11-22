@@ -125,7 +125,7 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
            (char*) pkt->data, (int) pkt->size,
            rx_info.rssi, (int)rx_info.snr,
            (long int) 0);
-    gnrc_lorawan_process_pkt(netif, pkt->data, pkt->size);
+    gnrc_lorawan_process_pkt(netif, pkt);
     return NULL;
 }
 

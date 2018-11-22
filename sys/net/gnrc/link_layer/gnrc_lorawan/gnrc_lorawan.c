@@ -20,36 +20,31 @@ static int _compare_mic(uint32_t expected_mic, uint8_t *mic_buf)
    return expected_mic == mic;
 }
 
-static void _process_join_accept(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
+static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
-    /* TODO: PACKET < 33 */
-
     /* Decrypt packet */
+    /* TODO: Proper handling */
     uint8_t out[32];
-    decrypt_join_accept(netif->lorawan.appkey, pkt+1, (size-1) >= 16, out);
-    memcpy(pkt+1, out, size-1);
+    decrypt_join_accept(netif->lorawan.appkey, ((uint8_t*) pkt->data)+1,
+            (pkt->size-1) >= 16, out);
+    memcpy(((uint8_t*) pkt->data)+1, out, pkt->size-1);
 
     /* Validate packet */
 
-    uint32_t mic = calculate_mic(pkt, size-MIC_SIZE, netif->lorawan.appkey);
-    if(!_compare_mic(mic, pkt+size-MIC_SIZE)) {
+    uint32_t mic = calculate_mic(pkt->data, pkt->size-MIC_SIZE, netif->lorawan.appkey);
+    if(!_compare_mic(mic, ((uint8_t*) pkt->data)+pkt->size-MIC_SIZE)) {
         printf("BAD MIC!");
         return;
     }
 
     netif->lorawan.fcnt = 0;
-    generate_session_keys(pkt+1, netif->lorawan.dev_nonce, netif->lorawan.appkey, netif->lorawan.nwkskey, netif->lorawan.appskey);
-
-    for(int i=0;i<33;i++) {
-        printf("%02x ", pkt[i]);
-    }
-    printf("\n");
+    generate_session_keys(((uint8_t*)pkt->data)+1, netif->lorawan.dev_nonce, netif->lorawan.appkey, netif->lorawan.nwkskey, netif->lorawan.appskey);
 
     /* Copy devaddr */
-    memcpy(netif->lorawan.dev_addr, pkt+7, 4);
+    memcpy(netif->lorawan.dev_addr, ((uint8_t*) pkt->data)+7, 4);
 
-    netif->lorawan.dl_settings = *(pkt+11);
-    netif->lorawan.rx_delay = *(pkt+12);
+    netif->lorawan.dl_settings = *(((uint8_t*) pkt->data)+11);
+    netif->lorawan.rx_delay = *(((uint8_t*) pkt->data)+12);
 
     printf("dl_settings: %i\n", netif->lorawan.dl_settings);
     printf("rx_delay: %i\n", netif->lorawan.rx_delay);
@@ -84,15 +79,16 @@ int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate)
     return 0;
 }
 
-void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
+void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
-    (void) size;
-    uint8_t *p = pkt;
+    /* TODO: Pass to proper struct */
+    uint8_t *p = pkt->data;
 
     uint8_t mtype = (*p & MTYPE_MASK) >> 5;
     switch(mtype) {
         case MTYPE_JOIN_ACCEPT:
-            _process_join_accept(netif, pkt, size);
+            _process_join_accept(netif, pkt);
+            gnrc_pktbuf_release(pkt);
             break;
         default:
             break;
