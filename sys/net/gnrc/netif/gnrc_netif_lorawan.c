@@ -165,6 +165,8 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
     if (netdev->driver->send(netdev, &iolist) == -ENOTSUP) {
         puts("Cannot send: radio is still transmitting");
     }
+
+    gnrc_pktbuf_release(pkt);
     
     /* TODO:! */
     netif->lorawan.fcnt += 1;
