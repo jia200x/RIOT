@@ -102,6 +102,9 @@ void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, uint8_t *pkt, size_t size)
 /*TODO: REFACTOR */
 gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
 {
+    /* TODO: Add error handling */
+    gnrc_pktbuf_merge(payload);
+
     gnrc_pktsnip_t *enc_payload = gnrc_pktbuf_add(NULL, NULL, payload->size, GNRC_NETTYPE_UNDEF);
     gnrc_pktsnip_t *hdr = gnrc_pktbuf_add(enc_payload, NULL, sizeof(lorawan_hdr_t), GNRC_NETTYPE_UNDEF);
 
