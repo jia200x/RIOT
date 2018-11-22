@@ -231,10 +231,6 @@ void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
         .iol_len = pkt->size
     };
 
-   /* for(unsigned int i=0;i<pkt_size;i++) {
-        printf("%02x ", buf[i]);
-    }
-    printf("\n");*/
     if (dev->driver->send(dev, &iolist) == -ENOTSUP) {
         puts("Cannot send: radio is still transmitting");
     }
