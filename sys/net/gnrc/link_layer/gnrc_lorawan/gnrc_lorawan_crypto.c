@@ -5,47 +5,42 @@
 #include "crypto/ciphers.h"
 
 #include "net/gnrc/lorawan/lorawan.h"
-
-#define PKT_WRITE_BYTE(CURSOR, BYTE) *(CURSOR++) = BYTE
-
-#define PKT_WRITE(CURSOR, SRC, LEN) do {\
-    memcpy(CURSOR, SRC, LEN); \
-    CURSOR += LEN; \
-} while (0);
+#include "byteorder.h"
 
 //TODO
 static cmac_context_t CmacContext;
 static uint8_t digest[16];
 static cipher_t AesContext;
 
+typedef struct  __attribute__((packed)) {
+    uint8_t fb;
+    uint32_t u8_pad;
+    uint8_t dir;
+    le_uint32_t dev_addr;
+    le_uint32_t fcnt;
+    uint8_t u32_pad;
+    uint8_t len;
+} lorawan_block_t;
 
 uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey)
 {
     /* Block */
-    uint8_t block[16];
-    uint8_t *p = block;
-    memset(block, 0, 16);
-    
-    PKT_WRITE_BYTE(p, 0x49);
-    /* pad */
-    p += 4;
+    lorawan_block_t block; 
 
-    PKT_WRITE_BYTE(p, dir & 0x1);
-    PKT_WRITE(p, dev_addr, 4);
+    block.fb = 0x49;
+    block.u8_pad = 0;
+    block.dir = dir & 0x1;
 
-    PKT_WRITE_BYTE(p, fcnt & 0xFF);
-    PKT_WRITE_BYTE(p, (fcnt >> 8) & 0xFF);
-    PKT_WRITE_BYTE(p, 0);
-    PKT_WRITE_BYTE(p, 0);
+    memcpy(&block.dev_addr, dev_addr, 4);
 
-    /* More pad */
-    PKT_WRITE_BYTE(p, 0);
+    block.fcnt = byteorder_btoll(byteorder_htonl(fcnt));
+    block.u32_pad = 0;
 
     /* TODO: Length of packet snip */
-    PKT_WRITE_BYTE(p, gnrc_pkt_len(pkt));
+    block.len = gnrc_pkt_len(pkt);
 
     cmac_init(&CmacContext, nwkskey, 16);
-    cmac_update(&CmacContext, block, sizeof(block) );
+    cmac_update(&CmacContext, &block, sizeof(block) );
     while(pkt != NULL) {
         cmac_update(&CmacContext, pkt->data, pkt->size);
         pkt = pkt->next;
@@ -63,27 +58,22 @@ void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t 
     memset(s_block, 0, sizeof(s_block));
     memset(a_block, 0, sizeof(a_block));
 
-    uint8_t *p = a_block;
+    lorawan_block_t *block = (lorawan_block_t*) a_block;
 
-    PKT_WRITE_BYTE(p, 0x01);
+    block->fb = 0x01;
 
-    /* pad */
-    p += 4;
+    block->u8_pad = 0;
+    block->dir = dir & 0x1;
 
-    PKT_WRITE_BYTE(p, dir & 0x1);
-    PKT_WRITE(p, dev_addr, 4);
+    memcpy(&block->dev_addr, dev_addr, 4);
 
     /* TODO: Frame Counter */
-    PKT_WRITE_BYTE(p, fcnt & 0xFF);
-    PKT_WRITE_BYTE(p, (fcnt >> 8) & 0xFF);
-    PKT_WRITE_BYTE(p, 0);
-    PKT_WRITE_BYTE(p, 0);
+    block->fcnt = byteorder_btoll(byteorder_htonl(fcnt));
 
-    /* More pad */
-    PKT_WRITE_BYTE(p, 0);
+    block->u32_pad = 0;
 
     /* TODO: */
-    PKT_WRITE_BYTE(p, 1);
+    block->len = 1;
 
     //uint8_t blocks = (size >> 8) + 1;
     /* TODO: APPKEY HARDCODED! */
