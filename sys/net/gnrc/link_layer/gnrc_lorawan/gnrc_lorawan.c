@@ -37,7 +37,7 @@ static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     }
 
     netif->lorawan.fcnt = 0;
-    lorawan_join_accept_t *ja_hdr = (lorawan_join_accept_t*) out;
+    lorawan_join_accept_t *ja_hdr = (lorawan_join_accept_t*) pkt->data;
     generate_session_keys(ja_hdr->app_nonce, netif->lorawan.dev_nonce, netif->lorawan.appkey, netif->lorawan.nwkskey, netif->lorawan.appskey);
 
     /* Copy devaddr */
