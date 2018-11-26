@@ -63,6 +63,13 @@ static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     netif->lorawan.joined = true;
 }
 
+void gnrc_lorawan_join_abp(gnrc_netif_t *netif)
+{
+    /* That's it! */
+    puts("Joined with ABP");
+    netif->lorawan.fcnt = 0;
+    netif->lorawan.joined = true;
+}
 int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate)
 {
     netdev_t *dev = netif->dev;

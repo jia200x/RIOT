@@ -55,6 +55,7 @@ void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t 
 void decrypt_join_accept(uint8_t *key, uint8_t *pkt, int has_clist, uint8_t *out);
 void generate_session_keys(uint8_t *app_nonce, uint8_t *dev_nonce, uint8_t *appkey, uint8_t *nwkskey, uint8_t *appskey);
 void gnrc_lorawan_send_join_request(gnrc_netif_t *netif);
+void gnrc_lorawan_join_abp(gnrc_netif_t *netif);
 void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif);
 void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt);
 int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate);

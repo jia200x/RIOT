@@ -198,7 +198,16 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
     (void) netif;
     switch(opt->opt) {
         case NETOPT_JOIN:
-            gnrc_lorawan_send_join_request(netif);
+            assert(opt->data_len == sizeof(uint8_t));
+            if(*(uint8_t*) opt->data) {
+                gnrc_lorawan_send_join_request(netif);
+            }
+            else {
+                gnrc_lorawan_join_abp(netif);
+            }
+            break;
+        case NETOPT_ADDRESS:
+            memcpy(&netif->lorawan.dev_addr, opt->data, opt->data_len);
             break;
         case NETOPT_ADDRESS_LONG:
             memcpy(&netif->lorawan.deveui, opt->data, opt->data_len);
@@ -208,6 +217,12 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
             break;
         case NETOPT_APPKEY:
             memcpy(&netif->lorawan.appkey, opt->data, opt->data_len);
+            break;
+        case NETOPT_APPSKEY:
+            memcpy(&netif->lorawan.appskey, opt->data, opt->data_len);
+            break;
+        case NETOPT_NWKSKEY:
+            memcpy(&netif->lorawan.nwkskey, opt->data, opt->data_len);
             break;
         case NETOPT_DATARATE:
             assert(opt->data_len == sizeof(uint8_t));

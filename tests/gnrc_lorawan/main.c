@@ -63,15 +63,16 @@
 //static uint8_t message[32];
 static sx127x_t sx127x;
 
+/*Little endian! */
 uint8_t  appeui[8] = { 0x2E, 0x91, 0x00, 0xD0, 0x7E, 0xD5, 0xB3, 0x70 };
 uint8_t  deveui[8] = { 0x17, 0xFF, 0x06, 0xDA, 0x7E, 0xD5, 0xB3, 0x70 };
 uint8_t  appkey[16] = { 0x16, 0xC4, 0x79, 0x33, 0xD6, 0x1F, 0x17, 0x22, 0x43, 0x7C, 0xF9, 0x99, 0x2D, 0xAB, 0x37, 0x3F };
 
-uint8_t nwkskey[16] = {0};
-uint8_t appskey[16] = {0};
+int8_t nwkskey[16] = { 0xC8, 0x81, 0x26, 0x2B, 0xC8, 0x7A, 0xD7, 0x91, 0x75, 0xB2, 0x0F, 0xDA, 0xB6, 0x83, 0x07, 0xEB };
+uint8_t appskey[16] = { 0xAA, 0x35, 0xDE, 0x79, 0xCC, 0x6A, 0x66, 0x98, 0xC8, 0x65, 0x32, 0x0F, 0x7A, 0x76, 0xF1, 0xEA };
 
 uint8_t dev_nonce[2];
-uint8_t dev_addr[4];
+uint8_t dev_addr[4] = { 0x06, 0x1A, 0x01, 0x26 };
 
 uint16_t fcnt = 0;
 
@@ -339,6 +340,19 @@ int send_something_cmd(int argc, char **argv)
     return 0;
 }
 
+int lora_abp(int argc, char **argv)
+{
+    (void) argc;
+    (void) argv;
+    uint8_t join_method = 0;
+    gnrc_netapi_set(3, NETOPT_ADDRESS, 0, dev_addr, 4);
+    gnrc_netapi_set(3, NETOPT_NWKSKEY, 0, nwkskey, 16);
+    gnrc_netapi_set(3, NETOPT_APPSKEY, 0, appskey, 16);
+    gnrc_netapi_set(3, NETOPT_JOIN, 0, &join_method, 1);
+
+    return 0;
+}
+
 int lora_cmd(int argc, char **argv)
 {
     (void) argc;
@@ -346,13 +360,15 @@ int lora_cmd(int argc, char **argv)
     gnrc_netapi_set(3, NETOPT_ADDRESS_LONG, 0, deveui, 8);
     gnrc_netapi_set(3, NETOPT_APPEUI, 0, appeui, 8);
     gnrc_netapi_set(3, NETOPT_APPKEY, 0, appkey, 16);
-    gnrc_netapi_set(3, NETOPT_JOIN, 0, NULL, 0);
+    uint8_t join_method = 1;
+    gnrc_netapi_set(3, NETOPT_JOIN, 0, &join_method, 1);
 
     return 0;
 }
 
 static const shell_command_t shell_commands[] = {
     { "ota",      "Perform OTA",     lora_cmd},
+    { "abp",      "Perform OTA",     lora_abp},
     { "test2",    "Test ULora 2",     send_something_cmd},
     { "setup",    "Initialize LoRa modulation settings",     lora_setup_cmd},
     { "random",   "Get random number from sx127x",           random_cmd },
