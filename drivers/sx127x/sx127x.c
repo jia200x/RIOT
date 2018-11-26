@@ -307,9 +307,10 @@ static void _on_tx_timeout(void *arg)
 
 static void _on_rx_timeout(void *arg)
 {
-    netdev_t *dev = (netdev_t *) arg;
+    (void) arg;
+    //netdev_t *dev = (netdev_t *) arg;
 
-    dev->event_callback(dev, NETDEV_EVENT_RX_TIMEOUT);
+    //dev->event_callback(dev, NETDEV_EVENT_RX_TIMEOUT);
 }
 
 static void _init_timers(sx127x_t *dev)
