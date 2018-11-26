@@ -48,6 +48,10 @@ extern "C" {
 #define JOIN_REQUEST_SIZE 23
 #define MIC_SIZE 4
 
+#define LORAWAN_STATE_IDLE (0)
+#define LORAWAN_STATE_RX_1 (1)
+#define LORAWAN_STATE_RX_2 (2)
+#define LORAWAN_STATE_TX (2)
 
 uint32_t calculate_mic(uint8_t *buf, size_t size, uint8_t *appkey);
 uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);

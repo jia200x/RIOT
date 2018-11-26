@@ -94,6 +94,8 @@ int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate)
 
 void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
+    netif->lorawan.state = LORAWAN_STATE_IDLE;
+    xtimer_remove(&netif->lorawan.rx_1);
     /* TODO: Pass to proper struct */
     uint8_t *p = pkt->data;
 
@@ -204,6 +206,7 @@ static gnrc_pktsnip_t *_build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uin
 void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif)
 {
     netif->lorawan.msg.type = MSG_TYPE_TIMEOUT;
+    netif->lorawan.state = LORAWAN_STATE_RX_1;
     /* TODO:This logic might change */
     if(!netif->lorawan.joined) {
         /* Join request */
@@ -219,9 +222,11 @@ void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif)
 
     /* TODO: Sleep interface */
 }
+/*TODO: Move to gnrc_netif*/
 void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
 {
     netdev_t *dev = netif->dev;
+    netif->lorawan.state = LORAWAN_STATE_TX;
 
     uint32_t channel_freq = 868300000;
     
