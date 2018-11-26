@@ -20,6 +20,12 @@ static int _compare_mic(uint32_t expected_mic, uint8_t *mic_buf)
    return expected_mic == mic;
 }
 
+void gnrc_lorawan_event_timeout(gnrc_netif_t *netif)
+{
+    (void) netif;
+    puts("gnrc_lorawan_event_timeout");
+}
+
 static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
     /* TODO: Validate packet size */

@@ -72,6 +72,10 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
                 gnrc_lorawan_event_tx_complete(netif);
                 puts("Transmission completed");
                 break;
+            case NETDEV_EVENT_RX_TIMEOUT:
+                puts("RX timeout");
+                gnrc_lorawan_event_timeout(netif);
+                break;
             default:
                 DEBUG("gnrc_netif: warning: unhandled event %u.\n", event);
         }
