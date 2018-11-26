@@ -140,7 +140,7 @@ gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *p
     return hdr;
 }
 
-void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)
+static void _configure_rx_window(gnrc_netif_t *netif)
 {
     netdev_t *netdev = netif->dev;
     netopt_enable_t iq_invert = true;
@@ -154,7 +154,11 @@ void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)
     netdev->driver->set(netdev, NETOPT_SINGLE_RECEIVE, &single, sizeof(single));
     const uint32_t timeout = 25;
     netdev->driver->set(netdev, NETOPT_RX_TIMEOUT, &timeout, sizeof(timeout));
+}
 
+void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)
+{
+    netdev_t *netdev = netif->dev;
     /* Switch to RX state */
     uint8_t state = NETOPT_STATE_RX;
     netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
@@ -187,14 +191,16 @@ static gnrc_pktsnip_t *_build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uin
 void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif)
 {
     netif->lorawan.msg.type = MSG_TYPE_TIMEOUT;
-    /* This logic might change */
+    /* TODO:This logic might change */
     if(!netif->lorawan.joined) {
         /* Join request */
         xtimer_set_msg(&netif->lorawan.rx_1, 4950000, &netif->lorawan.msg, netif->pid);
+        _configure_rx_window(netif);
     }
     else {
         puts("It's joined");
         xtimer_set_msg(&netif->lorawan.rx_1, 950000, &netif->lorawan.msg, netif->pid);
+        _configure_rx_window(netif);
     }
 
 

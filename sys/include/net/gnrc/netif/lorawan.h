@@ -28,6 +28,7 @@
 extern "C" {
 #endif
 
+/* TODO: Only store neessary keys! */
 typedef struct {
     uint8_t deveui[GNRC_LORAWAN_EUI_LEN];
     uint8_t appeui[GNRC_LORAWAN_EUI_LEN];
