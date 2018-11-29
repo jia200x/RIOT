@@ -239,6 +239,11 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
             assert(opt->data_len == sizeof(uint8_t));
             netif->lorawan.confirmed_data = *((uint8_t*) opt->data);
             break;
+        case NETOPT_RX2_DATARATE:
+            assert(opt->data_len == sizeof(uint8_t));
+            netif->lorawan.dl_settings &= 0xF0;
+            netif->lorawan.dl_settings |= *((uint8_t*) opt->data) & 0xF;
+            break;
         default:
             netif->dev->driver->get(netif->dev, opt->opt, opt->data, opt->data_len);
             break;

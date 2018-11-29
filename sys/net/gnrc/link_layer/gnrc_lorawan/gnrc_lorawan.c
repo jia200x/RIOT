@@ -55,7 +55,9 @@ static void _configure_rx_window_2(gnrc_netif_t *netif)
     netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
     //sx127x_set_iq_invert(&sx127x, true);
 
-    gnrc_lorawan_set_dr(netif, 3);
+    /* Get DR for RX 2 */
+    uint8_t dr_rx2 = netif->lorawan.dl_settings & 0xF;
+    gnrc_lorawan_set_dr(netif, dr_rx2);
 
     /* Switch to continuous listen mode */
     const netopt_enable_t single = true;

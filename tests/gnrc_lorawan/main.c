@@ -347,9 +347,11 @@ int lora_abp(int argc, char **argv)
     (void) argc;
     (void) argv;
     uint8_t join_method = 0;
+    uint8_t rx2_dr = 3;
     gnrc_netapi_set(3, NETOPT_ADDRESS, 0, dev_addr, 4);
     gnrc_netapi_set(3, NETOPT_NWKSKEY, 0, nwkskey, 16);
     gnrc_netapi_set(3, NETOPT_APPSKEY, 0, appskey, 16);
+    gnrc_netapi_set(3, NETOPT_RX2_DATARATE, 0, &rx2_dr, sizeof(uint8_t));
     gnrc_netapi_set(3, NETOPT_JOIN, 0, &join_method, 1);
 
     return 0;
