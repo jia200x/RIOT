@@ -26,6 +26,8 @@ int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate)
     dev->driver->set(dev, NETOPT_BANDWIDTH, &bw, sizeof(bw));
     dev->driver->set(dev, NETOPT_SPREADING_FACTOR, &sf, sizeof(sf));
 
+    netif->lorawan.datarate = datarate;
+
     return 0;
 }
 
@@ -34,9 +36,9 @@ static void _configure_rx_window(gnrc_netif_t *netif)
     netdev_t *netdev = netif->dev;
     netopt_enable_t iq_invert = true;
     netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
-    //sx127x_set_iq_invert(&sx127x, true);
 
-    gnrc_lorawan_set_dr(netif, 5);
+    /* TODO: Add DR1 offset */
+    gnrc_lorawan_set_dr(netif, netif->lorawan.datarate);
 
     /* Switch to continuous listen mode */
     const netopt_enable_t single = true;

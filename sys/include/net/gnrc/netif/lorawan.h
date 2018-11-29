@@ -38,6 +38,7 @@ typedef struct {
     uint8_t state;
     uint8_t dev_nonce[2];
     uint8_t dev_addr[4];
+    uint8_t datarate;
     uint16_t fcnt;
     uint8_t dl_settings;
     uint8_t rx_delay;
