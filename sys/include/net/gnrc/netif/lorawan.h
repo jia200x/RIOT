@@ -44,6 +44,7 @@ typedef struct {
     xtimer_t rx_1;
     xtimer_t rx_2;
     msg_t msg;
+    msg_t msg_2;
     uint8_t joined;
 } gnrc_netif_lorawan_t;
 
