@@ -80,7 +80,7 @@ typedef struct __attribute__((packed)) {
     uint8_t mt_maj;
     uint8_t app_nonce[3];
     uint8_t net_id[3];
-    uint32_t dev_addr[4];
+    uint8_t dev_addr[4];
     uint8_t dl_settings;
     uint8_t rx_delay;
 } lorawan_join_accept_t;
