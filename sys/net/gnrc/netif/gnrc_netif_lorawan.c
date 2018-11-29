@@ -81,6 +81,7 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
         }
     }
 }
+/* TODO: Move to gnrc_lorawan */
 static void _init(gnrc_netif_t *netif)
 {
     netif->dev->event_callback = _event_cb;
@@ -90,6 +91,8 @@ static void _init(gnrc_netif_t *netif)
     uint8_t syncword = LORA_SYNCWORD_PUBLIC;
     netif->dev->driver->set(netif->dev, NETOPT_SYNCWORD, &syncword, sizeof(syncword));
 
+    uint8_t confirmed_data = false;
+    netif->dev->driver->set(netif->dev, NETOPT_ACK_REQ, &confirmed_data, sizeof(confirmed_data));
 
     netif->lorawan.joined = false;
 }
@@ -231,6 +234,10 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
         case NETOPT_DATARATE:
             assert(opt->data_len == sizeof(uint8_t));
             gnrc_lorawan_set_dr(netif, *(uint8_t*) opt->data);  
+            break;
+        case NETOPT_ACK_REQ:
+            assert(opt->data_len == sizeof(uint8_t));
+            netif->lorawan.confirmed_data = *((uint8_t*) opt->data);
             break;
         default:
             netif->dev->driver->get(netif->dev, opt->opt, opt->data, opt->data_len);

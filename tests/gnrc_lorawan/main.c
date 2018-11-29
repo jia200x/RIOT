@@ -333,8 +333,10 @@ int send_something_cmd(int argc, char **argv)
     (void) argc;
     (void) argv;
     uint8_t dr = atoi(argv[1]);
+    uint8_t confirmed = atoi(argv[2]);
     gnrc_pktsnip_t *pkt;
     gnrc_netapi_set(3, NETOPT_DATARATE, 0, &dr, sizeof(dr));
+    gnrc_netapi_set(3, NETOPT_ACK_REQ, 0, &confirmed, sizeof(confirmed));
     pkt = gnrc_pktbuf_add(NULL, "RIOT", 4, GNRC_NETTYPE_UNDEF);
     gnrc_netapi_send(3, pkt);
     return 0;

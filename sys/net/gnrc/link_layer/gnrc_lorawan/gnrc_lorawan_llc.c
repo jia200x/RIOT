@@ -96,7 +96,7 @@ gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *p
 
     lorawan_hdr_t *lw_hdr = hdr->data;
 
-    lorawan_hdr_set_mtype(lw_hdr, MTYPE_UNCNF_UPLINK);
+    lorawan_hdr_set_mtype(lw_hdr, netif->lorawan.confirmed_data ? MTYPE_CNF_UPLINK : MTYPE_UNCNF_UPLINK);
     lorawan_hdr_set_maj(lw_hdr, MAJOR_LRWAN_R1);
 
     /* TODO: */

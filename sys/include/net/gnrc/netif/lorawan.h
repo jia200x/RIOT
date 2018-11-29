@@ -46,6 +46,7 @@ typedef struct {
     msg_t msg;
     msg_t msg_2;
     uint8_t joined;
+    uint8_t confirmed_data;
 } gnrc_netif_lorawan_t;
 
 #ifdef __cplusplus
