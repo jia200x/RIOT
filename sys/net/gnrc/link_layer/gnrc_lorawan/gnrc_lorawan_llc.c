@@ -41,7 +41,9 @@ static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     memcpy(netif->lorawan.dev_addr, ja_hdr->dev_addr, 4);
 
     netif->lorawan.dl_settings = ja_hdr->dl_settings;
-    netif->lorawan.rx_delay = ja_hdr->rx_delay;
+
+    /* delay 0 maps to 1 second */
+    netif->lorawan.rx_delay = ja_hdr->rx_delay ? ja_hdr->rx_delay : 1;
 
     printf("dl_settings: %i\n", netif->lorawan.dl_settings);
     printf("rx_delay: %i\n", netif->lorawan.rx_delay);
@@ -68,6 +70,7 @@ void gnrc_lorawan_join_abp(gnrc_netif_t *netif)
     /* That's it! */
     puts("Joined with ABP");
     netif->lorawan.fcnt = 0;
+    netif->lorawan.rx_delay = 1;
     netif->lorawan.joined = true;
 }
 void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)

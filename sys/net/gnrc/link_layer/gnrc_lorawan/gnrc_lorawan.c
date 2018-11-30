@@ -86,7 +86,7 @@ void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif)
     netif->lorawan.msg_2.type = MSG_TYPE_TIMEOUT;
     netif->lorawan.state = LORAWAN_STATE_RX_1;
 
-    /* TODO: This logic might change */
+    /* TODO: This logic WILL change */
     if(!netif->lorawan.joined) {
         /* Join request */
         xtimer_set_msg(&netif->lorawan.rx_1, 4950000, &netif->lorawan.msg, netif->pid);
@@ -95,8 +95,8 @@ void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif)
     }
     else {
         puts("It's joined");
-        xtimer_set_msg(&netif->lorawan.rx_1, 950000, &netif->lorawan.msg, netif->pid);
-        xtimer_set_msg(&netif->lorawan.rx_2, 1980000, &netif->lorawan.msg_2, netif->pid);
+        xtimer_set_msg(&netif->lorawan.rx_1, netif->lorawan.rx_delay*1000000-50000, &netif->lorawan.msg, netif->pid);
+        xtimer_set_msg(&netif->lorawan.rx_2, 1000000 + netif->lorawan.rx_delay*1000000-20000, &netif->lorawan.msg_2, netif->pid);
         _configure_rx_window(netif);
     }
     /* TODO: Sleep interface */
