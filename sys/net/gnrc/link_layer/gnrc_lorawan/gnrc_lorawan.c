@@ -41,7 +41,7 @@ static void _configure_rx_window(gnrc_netif_t *netif)
 
     /* TODO: Add DR1 offset */
     uint8_t dr_offset = (netif->lorawan.dl_settings >> 4) & 0x7;
-    gnrc_lorawan_set_dr(netif, rx1_dr_offset[netif->lorawan.datarate][dr_offset]);
+    gnrc_lorawan_set_dr(netif, gnrc_lorawan_rx1_get_dr_offset(netif->lorawan.datarate, dr_offset));
 
     /* Switch to continuous listen mode */
     const netopt_enable_t single = true;
@@ -70,15 +70,6 @@ static void _configure_rx_window_2(gnrc_netif_t *netif)
     netdev->driver->set(netdev, NETOPT_SINGLE_RECEIVE, &single, sizeof(single));
     const uint32_t timeout = 25;
     netdev->driver->set(netdev, NETOPT_RX_TIMEOUT, &timeout, sizeof(timeout));
-}
-
-uint32_t gnrc_lorawan_pick_channel(gnrc_netif_t *netif) {
-    /* TODO: Implement when add/remove channel gets implemented */
-    netdev_t *netdev = netif->dev;
-    uint32_t random_number;
-    netdev->driver->get(netdev, NETOPT_RANDOM, &random_number, sizeof(random_number));
-    
-    return lorawan_channels[random_number % 3];
 }
 
 void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)

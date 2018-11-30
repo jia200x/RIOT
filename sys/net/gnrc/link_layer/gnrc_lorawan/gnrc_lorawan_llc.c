@@ -3,6 +3,7 @@
 #include "net/gnrc/netif.h"
 #include "net/lora.h"
 #include "net/gnrc/lorawan/lorawan.h"
+#include "net/gnrc/lorawan/region.h"
 #include "errno.h"
 #include "net/gnrc/pktbuf.h"
 
@@ -21,8 +22,9 @@ static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 
     /* TODO: Proper handling */
     uint8_t out[32];
+    uint8_t has_cflist = (pkt->size-1) >= 16;
     decrypt_join_accept(netif->lorawan.appkey, ((uint8_t*) pkt->data)+1,
-            (pkt->size-1) >= 16, out);
+            has_cflist, out);
     memcpy(((uint8_t*) pkt->data)+1, out, pkt->size-1);
 
     uint32_t mic = calculate_mic(pkt->data, pkt->size-MIC_SIZE, netif->lorawan.appkey);
@@ -55,6 +57,8 @@ static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
         printf("%02x ", netif->lorawan.appskey[i]);
     }
     printf("\n");
+
+    gnrc_lorawan_process_cflist(netif, out+sizeof(lorawan_join_accept_t)-1);
     netif->lorawan.joined = true;
 }
 
