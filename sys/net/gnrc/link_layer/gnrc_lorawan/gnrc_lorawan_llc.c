@@ -160,7 +160,7 @@ void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
     netdev_t *dev = netif->dev;
     netif->lorawan.state = LORAWAN_STATE_TX;
 
-    uint32_t channel_freq = 868300000;
+    uint32_t channel_freq = gnrc_lorawan_pick_channel(netif);
     
     gnrc_lorawan_set_dr(netif, 5);
 

@@ -72,6 +72,15 @@ static void _configure_rx_window_2(gnrc_netif_t *netif)
     netdev->driver->set(netdev, NETOPT_RX_TIMEOUT, &timeout, sizeof(timeout));
 }
 
+uint32_t gnrc_lorawan_pick_channel(gnrc_netif_t *netif) {
+    /* TODO: Implement when add/remove channel gets implemented */
+    netdev_t *netdev = netif->dev;
+    uint32_t random_number;
+    netdev->driver->get(netdev, NETOPT_RANDOM, &random_number, sizeof(random_number));
+    
+    return lorawan_channels[random_number % 3];
+}
+
 void gnrc_lorawan_open_rx_window(gnrc_netif_t *netif)
 {
     netdev_t *netdev = netif->dev;

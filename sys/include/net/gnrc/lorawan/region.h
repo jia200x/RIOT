@@ -5,6 +5,26 @@
 extern "C" {
 #endif
 
+/* TODO: Implement in struct */
+static uint32_t lorawan_channels[16] = {
+    868100000,
+    868300000,
+    868500000,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+};
+
 /*TODO: Implement properly... */
 static const uint8_t rx1_dr_offset[8][6] = {
     {0,0,0,0,0,0},

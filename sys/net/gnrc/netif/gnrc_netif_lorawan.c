@@ -144,7 +144,8 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
         return 0;
     }
     netdev_t *netdev = netif->dev;
-    uint32_t chan = 868300000;
+
+    uint32_t chan = gnrc_lorawan_pick_channel(netif);
 
     netdev->driver->set(netdev, NETOPT_CHANNEL_FREQUENCY, &chan, sizeof(chan));
 

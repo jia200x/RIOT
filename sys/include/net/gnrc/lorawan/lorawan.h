@@ -66,6 +66,7 @@ void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt);
 int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate);
 gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *payload);
 void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif);
+uint32_t gnrc_lorawan_pick_channel(gnrc_netif_t *netif);
 
 #ifdef __cplusplus
 }
