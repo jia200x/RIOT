@@ -7,6 +7,7 @@
 #include "net/gnrc/pktbuf.h"
 
 #include "net/lorawan/hdr.h"
+#include "net/gnrc/lorawan/region.h"
 
 #define GNRC_LORAWAN_NUMOF_DATARATES 7
 
@@ -31,6 +32,7 @@ int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate)
     return 0;
 }
 
+/* TODO: Merge into one function */
 static void _configure_rx_window(gnrc_netif_t *netif)
 {
     netdev_t *netdev = netif->dev;
@@ -38,7 +40,8 @@ static void _configure_rx_window(gnrc_netif_t *netif)
     netdev->driver->set(netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
 
     /* TODO: Add DR1 offset */
-    gnrc_lorawan_set_dr(netif, netif->lorawan.datarate);
+    uint8_t dr_offset = (netif->lorawan.dl_settings >> 4) & 0x7;
+    gnrc_lorawan_set_dr(netif, rx1_dr_offset[netif->lorawan.datarate][dr_offset]);
 
     /* Switch to continuous listen mode */
     const netopt_enable_t single = true;
@@ -58,6 +61,7 @@ static void _configure_rx_window_2(gnrc_netif_t *netif)
     //sx127x_set_iq_invert(&sx127x, true);
 
     /* Get DR for RX 2 */
+    /* TODO: Implement helper for this function */
     uint8_t dr_rx2 = netif->lorawan.dl_settings & 0xF;
     gnrc_lorawan_set_dr(netif, dr_rx2);
 
