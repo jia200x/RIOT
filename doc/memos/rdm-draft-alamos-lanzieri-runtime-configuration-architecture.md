@@ -89,7 +89,7 @@ etc.
 
 # 5. Storage facilities
 Storage facilities MUST implement the **storage
-interface** to allow the RIOT Registry to load, search and save configuration
+interface** to allow the RIOT Registry to load, search and store configuration
 parameters. From the point of view of the RIOT Registry all parameters are
 key/value strings, it is responsibility of the storage facility to transform
 that to the proper format for storage (e.g. lines separated by `\n` character in
@@ -122,7 +122,7 @@ in the RIOT Registry.
 5. The `commit` handler is called once all configurations have been loaded from the registered sources.
 
 6. At any time, the application or the configuration manager can:
-   - **Save** a particular parameter or all, if a storage facility is already registered as a destination. 
+   - **Store** a particular parameter or all, if a storage facility is already registered as a destination. 
    - **Set**, **get** or **export** a particular parameter. To do this the RIOT Registry uses the `set`,  `get` or `export` handler of the corresponding configuration group respectively.
 
 ## Acknowledgements
