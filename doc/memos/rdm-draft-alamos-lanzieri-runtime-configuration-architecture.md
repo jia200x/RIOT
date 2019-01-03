@@ -11,8 +11,9 @@ mechanisms to implement a runtime configuration system on a RIOT node.
 
 A runtime configuration system is in charge of providing a mechanism to set and
 get the values of configuration parameters that are used during the execution of the firmware,
-as well as a way to persist these values. Most of times these values are
-per-node specific.
+as well as a way to persist these values. Runtime configurations are deployment-specific and
+can be changed on a per node basis. Appropriate management tools could also enable the
+configuration of node groups.
 
 Examples of runtime configurations are:
 - Transmission duty cycles
