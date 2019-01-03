@@ -18,7 +18,7 @@ configuration of node groups.
 Examples of runtime configurations are:
 - Transmission duty cycles
 - Sensor thresholds
-- Private-public keys
+- Security credentials
 - System state variables
 
 These parameters might have constraints, like an specific order to be applied
