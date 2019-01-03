@@ -45,7 +45,7 @@ This memo uses the [RFC2119](https://www.ietf.org/rfc/rfc2119.txt) terminology
 and the following acronyms:
 
 - RDM: RIOT Developer Memo
-- CTF: RIOT's Configuration Task Force
+- CTF: RIOT Configuration Task Force
 - RCS: Runtime Configuration System
 
 # 1. Introduction
