@@ -51,9 +51,8 @@ and the following acronyms:
 # 1. Introduction
 This document specifies the proposed architecture by the
 Configuration Task Force (CFT) to implement a secure and reliable Runtime
-Configuration System (RCS), focusing in modularity, reusing of existing
-technologies in RIOT (network stack, storage interface) and adhering to
-standards.
+Configuration System (RCS) focusing on modularity, reuse of existing
+technologies in RIOT (network stack, storage interface) and standard compliance.
 
 # 2. Architecture
 The RCS is formed by [the RIOT Registry](3-the-riot-registry), one or more [Registry Handlers](4-registry-handlers), one or more
