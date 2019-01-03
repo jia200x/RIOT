@@ -21,7 +21,7 @@ Examples of runtime configurations are:
 - Security credentials
 - System state variables
 
-These parameters might have constraints, like an specific order to be applied
+These parameters might have constraints, like a specific order to be applied
 (due to interdependencies) or value boundaries.
 
 The main advantages of having such a system are:
