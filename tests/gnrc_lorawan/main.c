@@ -76,6 +76,8 @@ uint8_t dev_addr[4] = { 0x06, 0x1A, 0x01, 0x26 };
 
 uint16_t fcnt = 0;
 
+#define MESSAGE "This is a very long LoRaWAN string in order to test how well the implementation behaves in this context"
+
 
 extern uint32_t calculate_mic(uint8_t *buf, size_t size, uint8_t *appkey);
 int lora_setup_cmd(int argc, char **argv) {
@@ -334,10 +336,12 @@ int send_something_cmd(int argc, char **argv)
     (void) argv;
     uint8_t dr = atoi(argv[1]);
     uint8_t confirmed = atoi(argv[2]);
+    uint8_t payload_size = argc > 3 ? atoi(argv[3]) : 4;
+    printf("%i\n", (int) payload_size);
     gnrc_pktsnip_t *pkt;
     gnrc_netapi_set(3, NETOPT_DATARATE, 0, &dr, sizeof(dr));
     gnrc_netapi_set(3, NETOPT_ACK_REQ, 0, &confirmed, sizeof(confirmed));
-    pkt = gnrc_pktbuf_add(NULL, "RIOT", 4, GNRC_NETTYPE_UNDEF);
+    pkt = gnrc_pktbuf_add(NULL, MESSAGE, payload_size, GNRC_NETTYPE_UNDEF);
     gnrc_netapi_send(3, pkt);
     return 0;
 }

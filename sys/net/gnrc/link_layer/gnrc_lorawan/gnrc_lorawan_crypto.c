@@ -50,7 +50,7 @@ uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_p
     return ( uint32_t )( ( uint32_t )digest[3] << 24 | ( uint32_t )digest[2] << 16 | ( uint32_t )digest[1] << 8 | ( uint32_t )digest[0] );
 }
 
-void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey, uint8_t *out)
+void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey)
 {
     uint8_t s_block[16];
     uint8_t a_block[16];
@@ -59,6 +59,8 @@ void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t 
     memset(a_block, 0, sizeof(a_block));
 
     lorawan_block_t *block = (lorawan_block_t*) a_block;
+
+    cipher_init(&AesContext, CIPHER_AES_128, appskey, 16);
 
     block->fb = 0x01;
 
@@ -69,19 +71,20 @@ void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t 
 
     /* TODO: Frame Counter */
     block->fcnt = byteorder_btoll(byteorder_htonl(fcnt));
-
     block->u32_pad = 0;
 
-    /* TODO: */
-    block->len = 1;
+    int blocks = ((size-1) >> 4) + 1;
 
-    //uint8_t blocks = (size >> 8) + 1;
-    /* TODO: APPKEY HARDCODED! */
-    cipher_init(&AesContext, CIPHER_AES_128, appskey, 16);
-    cipher_encrypt(&AesContext, a_block, s_block);
+    for (int j=1;j<=blocks;j++)
+    {
+        block->len=j;
+        cipher_encrypt(&AesContext, a_block, s_block);
 
-    for(unsigned i=0;i<size;i++) {
-        out[i] = payload[i] ^ s_block[i];
+        for(unsigned i=0;i< (j == blocks ? size % 16 : 16);i++) {
+            payload[i] = payload[i] ^ s_block[i];
+        }
+
+        payload += 16;
     }
 }
 
