@@ -98,7 +98,8 @@ gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *p
     /* TODO: Add error handling */
     gnrc_pktbuf_merge(payload);
 
-    gnrc_pktsnip_t *hdr = gnrc_pktbuf_add(payload, NULL, sizeof(lorawan_hdr_t), GNRC_NETTYPE_UNDEF);
+    /* TODO: Port and fopts */
+    gnrc_pktsnip_t *hdr = gnrc_pktbuf_add(payload, NULL, sizeof(lorawan_hdr_t) + 1, GNRC_NETTYPE_UNDEF);
 
     lorawan_hdr_t *lw_hdr = hdr->data;
 
@@ -118,10 +119,10 @@ gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *p
     lw_hdr->fcnt = fcnt;
 
     /* TODO:Hardcoded port is 1 */
-    lw_hdr->port = netif->lorawan.port;
+    *((uint8_t*) (lw_hdr+1)) = netif->lorawan.port;
 
     /* Encrypt payload (it's block encryption so we can use the same buffer!) */
-    encrypt_payload(payload->data, payload->size, netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.appskey);
+    encrypt_payload(payload->data, payload->size, netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.port ? netif->lorawan.appskey : netif->lorawan.nwkskey);
 
     /* Now calculate MIC */
     gnrc_pktsnip_t *mic = gnrc_pktbuf_add(NULL, NULL, 4, GNRC_NETTYPE_UNDEF);

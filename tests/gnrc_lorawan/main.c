@@ -353,7 +353,7 @@ int send_option(int argc, char **argv)
     (void) argc;
     (void) argv;
     uint8_t dr = 0;
-    uint8_t confirmed = false;
+    uint8_t confirmed = true;
     gnrc_pktsnip_t *pkt;
     uint8_t port = 0;
     gnrc_netapi_set(3, NETOPT_TX_PORT, 0, &port, 1);

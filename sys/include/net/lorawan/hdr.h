@@ -65,7 +65,6 @@ typedef struct __attribute__((packed)) {
     le_uint32_t addr; /**< 32 bit LoRaWAN address */
     uint8_t fctrl;    /**< frame control */
     le_uint16_t fcnt; /**< frame counter */
-    uint8_t port;     /**< port */
 } lorawan_hdr_t;
 
 typedef struct __attribute__((packed)) {
