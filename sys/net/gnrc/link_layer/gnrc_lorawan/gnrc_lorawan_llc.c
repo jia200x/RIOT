@@ -118,7 +118,7 @@ gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *p
     lw_hdr->fcnt = fcnt;
 
     /* TODO:Hardcoded port is 1 */
-    lw_hdr->port = 1;
+    lw_hdr->port = netif->lorawan.port;
 
     /* Encrypt payload (it's block encryption so we can use the same buffer!) */
     encrypt_payload(payload->data, payload->size, netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.appskey);

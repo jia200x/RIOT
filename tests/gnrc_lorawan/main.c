@@ -337,11 +337,29 @@ int send_something_cmd(int argc, char **argv)
     uint8_t dr = atoi(argv[1]);
     uint8_t confirmed = atoi(argv[2]);
     uint8_t payload_size = argc > 3 ? atoi(argv[3]) : 4;
+    uint8_t port = 1;
     printf("%i\n", (int) payload_size);
     gnrc_pktsnip_t *pkt;
+    gnrc_netapi_set(3, NETOPT_TX_PORT, 0, &port, 1);
     gnrc_netapi_set(3, NETOPT_DATARATE, 0, &dr, sizeof(dr));
     gnrc_netapi_set(3, NETOPT_ACK_REQ, 0, &confirmed, sizeof(confirmed));
     pkt = gnrc_pktbuf_add(NULL, MESSAGE, payload_size, GNRC_NETTYPE_UNDEF);
+    gnrc_netapi_send(3, pkt);
+    return 0;
+}
+
+int send_option(int argc, char **argv)
+{
+    (void) argc;
+    (void) argv;
+    uint8_t dr = 0;
+    uint8_t confirmed = false;
+    gnrc_pktsnip_t *pkt;
+    uint8_t port = 0;
+    gnrc_netapi_set(3, NETOPT_TX_PORT, 0, &port, 1);
+    gnrc_netapi_set(3, NETOPT_DATARATE, 0, &dr, sizeof(dr));
+    gnrc_netapi_set(3, NETOPT_ACK_REQ, 0, &confirmed, sizeof(confirmed));
+    pkt = gnrc_pktbuf_add(NULL, "\x02", 1, GNRC_NETTYPE_UNDEF);
     gnrc_netapi_send(3, pkt);
     return 0;
 }
@@ -378,6 +396,7 @@ static const shell_command_t shell_commands[] = {
     { "ota",      "Perform OTA",     lora_cmd},
     { "abp",      "Perform OTA",     lora_abp},
     { "test2",    "Test ULora 2",     send_something_cmd},
+    { "op",       "Options!",     send_option},
     { "setup",    "Initialize LoRa modulation settings",     lora_setup_cmd},
     { "random",   "Get random number from sx127x",           random_cmd },
     { "channel",  "Get/Set channel frequency (in Hz)",       channel_cmd },

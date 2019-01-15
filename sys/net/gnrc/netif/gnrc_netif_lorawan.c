@@ -95,6 +95,8 @@ static void _init(gnrc_netif_t *netif)
     netif->dev->driver->set(netif->dev, NETOPT_ACK_REQ, &confirmed_data, sizeof(confirmed_data));
 
     netif->lorawan.joined = false;
+    /* TODO: Default port */
+    netif->lorawan.port = 1;
 }
 
 gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize,
@@ -126,6 +128,10 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
         return NULL;
     }
 
+    for(unsigned i=0;i<pkt->size;i++) {
+        printf("%02x ", ((uint8_t*) pkt->data)[i]);
+    }
+    printf("\n");
     /* TODO: Time On Air from netdev! */
     printf("{Payload: \"%s\" (%d bytes), RSSI: %i, SNR: %i, TOA: %lu}\n",
            (char*) pkt->data, (int) pkt->size,
@@ -244,6 +250,10 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
             assert(opt->data_len == sizeof(uint8_t));
             netif->lorawan.dl_settings &= 0xF0;
             netif->lorawan.dl_settings |= *((uint8_t*) opt->data) & 0xF;
+            break;
+        case NETOPT_TX_PORT:
+            assert(opt->data_len == sizeof(uint8_t));
+            netif->lorawan.port = *((uint8_t*) opt->data);
             break;
         default:
             netif->dev->driver->get(netif->dev, opt->opt, opt->data, opt->data_len);

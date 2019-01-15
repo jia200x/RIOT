@@ -588,6 +588,7 @@ typedef enum {
     NETOPT_RANDOM,
     NETOPT_DATARATE,
     NETOPT_RX2_DATARATE,
+    NETOPT_TX_PORT,
 
     /* add more options if needed */
 
