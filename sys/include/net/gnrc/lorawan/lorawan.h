@@ -53,6 +53,13 @@ extern "C" {
 #define LORAWAN_STATE_RX_2 (2)
 #define LORAWAN_STATE_TX (2)
 
+typedef struct {
+    uint8_t *data;
+    uint8_t size;
+    uint8_t index;
+} fopt_buffer_t;
+
+
 uint32_t calculate_mic(uint8_t *buf, size_t size, uint8_t *appkey);
 uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
 void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey);
@@ -69,6 +76,8 @@ void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif);
 uint32_t gnrc_lorawan_pick_channel(gnrc_netif_t *netif);
 int gnrc_lorawan_set_pending_fopt(gnrc_netif_t *netif, uint8_t cid, uint8_t value);
 int gnrc_lorawan_get_pending_fopt(gnrc_netif_t *netif, uint8_t cid);
+uint8_t gnrc_lorawan_build_options(gnrc_netif_t *netif, fopt_buffer_t *buf);
+void gnrc_lorawan_process_fopts(gnrc_netif_t *netif, gnrc_pktsnip_t *fopts);
 
 #ifdef __cplusplus
 }

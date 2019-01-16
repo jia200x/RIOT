@@ -67,33 +67,6 @@ static gnrc_pktsnip_t *_process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t 
     return NULL;
 }
 
-static void _process_fopts(gnrc_netif_t *netif, gnrc_pktsnip_t *fopts)
-{
-    if (fopts == NULL) {
-        return;
-    }
-    
-    uint8_t index = 0;
-    uint8_t *data = fopts->data;
-
-    while(index < fopts->size) {
-        switch(data[index++]) {
-            case 0x02:
-                if(!(gnrc_lorawan_get_pending_fopt(netif, 0x02) > 0)) {
-                    puts("Received unexpected LinkCheckAns. Stop processing");
-                    return;
-                }
-                printf("Modulation margin: %idb\n", data[index++]);
-                printf("Number of gateways: %i\n", data[index++]);
-                gnrc_lorawan_set_pending_fopt(netif, 0x02, false);
-                break;
-            default:
-                /* Unrecognized option. Stop processing */
-                return;
-        }
-    }
-}
-
 extern uint32_t calculate_pkt_mic_2(lorawan_hdr_t *lw_hdr, uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
 static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
@@ -127,7 +100,7 @@ static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
         goto fail;
     }
 
-    _process_fopts(netif, fopts);
+    gnrc_lorawan_process_fopts(netif, fopts);
 
     return pkt;
 
@@ -171,42 +144,13 @@ gnrc_pktsnip_t *gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
     return pkt;
 }
 
-typedef struct {
-    uint8_t *data;
-    uint8_t size;
-    uint8_t index;
-} hdr_buffer_t;
-
-static uint8_t _mlme_link_check_req(gnrc_netif_t *netif, hdr_buffer_t *buf)
-{
-    uint8_t opt = netif->lorawan.fopts[0] & (1<<2);
-
-    if (!opt) {
-        return 0;
-    }
-
-    if(buf) {
-        assert(buf->index + 1 <= buf->size);
-        buf->data[buf->index++] = 0x02;
-    }
-
-    return 1;
-}
-
-static uint8_t _build_options(gnrc_netif_t *netif, hdr_buffer_t *buf)
-{
-    size_t size = 0;
-    size += _mlme_link_check_req(netif, buf);
-    return size;
-}
-
 /* TODO: REFACTOR */
 /* TODO: Add error handling */
 /* TODO: Check if it's possible to send in fopts!*/
 /* TODO: No options so far */
 gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
 {
-    uint8_t opts_length = _build_options(netif, NULL);
+    uint8_t opts_length = gnrc_lorawan_build_options(netif, NULL);
 
     gnrc_pktbuf_merge(payload);
 
@@ -227,13 +171,13 @@ gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *p
     le_uint16_t fcnt = *((le_uint16_t*) &netif->lorawan.fcnt);
     lw_hdr->fcnt = fcnt;
 
-    hdr_buffer_t buf = {
+    fopt_buffer_t buf = {
         .data = ((uint8_t*) (lw_hdr+1)),
         .size = opts_length + 1,
         .index = 0
     };
 
-    _build_options(netif, &buf);
+    gnrc_lorawan_build_options(netif, &buf);
     assert(buf.index == opts_length);
 
     buf.data[buf.index++] = netif->lorawan.port;
