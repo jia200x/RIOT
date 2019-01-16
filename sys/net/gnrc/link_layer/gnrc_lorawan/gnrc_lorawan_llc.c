@@ -166,7 +166,13 @@ gnrc_pktsnip_t *gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
         case MTYPE_CNF_DOWNLINK:
         case MTYPE_UNCNF_DOWNLINK:
             pkt = _process_downlink(netif, pkt);
-            break;
+            if(pkt) {
+                for(unsigned i=0;i<pkt->size;i++) {
+                    printf("%02x ", ((uint8_t*) pkt->data)[i]);
+                }
+                printf("\n");
+            }
+            /* FALLTHRU */
         default:
             gnrc_pktbuf_release(pkt);
             pkt = NULL;
