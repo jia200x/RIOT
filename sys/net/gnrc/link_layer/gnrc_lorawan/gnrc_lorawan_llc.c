@@ -96,12 +96,43 @@ static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
     uint8_t n_fopts = lorawan_hdr_get_frame_opts_len(lw_hdr);
     gnrc_pktsnip_t *fopts = gnrc_pktbuf_mark(pkt, n_fopts, GNRC_NETTYPE_UNDEF);
 
+    /* Failed to allocate buffer */
     if(n_fopts && !fopts) {
         goto fail;
     }
 
-    gnrc_lorawan_process_fopts(netif, fopts);
 
+    /* Port not present. Stop reading frame and process options (if any) */
+    if(pkt->size == 0) {
+        goto out;
+    }
+
+    gnrc_pktsnip_t *port = gnrc_pktbuf_mark(pkt, 1, GNRC_NETTYPE_UNDEF);
+
+    /* No payload. Stop reading frame and process options (if any) */
+    if(pkt->size == 0) {
+        goto out;
+    }
+
+    /* Port cannot be 0 if there are options */
+    if(fopts && !(*((uint8_t*) port->data))) {
+        goto fail;
+    }
+
+    uint16_t fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
+    /* Encrypt payload (it's block encryption so we can use the same buffer!) */
+    encrypt_payload(pkt->data, pkt->size, (uint8_t*) &lw_hdr->addr, fcnt, 1, port ? netif->lorawan.appskey : netif->lorawan.nwkskey);
+
+    /* If port is 0, pkt is a buffer with fopts */
+    if(!port) {
+        gnrc_lorawan_process_fopts(netif, pkt);
+        /* The packet is consumed here */
+        gnrc_pktbuf_release(pkt);
+        pkt = NULL;
+    }
+
+out:
+    gnrc_lorawan_process_fopts(netif, fopts);
     return pkt;
 
 fail:
