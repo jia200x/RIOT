@@ -589,6 +589,7 @@ typedef enum {
     NETOPT_DATARATE,
     NETOPT_RX2_DATARATE,
     NETOPT_TX_PORT,
+    NETOPT_LINK_CHECK,
 
     /* add more options if needed */
 

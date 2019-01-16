@@ -97,6 +97,7 @@ static void _init(gnrc_netif_t *netif)
     netif->lorawan.joined = false;
     /* TODO: Default port */
     netif->lorawan.port = 1;
+    memset(netif->lorawan.fopts, 0, sizeof(netif->lorawan.fopts));
 }
 
 gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize,
@@ -254,6 +255,10 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
         case NETOPT_TX_PORT:
             assert(opt->data_len == sizeof(uint8_t));
             netif->lorawan.port = *((uint8_t*) opt->data);
+            break;
+        case NETOPT_LINK_CHECK:
+            assert(opt->data_len == sizeof(uint8_t));
+            gnrc_lorawan_set_pending_fopt(netif, 0x02, *((uint8_t*) opt->data));
             break;
         default:
             netif->dev->driver->get(netif->dev, opt->opt, opt->data, opt->data_len);

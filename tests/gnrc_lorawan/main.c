@@ -338,8 +338,10 @@ int send_something_cmd(int argc, char **argv)
     uint8_t confirmed = atoi(argv[2]);
     uint8_t payload_size = argc > 3 ? atoi(argv[3]) : 4;
     uint8_t port = 1;
+    uint8_t link_check = argc > 4 ? atoi(argv[4]) : 0;
     printf("%i\n", (int) payload_size);
     gnrc_pktsnip_t *pkt;
+    gnrc_netapi_set(3, NETOPT_LINK_CHECK, 0, &link_check, 1);
     gnrc_netapi_set(3, NETOPT_TX_PORT, 0, &port, 1);
     gnrc_netapi_set(3, NETOPT_DATARATE, 0, &dr, sizeof(dr));
     gnrc_netapi_set(3, NETOPT_ACK_REQ, 0, &confirmed, sizeof(confirmed));

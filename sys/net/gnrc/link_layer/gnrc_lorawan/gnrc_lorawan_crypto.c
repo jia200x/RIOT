@@ -6,6 +6,7 @@
 
 #include "net/gnrc/lorawan/lorawan.h"
 #include "byteorder.h"
+#include "net/lorawan/hdr.h"
 
 //TODO
 static cmac_context_t CmacContext;
@@ -22,9 +23,37 @@ typedef struct  __attribute__((packed)) {
     uint8_t len;
 } lorawan_block_t;
 
+uint32_t calculate_pkt_mic_2(lorawan_hdr_t *lw_hdr, uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey)
+{
+    /* block */
+    lorawan_block_t block; 
+
+    block.fb = 0x49;
+    block.u8_pad = 0;
+    block.dir = dir & 0x1;
+
+    memcpy(&block.dev_addr, &lw_hdr->addr, sizeof(lw_hdr->addr));
+    memcpy(&block.fcnt, &lw_hdr->fcnt, sizeof(lw_hdr->fcnt));
+
+    block.u32_pad = 0;
+
+    /* TODO: length of packet snip */
+    block.len = gnrc_pkt_len(pkt);
+
+    cmac_init(&CmacContext, nwkskey, 16);
+    cmac_update(&CmacContext, &block, sizeof(block) );
+    while(pkt != NULL) {
+        cmac_update(&CmacContext, pkt->data, pkt->size);
+        pkt = pkt->next;
+    }
+    cmac_final(&CmacContext, digest);
+
+    return ( uint32_t )( ( uint32_t )digest[3] << 24 | ( uint32_t )digest[2] << 16 | ( uint32_t )digest[1] << 8 | ( uint32_t )digest[0] );
+}
+
 uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey)
 {
-    /* Block */
+    /* block */
     lorawan_block_t block; 
 
     block.fb = 0x49;

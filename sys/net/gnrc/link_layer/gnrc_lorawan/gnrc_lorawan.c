@@ -32,6 +32,32 @@ int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate)
     return 0;
 }
 
+int gnrc_lorawan_set_pending_fopt(gnrc_netif_t *netif, uint8_t cid, uint8_t value)
+{
+    if(!cid) {
+        return -EINVAL;
+    }
+
+    uint8_t col = (cid-1) >> 3;
+    uint8_t row = ((cid - 1) % 8) + 1;
+
+    netif->lorawan.fopts[col] &= ~(1<<row);
+    netif->lorawan.fopts[col] |= (!!value) << row;
+    return 0;
+}
+
+int gnrc_lorawan_get_pending_fopt(gnrc_netif_t *netif, uint8_t cid)
+{
+    if(!cid) {
+        return -EINVAL;
+    }
+
+    uint8_t col = (cid-1) >> 3;
+    uint8_t row = ((cid - 1) % 8) + 1;
+
+    return netif->lorawan.fopts[col] & (1<<row);
+}
+
 /* TODO: Merge into one function */
 static void _configure_rx_window(gnrc_netif_t *netif)
 {

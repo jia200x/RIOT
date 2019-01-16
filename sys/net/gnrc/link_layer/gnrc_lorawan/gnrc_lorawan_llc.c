@@ -16,7 +16,7 @@ static int _compare_mic(uint32_t expected_mic, uint8_t *mic_buf)
    return expected_mic == mic;
 }
 
-static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
+static gnrc_pktsnip_t *_process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
     /* TODO: Validate packet size */
 
@@ -29,8 +29,9 @@ static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 
     uint32_t mic = calculate_mic(pkt->data, pkt->size-MIC_SIZE, netif->lorawan.appkey);
     if(!_compare_mic(mic, ((uint8_t*) pkt->data)+pkt->size-MIC_SIZE)) {
-        printf("BAD MIC!");
-        return;
+        printf("BAD MIC!\n");
+        gnrc_pktbuf_release(pkt);
+        return NULL;
     }
 
     netif->lorawan.fcnt = 0;
@@ -62,8 +63,78 @@ static void _process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 
     gnrc_lorawan_process_cflist(netif, out+sizeof(lorawan_join_accept_t)-1);
     netif->lorawan.joined = true;
+    gnrc_pktbuf_release(pkt);
+    return NULL;
 }
 
+static void _process_fopts(gnrc_netif_t *netif, gnrc_pktsnip_t *fopts)
+{
+    if (fopts == NULL) {
+        return;
+    }
+    
+    uint8_t index = 0;
+    uint8_t *data = fopts->data;
+
+    while(index < fopts->size) {
+        switch(data[index++]) {
+            case 0x02:
+                if(!(gnrc_lorawan_get_pending_fopt(netif, 0x02) > 0)) {
+                    puts("Received unexpected LinkCheckAns. Stop processing");
+                    return;
+                }
+                printf("Modulation margin: %idb\n", data[index++]);
+                printf("Number of gateways: %i\n", data[index++]);
+                gnrc_lorawan_set_pending_fopt(netif, 0x02, false);
+                break;
+            default:
+                /* Unrecognized option. Stop processing */
+                return;
+        }
+    }
+}
+
+extern uint32_t calculate_pkt_mic_2(lorawan_hdr_t *lw_hdr, uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
+static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
+{
+    /* Extract the MIC */
+    gnrc_pktsnip_t *data = gnrc_pktbuf_mark(pkt, (pkt->size-4 > 0) ? pkt->size-4 : 0, GNRC_NETTYPE_UNDEF);
+
+    uint32_t mic = calculate_pkt_mic_2(data->data, 1, data, netif->lorawan.nwkskey);
+
+    if(!_compare_mic(mic, pkt->data)) {
+        printf("BAD MIC!\n");
+        goto fail;
+    }
+
+    /* Remove MIC from packet buffer */
+    pkt = gnrc_pktbuf_remove_snip(pkt, pkt);
+    assert(data == pkt);
+    pkt = data;
+
+    gnrc_pktsnip_t *hdr = gnrc_pktbuf_mark(pkt, sizeof(lorawan_hdr_t), GNRC_NETTYPE_UNDEF);
+
+    if(!hdr) {
+        goto fail;
+    }
+
+    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t*) hdr->data;
+
+    uint8_t n_fopts = lorawan_hdr_get_frame_opts_len(lw_hdr);
+    gnrc_pktsnip_t *fopts = gnrc_pktbuf_mark(pkt, n_fopts, GNRC_NETTYPE_UNDEF);
+
+    if(n_fopts && !fopts) {
+        goto fail;
+    }
+
+    _process_fopts(netif, fopts);
+
+    return pkt;
+
+fail:
+    gnrc_pktbuf_release(pkt);
+    return NULL;
+}
 
 void gnrc_lorawan_join_abp(gnrc_netif_t *netif)
 {
@@ -73,53 +144,99 @@ void gnrc_lorawan_join_abp(gnrc_netif_t *netif)
     netif->lorawan.rx_delay = 1;
     netif->lorawan.joined = true;
 }
-void gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
+
+gnrc_pktsnip_t *gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
     netif->lorawan.state = LORAWAN_STATE_IDLE;
     xtimer_remove(&netif->lorawan.rx_1);
     xtimer_remove(&netif->lorawan.rx_2);
+
     /* TODO: Pass to proper struct */
     uint8_t *p = pkt->data;
 
     uint8_t mtype = (*p & MTYPE_MASK) >> 5;
     switch(mtype) {
         case MTYPE_JOIN_ACCEPT:
-            _process_join_accept(netif, pkt);
-            gnrc_pktbuf_release(pkt);
+            pkt = _process_join_accept(netif, pkt);
+            break;
+        case MTYPE_CNF_DOWNLINK:
+        case MTYPE_UNCNF_DOWNLINK:
+            pkt = _process_downlink(netif, pkt);
             break;
         default:
+            gnrc_pktbuf_release(pkt);
+            pkt = NULL;
             break;
     }
+    return pkt;
 }
 
-/*TODO: REFACTOR */
+typedef struct {
+    uint8_t *data;
+    uint8_t size;
+    uint8_t index;
+} hdr_buffer_t;
+
+static uint8_t _mlme_link_check_req(gnrc_netif_t *netif, hdr_buffer_t *buf)
+{
+    uint8_t opt = netif->lorawan.fopts[0] & (1<<2);
+
+    if (!opt) {
+        return 0;
+    }
+
+    if(buf) {
+        assert(buf->index + 1 <= buf->size);
+        buf->data[buf->index++] = 0x02;
+    }
+
+    return 1;
+}
+
+static uint8_t _build_options(gnrc_netif_t *netif, hdr_buffer_t *buf)
+{
+    size_t size = 0;
+    size += _mlme_link_check_req(netif, buf);
+    return size;
+}
+
+/* TODO: REFACTOR */
+/* TODO: Add error handling */
+/* TODO: Check if it's possible to send in fopts!*/
+/* TODO: No options so far */
 gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
 {
-    /* TODO: Add error handling */
+    uint8_t opts_length = _build_options(netif, NULL);
+
     gnrc_pktbuf_merge(payload);
 
-    /* TODO: Port and fopts */
-    gnrc_pktsnip_t *hdr = gnrc_pktbuf_add(payload, NULL, sizeof(lorawan_hdr_t) + 1, GNRC_NETTYPE_UNDEF);
+    /* Allocate the LoRaWAN header, possible fopts and the port */
+    gnrc_pktsnip_t *hdr = gnrc_pktbuf_add(payload, NULL, sizeof(lorawan_hdr_t) + opts_length + 1, GNRC_NETTYPE_UNDEF);
 
     lorawan_hdr_t *lw_hdr = hdr->data;
 
     lorawan_hdr_set_mtype(lw_hdr, netif->lorawan.confirmed_data ? MTYPE_CNF_UPLINK : MTYPE_UNCNF_UPLINK);
     lorawan_hdr_set_maj(lw_hdr, MAJOR_LRWAN_R1);
 
-    /* TODO: */
-    /* De-hack!*/
-
     le_uint32_t dev_addr = *((le_uint32_t*) netif->lorawan.dev_addr); 
     lw_hdr->addr = dev_addr;
 
-    /* No options */
     lw_hdr->fctrl = 0;
+    lorawan_hdr_set_frame_opts_len(lw_hdr, opts_length);
 
     le_uint16_t fcnt = *((le_uint16_t*) &netif->lorawan.fcnt);
     lw_hdr->fcnt = fcnt;
 
-    /* TODO:Hardcoded port is 1 */
-    *((uint8_t*) (lw_hdr+1)) = netif->lorawan.port;
+    hdr_buffer_t buf = {
+        .data = ((uint8_t*) (lw_hdr+1)),
+        .size = opts_length + 1,
+        .index = 0
+    };
+
+    _build_options(netif, &buf);
+    assert(buf.index == opts_length);
+
+    buf.data[buf.index++] = netif->lorawan.port;
 
     /* Encrypt payload (it's block encryption so we can use the same buffer!) */
     encrypt_payload(payload->data, payload->size, netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.port ? netif->lorawan.appskey : netif->lorawan.nwkskey);
