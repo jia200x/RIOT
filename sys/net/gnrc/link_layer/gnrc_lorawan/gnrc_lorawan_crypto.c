@@ -79,10 +79,15 @@ uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_p
     return ( uint32_t )( ( uint32_t )digest[3] << 24 | ( uint32_t )digest[2] << 16 | ( uint32_t )digest[1] << 8 | ( uint32_t )digest[0] );
 }
 
+/* TODO: Add test for 0 payload */
 void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey)
 {
     uint8_t s_block[16];
     uint8_t a_block[16];
+
+    if(!size) {
+        return;
+    }
 
     memset(s_block, 0, sizeof(s_block));
     memset(a_block, 0, sizeof(a_block));

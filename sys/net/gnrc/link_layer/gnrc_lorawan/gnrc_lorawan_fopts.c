@@ -21,7 +21,7 @@ static uint8_t _mlme_link_check_req(gnrc_netif_t *netif, fopt_buffer_t *buf)
 
 void gnrc_lorawan_process_fopts(gnrc_netif_t *netif, gnrc_pktsnip_t *fopts)
 {
-    if (fopts == NULL) {
+    if (fopts == NULL || fopts->data) {
         return;
     }
     

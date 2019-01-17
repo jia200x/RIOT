@@ -9,6 +9,7 @@
 
 #include "net/lorawan/hdr.h"
 
+extern uint32_t calculate_pkt_mic_2(lorawan_hdr_t *lw_hdr, uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
 static int _compare_mic(uint32_t expected_mic, uint8_t *mic_buf)
 {
    uint32_t mic = mic_buf[0] | (mic_buf[1] << 8) |
@@ -67,77 +68,122 @@ static gnrc_pktsnip_t *_process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t 
     return NULL;
 }
 
-extern uint32_t calculate_pkt_mic_2(lorawan_hdr_t *lw_hdr, uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
-static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
+/* Ret: pkt on success
+ * Ret: NULL, packet is freed
+ */
+gnrc_pktsnip_t *gnrc_lorawan_validate_mic(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
-    /* Extract the MIC */
-    gnrc_pktsnip_t *data = gnrc_pktbuf_mark(pkt, (pkt->size-4 > 0) ? pkt->size-4 : 0, GNRC_NETTYPE_UNDEF);
+    gnrc_pktsnip_t *data;
+   
+    if (!(data = gnrc_pktbuf_mark(pkt, (pkt->size-MIC_SIZE > 0) ? pkt->size-MIC_SIZE : 0, GNRC_NETTYPE_UNDEF))) {
+        gnrc_pktbuf_release(pkt);
+        pkt = NULL;
+        goto end;
+    }
 
     uint32_t mic = calculate_pkt_mic_2(data->data, 1, data, netif->lorawan.nwkskey);
 
     if(!_compare_mic(mic, pkt->data)) {
         printf("BAD MIC!\n");
-        goto fail;
+        gnrc_pktbuf_release(pkt);
+        pkt = NULL;
+        goto end;
     }
 
     /* Remove MIC from packet buffer */
     pkt = gnrc_pktbuf_remove_snip(pkt, pkt);
     assert(data == pkt);
-    pkt = data;
 
-    gnrc_pktsnip_t *hdr = gnrc_pktbuf_mark(pkt, sizeof(lorawan_hdr_t), GNRC_NETTYPE_UNDEF);
+end:
+    return pkt;
+}
 
-    if(!hdr) {
-        goto fail;
+/* PRECONDITION: pkt is valid and doesn't contain MIC
+ *
+ * If fopts != NULL, there are options in the FOPTS field
+ * It pkt->data == NULL, there's no payload
+ *
+ * If pkt == NULL, there was an error (and packet was freed)
+ */
+gnrc_pktsnip_t *gnrc_lorawan_parse_downlink(gnrc_pktsnip_t *pkt, gnrc_pktsnip_t **fopts, 
+        le_uint32_t *dev_addr, uint16_t *fcnt, uint8_t *port)
+{
+    gnrc_pktsnip_t *hdr;
+    uint8_t _port;
+
+    if (!(hdr = gnrc_pktbuf_mark(pkt, sizeof(lorawan_hdr_t), GNRC_NETTYPE_UNDEF))) {
+        gnrc_pktbuf_release(pkt);
+        goto end;
     }
 
     lorawan_hdr_t *lw_hdr = (lorawan_hdr_t*) hdr->data;
 
+    *fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
+    *dev_addr = lw_hdr->addr;
+
     uint8_t n_fopts = lorawan_hdr_get_frame_opts_len(lw_hdr);
-    gnrc_pktsnip_t *fopts = gnrc_pktbuf_mark(pkt, n_fopts, GNRC_NETTYPE_UNDEF);
+    *fopts = gnrc_pktbuf_mark(pkt, n_fopts, GNRC_NETTYPE_UNDEF);
 
     /* Failed to allocate buffer */
     if(n_fopts && !fopts) {
-        goto fail;
+        gnrc_pktbuf_release(pkt);
+        goto end;
     }
-
 
     /* Port not present. Stop reading frame and process options (if any) */
     if(pkt->size == 0) {
-        goto out;
+        /* Don't release packet */
+        goto end;
     }
 
-    gnrc_pktsnip_t *port = gnrc_pktbuf_mark(pkt, 1, GNRC_NETTYPE_UNDEF);
+    gnrc_pktsnip_t *port_snip = gnrc_pktbuf_mark(pkt, 1, GNRC_NETTYPE_UNDEF);
+    _port = *((uint8_t*) port_snip->data);
 
-    /* No payload. Stop reading frame and process options (if any) */
-    if(pkt->size == 0) {
-        goto out;
+    if(pkt->size == 0 || (_port == 0 && fopts))
+    {
+        gnrc_pktbuf_release(pkt);
+        goto end;
     }
 
-    /* Port cannot be 0 if there are options */
-    if(fopts && !(*((uint8_t*) port->data))) {
-        goto fail;
+    *port = _port;
+
+end:
+    return pkt;
+
+}
+
+static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
+{
+    gnrc_pktsnip_t *fopts;
+    le_uint32_t dev_addr;
+    uint16_t fcnt;
+    uint8_t port;
+
+    /* Validate packet */
+    if(!(pkt = gnrc_lorawan_validate_mic(netif, pkt))) {
+        goto end;
     }
 
-    uint16_t fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
-    /* Encrypt payload (it's block encryption so we can use the same buffer!) */
-    encrypt_payload(pkt->data, pkt->size, (uint8_t*) &lw_hdr->addr, fcnt, 1, port ? netif->lorawan.appskey : netif->lorawan.nwkskey);
+    if(!(pkt = gnrc_lorawan_parse_downlink(pkt, &fopts, &dev_addr, &fcnt, &port))) {
+        goto end;
+    }
 
-    /* If port is 0, pkt is a buffer with fopts */
-    if(!port) {
-        gnrc_lorawan_process_fopts(netif, pkt);
-        /* The packet is consumed here */
+    /* TODO: Validate dev_addr and fcnt */
+
+    /* If port is 0, NwkSKey is used to decrypt FRMPayload fopts */
+    encrypt_payload(pkt->data, pkt->size, (uint8_t*) &dev_addr, fcnt, 1, port == 0 ? netif->lorawan.nwkskey : netif->lorawan.appskey);
+
+    gnrc_lorawan_process_fopts(netif, fopts);
+    gnrc_lorawan_process_fopts(netif, port == 0 ? pkt : NULL);
+
+    if(pkt->data == NULL || port == 0) {
+        /* Everything we needed was already consumed. Drop packet */
         gnrc_pktbuf_release(pkt);
         pkt = NULL;
     }
 
-out:
-    gnrc_lorawan_process_fopts(netif, fopts);
+end:
     return pkt;
-
-fail:
-    gnrc_pktbuf_release(pkt);
-    return NULL;
 }
 
 void gnrc_lorawan_join_abp(gnrc_netif_t *netif)
@@ -172,7 +218,7 @@ gnrc_pktsnip_t *gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
                 }
                 printf("\n");
             }
-            /* FALLTHRU */
+            break;
         default:
             gnrc_pktbuf_release(pkt);
             pkt = NULL;
