@@ -71,31 +71,14 @@ static gnrc_pktsnip_t *_process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t 
 /* Ret: pkt on success
  * Ret: NULL, packet is freed
  */
-gnrc_pktsnip_t *gnrc_lorawan_validate_mic(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
+int gnrc_lorawan_mic_is_valid(gnrc_pktsnip_t *pkt, gnrc_pktsnip_t *mic, uint8_t *key)
 {
-    gnrc_pktsnip_t *data;
-   
-    if (!(data = gnrc_pktbuf_mark(pkt, (pkt->size-MIC_SIZE > 0) ? pkt->size-MIC_SIZE : 0, GNRC_NETTYPE_UNDEF))) {
-        gnrc_pktbuf_release(pkt);
-        pkt = NULL;
-        goto end;
+    if(!_compare_mic(calculate_pkt_mic_2(pkt->data, 1, pkt, key), mic->data)) {
+        puts("Invalid MIC");
+        return -EINVAL;
     }
 
-    uint32_t mic = calculate_pkt_mic_2(data->data, 1, data, netif->lorawan.nwkskey);
-
-    if(!_compare_mic(mic, pkt->data)) {
-        printf("BAD MIC!\n");
-        gnrc_pktbuf_release(pkt);
-        pkt = NULL;
-        goto end;
-    }
-
-    /* Remove MIC from packet buffer */
-    pkt = gnrc_pktbuf_remove_snip(pkt, pkt);
-    assert(data == pkt);
-
-end:
-    return pkt;
+    return 0;
 }
 
 /* PRECONDITION: pkt is valid and doesn't contain MIC
@@ -105,78 +88,124 @@ end:
  *
  * If pkt == NULL, there was an error (and packet was freed)
  */
-gnrc_pktsnip_t *gnrc_lorawan_parse_downlink(gnrc_pktsnip_t *pkt, gnrc_pktsnip_t **fopts, 
-        le_uint32_t *dev_addr, uint16_t *fcnt, uint8_t *port)
+int gnrc_lorawan_parse_downlink(gnrc_pktsnip_t *pkt, 
+        gnrc_pktsnip_t **hdr, gnrc_pktsnip_t **fopts, gnrc_pktsnip_t **port)
 {
-    gnrc_pktsnip_t *hdr;
-    uint8_t _port;
+    int err = -EINVAL;
+    *fopts = *hdr = *port = NULL;
 
-    if (!(hdr = gnrc_pktbuf_mark(pkt, sizeof(lorawan_hdr_t), GNRC_NETTYPE_UNDEF))) {
-        gnrc_pktbuf_release(pkt);
+    if (!(*hdr = gnrc_pktbuf_mark(pkt, sizeof(lorawan_hdr_t), GNRC_NETTYPE_UNDEF))) {
+        puts("Couldn't allocate header");
         goto end;
     }
 
-    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t*) hdr->data;
-
-    *fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
-    *dev_addr = lw_hdr->addr;
+    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t*) (*hdr)->data;
 
     uint8_t n_fopts = lorawan_hdr_get_frame_opts_len(lw_hdr);
     *fopts = gnrc_pktbuf_mark(pkt, n_fopts, GNRC_NETTYPE_UNDEF);
 
     /* Failed to allocate buffer */
     if(n_fopts && !fopts) {
-        gnrc_pktbuf_release(pkt);
+        puts("Couldn't allocate fopts");
         goto end;
     }
 
     /* Port not present. Stop reading frame and process options (if any) */
     if(pkt->size == 0) {
-        /* Don't release packet */
+        err = 0;
         goto end;
     }
 
-    gnrc_pktsnip_t *port_snip = gnrc_pktbuf_mark(pkt, 1, GNRC_NETTYPE_UNDEF);
-    _port = *((uint8_t*) port_snip->data);
-
-    if(pkt->size == 0 || (_port == 0 && fopts))
+    *port = gnrc_pktbuf_mark(pkt, 1, GNRC_NETTYPE_UNDEF);
+    if(*port == NULL || pkt->size == 0)
     {
-        gnrc_pktbuf_release(pkt);
+        puts("Couldn't allocate port or invalid packet");
         goto end;
     }
-
-    *port = _port;
+    err = 0;
 
 end:
-    return pkt;
+    return err;
 
 }
 
+int gnrc_lorawan_downlink_is_valid(gnrc_netif_t *netif, gnrc_pktsnip_t *hdr,
+        gnrc_pktsnip_t *fopts, gnrc_pktsnip_t *port)
+{
+    /* TODO: Validate dev_addr */
+    /* TODO: Validate fcnt */
+    int err = -EINVAL;
+
+    (void) hdr;
+    (void) netif;
+
+    if(fopts && port && *((uint8_t*) port->data) == 0) {
+        goto end;
+    }
+
+    /* All OK */
+    err = 0;
+
+end:
+    return err;
+}
 static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
-    gnrc_pktsnip_t *fopts;
-    le_uint32_t dev_addr;
-    uint16_t fcnt;
-    uint8_t port;
+    uint8_t is_fopt_payload;
+    gnrc_pktsnip_t *data, *hdr, *fopts, *port;
 
-    /* Validate packet */
-    if(!(pkt = gnrc_lorawan_validate_mic(netif, pkt))) {
+    if (!(data = gnrc_pktbuf_mark(pkt, (pkt->size-MIC_SIZE > 0) ? pkt->size-MIC_SIZE : 0, GNRC_NETTYPE_UNDEF))) {
+        gnrc_pktbuf_release(pkt);
+        pkt = NULL;
         goto end;
     }
 
-    if(!(pkt = gnrc_lorawan_parse_downlink(pkt, &fopts, &dev_addr, &fcnt, &port))) {
+    if(!_compare_mic(calculate_pkt_mic_2(data->data, 1, data, netif->lorawan.nwkskey), pkt->data)) {
+        puts("Invalid MIC");
+        gnrc_pktbuf_release(pkt);
+        pkt = NULL;
         goto end;
     }
 
-    /* TODO: Validate dev_addr and fcnt */
+    /* Remove MIC from packet buffer */
+    pkt = gnrc_pktbuf_remove_snip(pkt, pkt);
+    assert(data == pkt);
+
+    if(gnrc_lorawan_parse_downlink(pkt, &hdr, &fopts, &port) < 0) {
+        gnrc_pktbuf_release(pkt);
+        pkt = NULL;
+        goto end;
+    }
+
+    if(gnrc_lorawan_downlink_is_valid(netif, hdr, fopts, port) < 0) {
+        gnrc_pktbuf_release(pkt);
+        pkt = NULL;
+        goto end;
+    }
+
+    lorawan_hdr_t *lw_hdr = hdr->data;
+    uint16_t _fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
+
+    if (port) {
+        is_fopt_payload = *((uint8_t*) port->data) == 0;
+    }
+    else {
+        is_fopt_payload = 0;
+    }
 
     /* If port is 0, NwkSKey is used to decrypt FRMPayload fopts */
-    encrypt_payload(pkt->data, pkt->size, (uint8_t*) &dev_addr, fcnt, 1, port == 0 ? netif->lorawan.nwkskey : netif->lorawan.appskey);
+    encrypt_payload(pkt->data, pkt->size, (uint8_t*) &lw_hdr->addr, _fcnt, 1, is_fopt_payload ? netif->lorawan.nwkskey : netif->lorawan.appskey);
 
-    gnrc_lorawan_process_fopts(netif, fopts);
-    gnrc_lorawan_process_fopts(netif, port == 0 ? pkt : NULL);
+    assert((is_fopt_payload && fopts) == false);
 
-    if(pkt->data == NULL || port == 0) {
+    if(is_fopt_payload) {
+        gnrc_lorawan_process_fopts(netif, pkt);
+    }
+    else {
+        gnrc_lorawan_process_fopts(netif, fopts);
+    }
+
+    if(port == NULL || is_fopt_payload) {
         /* Everything we needed was already consumed. Drop packet */
         gnrc_pktbuf_release(pkt);
         pkt = NULL;

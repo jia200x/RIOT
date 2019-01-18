@@ -19,32 +19,49 @@ static uint8_t _mlme_link_check_req(gnrc_netif_t *netif, fopt_buffer_t *buf)
     return 1;
 }
 
-void gnrc_lorawan_process_fopts(gnrc_netif_t *netif, gnrc_pktsnip_t *fopts)
+int gnrc_lorawan_perform_fopt(gnrc_netif_t *netif, fopt_buffer_t *fopt)
 {
-    if (fopts == NULL || fopts->data) {
-        return;
+    int err = -EINVAL;
+    if(fopt->index >= fopt->size) {
+        goto end;
     }
-    
-    uint8_t index = 0;
-    uint8_t *data = fopts->data;
 
     /* TODO: Better boundary check */
-    while(index < fopts->size) {
-        switch(data[index++]) {
-            case 0x02:
-                if(!(gnrc_lorawan_get_pending_fopt(netif, 0x02) > 0)) {
-                    puts("Received unexpected LinkCheckAns. Stop processing");
-                    return;
-                }
-                printf("Modulation margin: %idb\n", data[index++]);
-                printf("Number of gateways: %i\n", data[index++]);
-                gnrc_lorawan_set_pending_fopt(netif, 0x02, false);
+    switch(fopt->data[fopt->index++]) {
+        case 0x02:
+            if(!(gnrc_lorawan_get_pending_fopt(netif, 0x02) > 0)) {
+                puts("Received unexpected LinkCheckAns. Stop processing");
                 break;
-            default:
-                /* Unrecognized option. Stop processing */
-                return;
-        }
+            }
+            printf("Modulation margin: %idb\n", fopt->data[fopt->index++]);
+            printf("Number of gateways: %i\n", fopt->data[fopt->index++]);
+            gnrc_lorawan_set_pending_fopt(netif, 0x02, false);
+            err = 0;
+            break;
+        default:
+            puts("Undefined option");
+            break;
     }
+
+end:
+    return err;
+
+}
+
+void gnrc_lorawan_process_fopts(gnrc_netif_t *netif, gnrc_pktsnip_t *fopts)
+{
+    if (fopts == NULL || fopts->data == NULL) {
+        puts("No options");
+        return;
+    }
+
+    fopt_buffer_t buf = {
+        .data = fopts->data,
+        .size = fopts->size,
+        .index = 0
+    };
+
+    while(gnrc_lorawan_perform_fopt(netif, &buf) == 0) {}
 }
 
 uint8_t gnrc_lorawan_build_options(gnrc_netif_t *netif, fopt_buffer_t *buf)
