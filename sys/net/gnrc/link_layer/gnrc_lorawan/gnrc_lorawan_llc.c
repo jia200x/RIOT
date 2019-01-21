@@ -9,7 +9,6 @@
 
 #include "net/lorawan/hdr.h"
 
-extern uint32_t calculate_pkt_mic_2(lorawan_hdr_t *lw_hdr, uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
 static int _compare_mic(uint32_t expected_mic, uint8_t *mic_buf)
 {
    uint32_t mic = mic_buf[0] | (mic_buf[1] << 8) |
@@ -40,7 +39,7 @@ static gnrc_pktsnip_t *_process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t 
     generate_session_keys(ja_hdr->app_nonce, netif->lorawan.dev_nonce, netif->lorawan.appkey, netif->lorawan.nwkskey, netif->lorawan.appskey);
 
     /* Copy devaddr */
-    memcpy(netif->lorawan.dev_addr, ja_hdr->dev_addr, 4);
+    memcpy(&netif->lorawan.dev_addr, ja_hdr->dev_addr, 4);
 
     netif->lorawan.dl_settings = ja_hdr->dl_settings;
 
@@ -66,19 +65,6 @@ static gnrc_pktsnip_t *_process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t 
     netif->lorawan.joined = true;
     gnrc_pktbuf_release(pkt);
     return NULL;
-}
-
-/* Ret: pkt on success
- * Ret: NULL, packet is freed
- */
-int gnrc_lorawan_mic_is_valid(gnrc_pktsnip_t *pkt, gnrc_pktsnip_t *mic, uint8_t *key)
-{
-    if(!_compare_mic(calculate_pkt_mic_2(pkt->data, 1, pkt, key), mic->data)) {
-        puts("Invalid MIC");
-        return -EINVAL;
-    }
-
-    return 0;
 }
 
 /* PRECONDITION: pkt is valid and doesn't contain MIC
@@ -160,7 +146,14 @@ static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
         goto end;
     }
 
-    if(!_compare_mic(calculate_pkt_mic_2(data->data, 1, data, netif->lorawan.nwkskey), pkt->data)) {
+    le_uint32_t expected_mic = *((le_uint32_t*) pkt->data);
+    lorawan_hdr_t *lw_hdr = data->data;
+    uint16_t fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
+
+    le_uint32_t mic;
+    gnrc_lorawan_calculate_mic(&lw_hdr->addr, fcnt, 1, data, netif->lorawan.nwkskey, &mic);
+
+    if (expected_mic.u32 != mic.u32) {
         puts("Invalid MIC");
         gnrc_pktbuf_release(pkt);
         pkt = NULL;
@@ -183,8 +176,7 @@ static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
         goto end;
     }
 
-    lorawan_hdr_t *lw_hdr = hdr->data;
-    uint16_t _fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
+    lw_hdr = hdr->data;
 
     if (port) {
         is_fopt_payload = *((uint8_t*) port->data) == 0;
@@ -194,7 +186,7 @@ static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
     }
 
     /* If port is 0, NwkSKey is used to decrypt FRMPayload fopts */
-    encrypt_payload(pkt->data, pkt->size, (uint8_t*) &lw_hdr->addr, _fcnt, 1, is_fopt_payload ? netif->lorawan.nwkskey : netif->lorawan.appskey);
+    gnrc_lorawan_encrypt_payload(pkt->data, pkt->size, &lw_hdr->addr, fcnt, 1, is_fopt_payload ? netif->lorawan.nwkskey : netif->lorawan.appskey);
 
     assert((is_fopt_payload && fopts) == false);
 
@@ -256,55 +248,66 @@ gnrc_pktsnip_t *gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
     return pkt;
 }
 
+
+size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint16_t fcnt, uint8_t fctrl, uint8_t fopts_length, lorawan_buffer_t *buf)
+{
+    assert(fopts_length < 16);
+    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t*) buf->data;
+
+    lorawan_hdr_set_mtype(lw_hdr, mtype);
+    lorawan_hdr_set_maj(lw_hdr, MAJOR_LRWAN_R1);
+
+    lw_hdr->addr = *dev_addr;
+    lw_hdr->fctrl = fctrl;
+
+    lorawan_hdr_set_frame_opts_len(lw_hdr, fopts_length);
+
+    lw_hdr->fcnt = byteorder_btols(byteorder_htons(fcnt));
+
+    buf->index += sizeof(lorawan_hdr_t);
+
+    return sizeof(lorawan_hdr_t);
+}
+
 /* TODO: REFACTOR */
 /* TODO: Add error handling */
 /* TODO: Check if it's possible to send in fopts!*/
 /* TODO: No options so far */
 gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
 {
-    uint8_t opts_length = gnrc_lorawan_build_options(netif, NULL);
-
     gnrc_pktbuf_merge(payload);
 
-    /* Allocate the LoRaWAN header, possible fopts and the port */
-    gnrc_pktsnip_t *hdr = gnrc_pktbuf_add(payload, NULL, sizeof(lorawan_hdr_t) + opts_length + 1, GNRC_NETTYPE_UNDEF);
+    /* Encrypt payload (it's block encryption so we can use the same buffer!) */
+    gnrc_lorawan_encrypt_payload(payload->data, payload->size, &netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.port ? netif->lorawan.appskey : netif->lorawan.nwkskey);
 
-    lorawan_hdr_t *lw_hdr = hdr->data;
+    /* We try to allocate the whole header with fopts at once */
+    uint8_t fopts_length = gnrc_lorawan_build_options(netif, NULL);
+    
+    gnrc_pktsnip_t *mac_hdr = gnrc_pktbuf_add(payload, NULL, sizeof(lorawan_hdr_t) + fopts_length + 1, GNRC_NETTYPE_UNDEF);
 
-    lorawan_hdr_set_mtype(lw_hdr, netif->lorawan.confirmed_data ? MTYPE_CNF_UPLINK : MTYPE_UNCNF_UPLINK);
-    lorawan_hdr_set_maj(lw_hdr, MAJOR_LRWAN_R1);
-
-    le_uint32_t dev_addr = *((le_uint32_t*) netif->lorawan.dev_addr); 
-    lw_hdr->addr = dev_addr;
-
-    lw_hdr->fctrl = 0;
-    lorawan_hdr_set_frame_opts_len(lw_hdr, opts_length);
-
-    le_uint16_t fcnt = *((le_uint16_t*) &netif->lorawan.fcnt);
-    lw_hdr->fcnt = fcnt;
-
-    fopt_buffer_t buf = {
-        .data = ((uint8_t*) (lw_hdr+1)),
-        .size = opts_length + 1,
+    lorawan_buffer_t buf = {
+        .data = (uint8_t*) mac_hdr->data,
+        .size = mac_hdr->size,
         .index = 0
     };
 
+    gnrc_lorawan_build_hdr(netif->lorawan.confirmed_data ? MTYPE_CNF_UPLINK : MTYPE_UNCNF_UPLINK,
+           &netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, fopts_length, &buf);
+
     gnrc_lorawan_build_options(netif, &buf);
-    assert(buf.index == opts_length);
+
+    assert(buf.index == mac_hdr->size-1);
 
     buf.data[buf.index++] = netif->lorawan.port;
 
-    /* Encrypt payload (it's block encryption so we can use the same buffer!) */
-    encrypt_payload(payload->data, payload->size, netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, netif->lorawan.port ? netif->lorawan.appskey : netif->lorawan.nwkskey);
-
     /* Now calculate MIC */
     gnrc_pktsnip_t *mic = gnrc_pktbuf_add(NULL, NULL, 4, GNRC_NETTYPE_UNDEF);
-    uint32_t u32_mic = calculate_pkt_mic(0, netif->lorawan.dev_addr, netif->lorawan.fcnt, hdr, netif->lorawan.nwkskey);
+    uint32_t u32_mic = calculate_pkt_mic(0, (uint8_t*) &netif->lorawan.dev_addr, netif->lorawan.fcnt, mac_hdr, netif->lorawan.nwkskey);
 
     *((le_uint32_t*) mic->data) = byteorder_btoll(byteorder_htonl(u32_mic));
     LL_APPEND(payload, mic);
 
-    return hdr;
+    return mac_hdr;
 }
 
 static gnrc_pktsnip_t *_build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *appkey, uint8_t *dev_nonce)

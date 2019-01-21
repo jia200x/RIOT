@@ -23,7 +23,8 @@ typedef struct  __attribute__((packed)) {
     uint8_t len;
 } lorawan_block_t;
 
-uint32_t calculate_pkt_mic_2(lorawan_hdr_t *lw_hdr, uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey)
+void gnrc_lorawan_calculate_mic(le_uint32_t *dev_addr, uint16_t fcnt,
+        uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey, le_uint32_t *out)
 {
     /* block */
     lorawan_block_t block; 
@@ -32,8 +33,9 @@ uint32_t calculate_pkt_mic_2(lorawan_hdr_t *lw_hdr, uint8_t dir, gnrc_pktsnip_t 
     block.u8_pad = 0;
     block.dir = dir & 0x1;
 
-    memcpy(&block.dev_addr, &lw_hdr->addr, sizeof(lw_hdr->addr));
-    memcpy(&block.fcnt, &lw_hdr->fcnt, sizeof(lw_hdr->fcnt));
+    memcpy(&block.dev_addr, dev_addr, sizeof(le_uint32_t));
+
+    block.fcnt = byteorder_btoll(byteorder_htonl(fcnt));
 
     block.u32_pad = 0;
 
@@ -48,7 +50,7 @@ uint32_t calculate_pkt_mic_2(lorawan_hdr_t *lw_hdr, uint8_t dir, gnrc_pktsnip_t 
     }
     cmac_final(&CmacContext, digest);
 
-    return ( uint32_t )( ( uint32_t )digest[3] << 24 | ( uint32_t )digest[2] << 16 | ( uint32_t )digest[1] << 8 | ( uint32_t )digest[0] );
+    memcpy(out, digest, sizeof(le_uint32_t)); 
 }
 
 uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey)
@@ -80,7 +82,7 @@ uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_p
 }
 
 /* TODO: Add test for 0 payload */
-void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey)
+void gnrc_lorawan_encrypt_payload(uint8_t *payload, size_t size, le_uint32_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey)
 {
     uint8_t s_block[16];
     uint8_t a_block[16];
@@ -101,10 +103,10 @@ void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t 
     block->u8_pad = 0;
     block->dir = dir & 0x1;
 
-    memcpy(&block->dev_addr, dev_addr, 4);
+    block->dev_addr = *dev_addr;
+    block->fcnt = byteorder_btoll(byteorder_htonl(fcnt));
 
     /* TODO: Frame Counter */
-    block->fcnt = byteorder_btoll(byteorder_htonl(fcnt));
     block->u32_pad = 0;
 
     int blocks = ((size-1) >> 4) + 1;

@@ -37,7 +37,7 @@ typedef struct {
     uint8_t appskey[GNRC_LORAWAN_KEY_LEN];
     uint8_t state;
     uint8_t dev_nonce[2];
-    uint8_t dev_addr[4];
+    le_uint32_t dev_addr;
     uint8_t datarate;
     uint16_t fcnt;
     uint8_t dl_settings;

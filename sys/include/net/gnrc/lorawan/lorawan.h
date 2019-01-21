@@ -5,6 +5,7 @@
 #include <string.h>
 #include "net/lora.h"
 #include "net/gnrc/netif.h"
+#include "net/lorawan/hdr.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,18 +20,18 @@ extern "C" {
 
 #define MSG_TYPE_TIMEOUT            (0x3457)
 
-#define MTYPE_MASK           0b11100000
-#define MTYPE_JOIN_REQUEST   0b000
-#define MTYPE_JOIN_ACCEPT    0b001
-#define MTYPE_UNCNF_UPLINK   0b010
-#define MTYPE_UNCNF_DOWNLINK 0b011
-#define MTYPE_CNF_UPLINK     0b100
-#define MTYPE_CNF_DOWNLINK   0b101
-#define MTYPE_REJOIN_REQ     0b110
-#define MTYPE_PROPIETARY     0b111
+#define MTYPE_MASK           0xE0
+#define MTYPE_JOIN_REQUEST   0x0
+#define MTYPE_JOIN_ACCEPT    0x1
+#define MTYPE_UNCNF_UPLINK   0x2
+#define MTYPE_UNCNF_DOWNLINK 0x3
+#define MTYPE_CNF_UPLINK     0x4
+#define MTYPE_CNF_DOWNLINK   0x5
+#define MTYPE_REJOIN_REQ     0x6
+#define MTYPE_PROPIETARY     0x7
 
-#define MAJOR_MASK     0b11
-#define MAJOR_LRWAN_R1 0b00
+#define MAJOR_MASK     0x3
+#define MAJOR_LRWAN_R1 0x0
 
 #define DEV_ADDR_LEN 4
 #define FCTRL_LEN 1
@@ -57,12 +58,11 @@ typedef struct {
     uint8_t *data;
     uint8_t size;
     uint8_t index;
-} fopt_buffer_t;
-
+} lorawan_buffer_t;
 
 uint32_t calculate_mic(uint8_t *buf, size_t size, uint8_t *appkey);
 uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
-void encrypt_payload(uint8_t *payload, size_t size, uint8_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey);
+void gnrc_lorawan_encrypt_payload(uint8_t *payload, size_t size, le_uint32_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey);
 void decrypt_join_accept(uint8_t *key, uint8_t *pkt, int has_clist, uint8_t *out);
 void generate_session_keys(uint8_t *app_nonce, uint8_t *dev_nonce, uint8_t *appkey, uint8_t *nwkskey, uint8_t *appskey);
 void gnrc_lorawan_send_join_request(gnrc_netif_t *netif);
@@ -76,8 +76,14 @@ void gnrc_lorawan_event_tx_complete(gnrc_netif_t *netif);
 uint32_t gnrc_lorawan_pick_channel(gnrc_netif_t *netif);
 int gnrc_lorawan_set_pending_fopt(gnrc_netif_t *netif, uint8_t cid, uint8_t value);
 int gnrc_lorawan_get_pending_fopt(gnrc_netif_t *netif, uint8_t cid);
-uint8_t gnrc_lorawan_build_options(gnrc_netif_t *netif, fopt_buffer_t *buf);
+uint8_t gnrc_lorawan_build_options(gnrc_netif_t *netif, lorawan_buffer_t *buf);
 void gnrc_lorawan_process_fopts(gnrc_netif_t *netif, gnrc_pktsnip_t *fopts);
+void gnrc_lorawan_calculate_mic(le_uint32_t *dev_addr, uint16_t fcnt,
+        uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey, le_uint32_t *out);
+size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint16_t fcnt, uint8_t fctrl, uint8_t fopts_length, lorawan_buffer_t *buf);
+int gnrc_lorawan_fopts_mlme_link_check_req(gnrc_netif_t *netif, lorawan_buffer_t *buf);
+int gnrc_lorawan_fopt_read_cid(lorawan_buffer_t *fopt, uint8_t *cid);
+int gnrc_lorawan_perform_fopt(uint8_t cid, gnrc_netif_t *netif, lorawan_buffer_t *fopt);
 
 #ifdef __cplusplus
 }
