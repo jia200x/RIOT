@@ -42,6 +42,7 @@
 #include "net/gnrc/netapi.h"
 
 #include "net/gnrc/pktbuf.h"
+#include "net/gnrc/netreg.h"
 
 #define SX127X_LORA_MSG_QUEUE   (16U)
 #define SX127X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT)
@@ -78,6 +79,22 @@ uint16_t fcnt = 0;
 
 #define MESSAGE "This is a very long LoRaWAN string in order to test how well the implementation behaves in this context"
 
+void _test_cb(uint16_t cmd, gnrc_pktsnip_t *pkt, void *ctx)
+{
+    (void) ctx;
+    (void) cmd;
+    (void) pkt;
+    printf("AAA");
+}
+
+gnrc_netreg_entry_cbd_t _cbd = {
+        .cb=_test_cb,
+        .ctx = NULL
+};
+
+static gnrc_netreg_entry_t lorawan_entry = GNRC_NETREG_ENTRY_INIT_CB(
+        2, &_cbd
+);
 
 extern uint32_t calculate_mic(uint8_t *buf, size_t size, uint8_t *appkey);
 int lora_setup_cmd(int argc, char **argv) {
@@ -414,6 +431,8 @@ int main(void)
     /* start the shell */
     puts("Initialization successful - starting the shell now");
     char line_buf[SHELL_DEFAULT_BUFSIZE];
+
+    gnrc_netreg_register(GNRC_NETTYPE_LORAWAN, &lorawan_entry);
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
 
     return 0;

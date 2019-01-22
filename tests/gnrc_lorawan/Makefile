@@ -14,6 +14,7 @@ USEMODULE += gnrc_netdev_default
 USEMODULE += auto_init_gnrc_netif
 USEMODULE += gnrc_lorawan
 USEMODULE += gnrc_pktbuf_cmd
+USEMODULE += gnrc_netapi_callbacks
 
 DEVELHELP ?= 1
 
