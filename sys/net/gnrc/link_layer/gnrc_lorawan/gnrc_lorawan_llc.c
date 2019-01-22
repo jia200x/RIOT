@@ -46,20 +46,7 @@ static gnrc_pktsnip_t *_process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t 
     /* delay 0 maps to 1 second */
     netif->lorawan.rx_delay = ja_hdr->rx_delay ? ja_hdr->rx_delay : 1;
 
-    printf("dl_settings: %i\n", netif->lorawan.dl_settings);
-    printf("rx_delay: %i\n", netif->lorawan.rx_delay);
-
-    printf("NWKSKEY: ");
-    for(int i=0;i<16;i++) {
-        printf("%02x ", netif->lorawan.nwkskey[i]);
-    }
-    printf("\n");
-
-    printf("APPSKEY: ");
-    for(int i=0;i<16;i++) {
-        printf("%02x ", netif->lorawan.appskey[i]);
-    }
-    printf("\n");
+    printf("Joined!\n");
 
     gnrc_lorawan_process_cflist(netif, out+sizeof(lorawan_join_accept_t)-1);
     netif->lorawan.joined = true;
@@ -67,78 +54,9 @@ static gnrc_pktsnip_t *_process_join_accept(gnrc_netif_t *netif, gnrc_pktsnip_t 
     return NULL;
 }
 
-/* PRECONDITION: pkt is valid and doesn't contain MIC
- *
- * If fopts != NULL, there are options in the FOPTS field
- * It pkt->data == NULL, there's no payload
- *
- * If pkt == NULL, there was an error (and packet was freed)
- */
-int gnrc_lorawan_parse_downlink(gnrc_pktsnip_t *pkt, 
-        gnrc_pktsnip_t **hdr, gnrc_pktsnip_t **fopts, gnrc_pktsnip_t **port)
+gnrc_pktsnip_t *gnrc_lorawan_get_mac_payload(gnrc_pktsnip_t *pkt, uint8_t *nwkskey)
 {
-    int err = -EINVAL;
-    *fopts = *hdr = *port = NULL;
-
-    if (!(*hdr = gnrc_pktbuf_mark(pkt, sizeof(lorawan_hdr_t), GNRC_NETTYPE_UNDEF))) {
-        puts("Couldn't allocate header");
-        goto end;
-    }
-
-    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t*) (*hdr)->data;
-
-    uint8_t n_fopts = lorawan_hdr_get_frame_opts_len(lw_hdr);
-    *fopts = gnrc_pktbuf_mark(pkt, n_fopts, GNRC_NETTYPE_UNDEF);
-
-    /* Failed to allocate buffer */
-    if(n_fopts && !fopts) {
-        puts("Couldn't allocate fopts");
-        goto end;
-    }
-
-    /* Port not present. Stop reading frame and process options (if any) */
-    if(pkt->size == 0) {
-        err = 0;
-        goto end;
-    }
-
-    *port = gnrc_pktbuf_mark(pkt, 1, GNRC_NETTYPE_UNDEF);
-    if(*port == NULL || pkt->size == 0)
-    {
-        puts("Couldn't allocate port or invalid packet");
-        goto end;
-    }
-    err = 0;
-
-end:
-    return err;
-
-}
-
-int gnrc_lorawan_downlink_is_valid(gnrc_netif_t *netif, gnrc_pktsnip_t *hdr,
-        gnrc_pktsnip_t *fopts, gnrc_pktsnip_t *port)
-{
-    /* TODO: Validate dev_addr */
-    /* TODO: Validate fcnt */
-    int err = -EINVAL;
-
-    (void) hdr;
-    (void) netif;
-
-    if(fopts && port && *((uint8_t*) port->data) == 0) {
-        goto end;
-    }
-
-    /* All OK */
-    err = 0;
-
-end:
-    return err;
-}
-static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
-{
-    uint8_t is_fopt_payload;
-    gnrc_pktsnip_t *data, *hdr, *fopts, *port;
+    gnrc_pktsnip_t *data; 
 
     if (!(data = gnrc_pktbuf_mark(pkt, (pkt->size-MIC_SIZE > 0) ? pkt->size-MIC_SIZE : 0, GNRC_NETTYPE_UNDEF))) {
         gnrc_pktbuf_release(pkt);
@@ -146,15 +64,19 @@ static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
         goto end;
     }
 
-    le_uint32_t expected_mic = *((le_uint32_t*) pkt->data);
-    lorawan_hdr_t *lw_hdr = data->data;
+    assert(pkt->size == MIC_SIZE);
+
+    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t*) data->data;
+
     uint16_t fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
 
     le_uint32_t mic;
-    gnrc_lorawan_calculate_mic(&lw_hdr->addr, fcnt, 1, data, netif->lorawan.nwkskey, &mic);
+    le_uint32_t expected_mic;
+    memcpy(&expected_mic, pkt->data, MIC_SIZE);
+
+    gnrc_lorawan_calculate_mic(&lw_hdr->addr, fcnt, 1, data, nwkskey, &mic);
 
     if (expected_mic.u32 != mic.u32) {
-        puts("Invalid MIC");
         gnrc_pktbuf_release(pkt);
         pkt = NULL;
         goto end;
@@ -164,43 +86,118 @@ static gnrc_pktsnip_t *_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
     pkt = gnrc_pktbuf_remove_snip(pkt, pkt);
     assert(data == pkt);
 
-    if(gnrc_lorawan_parse_downlink(pkt, &hdr, &fopts, &port) < 0) {
+end:
+    return pkt;
+}
+
+/* Assume pkt with NO MIC */
+/* On error return NULL and free packet */
+gnrc_pktsnip_t *gnrc_lorawan_mark_fhdr(gnrc_pktsnip_t *pkt, lorawan_hdr_t **lw_hdr, uint8_t **fopts)
+{
+    lorawan_buffer_t lw_buf;
+
+    if(pkt->size < sizeof(lorawan_hdr_t)) {
+        /* FAILURE */
+        gnrc_pktbuf_release(pkt); 
+        return NULL;
+    }
+
+    lorawan_hdr_t *_hdr = pkt->data;
+    uint8_t fopts_length = lorawan_hdr_get_frame_opts_len(_hdr);
+    size_t hdr_size = sizeof(lorawan_hdr_t) + fopts_length;
+
+    gnrc_pktsnip_t *res = gnrc_pktbuf_mark(pkt, hdr_size, GNRC_NETTYPE_UNDEF);
+    if(!res) {
         gnrc_pktbuf_release(pkt);
-        pkt = NULL;
+        return NULL;
+    }
+
+    _hdr = res->data;
+    gnrc_lorawan_buffer_reset(&lw_buf, res->data, res->size);
+
+    printf("%i %i %i\n", hdr_size, lw_buf.size, lw_buf.index);
+
+    if(!(_hdr = (lorawan_hdr_t*) gnrc_lorawan_read_bytes(&lw_buf, sizeof(lorawan_hdr_t)))) {
+        /* FAILURE */
+        gnrc_pktbuf_release(pkt); 
+        return NULL;
+    }
+
+    uint8_t *_fopts = NULL;
+
+    if(fopts_length && !(_fopts = gnrc_lorawan_read_bytes(&lw_buf, fopts_length))) {
+        gnrc_pktbuf_release(pkt); 
+        return NULL;
+    }
+
+    *lw_hdr = _hdr;
+    *fopts = _fopts;
+
+    return pkt;
+}
+
+static gnrc_pktsnip_t *_handle_empty_payload(gnrc_netif_t *netif, lorawan_hdr_t *lw_hdr, gnrc_pktsnip_t *pkt, uint8_t* fopts)
+{
+    assert(pkt && pkt->data == NULL);
+    if(fopts) {
+        gnrc_lorawan_process_fopts(netif, fopts, lorawan_hdr_get_frame_opts_len(lw_hdr));
+    }
+
+    gnrc_pktbuf_release(pkt);
+    return NULL;
+}
+
+static gnrc_pktsnip_t *_handle_payload(gnrc_netif_t *netif, lorawan_hdr_t *lw_hdr, gnrc_pktsnip_t *pkt, uint8_t* fopts)
+{
+    assert(pkt && pkt->data);
+
+    if(pkt->size < 2) {
+        gnrc_pktbuf_release(pkt);
+        return NULL;
+    }
+
+    /* Decrypt pkt */
+    uint8_t *port = ((uint8_t*) pkt->data);
+    uint8_t *payload = port + 1;
+    size_t payload_size = pkt->size-1;
+
+    if(*port==0) {
+        if(fopts) {
+            gnrc_pktbuf_release(pkt);
+            return NULL;
+        }
+        gnrc_lorawan_encrypt_payload(payload, payload_size, &lw_hdr->addr, byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt)), 1, netif->lorawan.nwkskey);
+        gnrc_lorawan_process_fopts(netif, payload, payload_size);
+        gnrc_pktbuf_release(pkt);
+        return NULL;
+    }
+    else {
+        gnrc_lorawan_encrypt_payload(payload, payload_size, &lw_hdr->addr, byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt)), 1, netif->lorawan.appskey);
+        if(fopts) {
+            gnrc_lorawan_process_fopts(netif, fopts, lorawan_hdr_get_frame_opts_len(lw_hdr));
+        }
+    }
+    return pkt;
+}
+
+gnrc_pktsnip_t *gnrc_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
+{
+    if(!(pkt = gnrc_lorawan_get_mac_payload(pkt, netif->lorawan.nwkskey))) {
         goto end;
     }
 
-    if(gnrc_lorawan_downlink_is_valid(netif, hdr, fopts, port) < 0) {
-        gnrc_pktbuf_release(pkt);
-        pkt = NULL;
+    uint8_t *fopts;
+    lorawan_hdr_t *lw_hdr;
+    
+    if(!(pkt = gnrc_lorawan_mark_fhdr(pkt, &lw_hdr, &fopts))) {
         goto end;
-    }
+    } 
 
-    lw_hdr = hdr->data;
-
-    if (port) {
-        is_fopt_payload = *((uint8_t*) port->data) == 0;
+    if(pkt->data) {
+        pkt = _handle_payload(netif, lw_hdr, pkt, fopts);
     }
     else {
-        is_fopt_payload = 0;
-    }
-
-    /* If port is 0, NwkSKey is used to decrypt FRMPayload fopts */
-    gnrc_lorawan_encrypt_payload(pkt->data, pkt->size, &lw_hdr->addr, fcnt, 1, is_fopt_payload ? netif->lorawan.nwkskey : netif->lorawan.appskey);
-
-    assert((is_fopt_payload && fopts) == false);
-
-    if(is_fopt_payload) {
-        gnrc_lorawan_process_fopts(netif, pkt);
-    }
-    else {
-        gnrc_lorawan_process_fopts(netif, fopts);
-    }
-
-    if(port == NULL || is_fopt_payload) {
-        /* Everything we needed was already consumed. Drop packet */
-        gnrc_pktbuf_release(pkt);
-        pkt = NULL;
+        pkt = _handle_empty_payload(netif, lw_hdr, pkt, fopts);
     }
 
 end:
@@ -232,7 +229,7 @@ gnrc_pktsnip_t *gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
             break;
         case MTYPE_CNF_DOWNLINK:
         case MTYPE_UNCNF_DOWNLINK:
-            pkt = _process_downlink(netif, pkt);
+            pkt = gnrc_process_downlink(netif, pkt);
             if(pkt) {
                 for(unsigned i=0;i<pkt->size;i++) {
                     printf("%02x ", ((uint8_t*) pkt->data)[i]);

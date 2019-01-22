@@ -50,6 +50,8 @@ typedef struct {
     uint8_t confirmed_data;
     uint8_t port;
     uint8_t fopts[32];
+    uint8_t last_margin;
+    uint8_t last_num_gateways;
 } gnrc_netif_lorawan_t;
 
 #ifdef __cplusplus

@@ -32,6 +32,40 @@ int gnrc_lorawan_set_dr(gnrc_netif_t *netif, uint8_t datarate)
     return 0;
 }
 
+int gnrc_lorawan_buffer_reset(lorawan_buffer_t *buf, uint8_t *data, size_t length)
+{
+    if(!buf || !data || !length) {
+        return -EINVAL;
+    }
+
+    buf->data = data;
+    buf->size = length;
+    buf->index = 0;
+    return 0;
+}
+
+uint8_t *gnrc_lorawan_read_bytes(lorawan_buffer_t *buf, size_t length)
+{
+    if(!length || buf->index + length > buf->size) {
+        return NULL;
+    }
+
+    uint8_t *p = buf->data+ buf->index;
+    buf->index += length;
+    return p;
+}
+
+int gnrc_lorawan_write_bytes(lorawan_buffer_t *buf, uint8_t *bytes, size_t length)
+{
+    if(!length || buf->index + length > buf->size) {
+        return 0;
+    }
+
+    memcpy(buf->data+buf->index, bytes, length);
+    buf->index += length;
+    return length;
+}
+
 int gnrc_lorawan_set_pending_fopt(gnrc_netif_t *netif, uint8_t cid, uint8_t value)
 {
     if(!cid) {

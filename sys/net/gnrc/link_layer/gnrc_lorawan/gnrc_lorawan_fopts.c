@@ -18,8 +18,10 @@ static int _mlme_link_check_ans(gnrc_netif_t *netif, lorawan_buffer_t *fopt)
 {
     (void) netif;
     if(fopt) {
-        printf("Modulation margin: %idb\n", fopt->data[fopt->index++]);
-        printf("Number of gateways: %i\n", fopt->data[fopt->index++]);
+        netif->lorawan.last_margin = fopt->data[fopt->index++];
+        netif->lorawan.last_num_gateways = fopt->data[fopt->index++];
+        printf("Modulation margin: %idb\n", netif->lorawan.last_margin);
+        printf("Number of gateways: %i\n", netif->lorawan.last_num_gateways);
     }
 
     /* Return read bytes */
@@ -52,21 +54,17 @@ int gnrc_lorawan_fopt_read_cid(lorawan_buffer_t *fopt, uint8_t *cid)
     return gnrc_lorawan_perform_fopt(*cid, NULL, NULL);
 }
 
-void gnrc_lorawan_process_fopts(gnrc_netif_t *netif, gnrc_pktsnip_t *fopts)
+void gnrc_lorawan_process_fopts(gnrc_netif_t *netif, uint8_t *fopts, size_t size)
 {
-    if (fopts == NULL || fopts->data == NULL) {
+    if (!fopts || !size) {
         puts("No options");
         return;
     }
 
-    lorawan_buffer_t buf = {
-        .data = fopts->data,
-        .size = fopts->size,
-        .index = 0
-    };
+    lorawan_buffer_t buf;
+    gnrc_lorawan_buffer_reset(&buf, fopts, size);
 
     uint8_t cid;
-
     while(gnrc_lorawan_fopt_read_cid(&buf, &cid) >= 0) {
         if(!(gnrc_lorawan_get_pending_fopt(netif, cid) > 0)) {
             puts("Received unexpected FOpt. Stop processing ");
