@@ -68,7 +68,7 @@ gnrc_pktsnip_t *gnrc_lorawan_get_mac_payload(gnrc_pktsnip_t *pkt, uint8_t *nwksk
 
     lorawan_hdr_t *lw_hdr = (lorawan_hdr_t*) data->data;
 
-    uint16_t fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
+    uint32_t fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
 
     le_uint32_t mic;
     le_uint32_t expected_mic;
@@ -246,7 +246,7 @@ gnrc_pktsnip_t *gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
 }
 
 
-size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint16_t fcnt, uint8_t fctrl, uint8_t fopts_length, lorawan_buffer_t *buf)
+size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint32_t fcnt, uint8_t fctrl, uint8_t fopts_length, lorawan_buffer_t *buf)
 {
     assert(fopts_length < 16);
     lorawan_hdr_t *lw_hdr = (lorawan_hdr_t*) buf->data;

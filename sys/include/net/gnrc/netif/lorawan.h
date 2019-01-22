@@ -39,7 +39,7 @@ typedef struct {
     uint8_t dev_nonce[2];
     le_uint32_t dev_addr;
     uint8_t datarate;
-    uint16_t fcnt;
+    uint32_t fcnt;
     uint8_t dl_settings;
     uint8_t rx_delay;
     xtimer_t rx_1;

@@ -61,8 +61,8 @@ typedef struct {
 } lorawan_buffer_t;
 
 uint32_t calculate_mic(uint8_t *buf, size_t size, uint8_t *appkey);
-uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
-void gnrc_lorawan_encrypt_payload(uint8_t *payload, size_t size, le_uint32_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey);
+uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint32_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
+void gnrc_lorawan_encrypt_payload(uint8_t *payload, size_t size, le_uint32_t *dev_addr, uint32_t fcnt, uint8_t dir, uint8_t *appskey);
 void decrypt_join_accept(uint8_t *key, uint8_t *pkt, int has_clist, uint8_t *out);
 void generate_session_keys(uint8_t *app_nonce, uint8_t *dev_nonce, uint8_t *appkey, uint8_t *nwkskey, uint8_t *appskey);
 void gnrc_lorawan_send_join_request(gnrc_netif_t *netif);
@@ -78,9 +78,9 @@ int gnrc_lorawan_set_pending_fopt(gnrc_netif_t *netif, uint8_t cid, uint8_t valu
 int gnrc_lorawan_get_pending_fopt(gnrc_netif_t *netif, uint8_t cid);
 uint8_t gnrc_lorawan_build_options(gnrc_netif_t *netif, lorawan_buffer_t *buf);
 void gnrc_lorawan_process_fopts(gnrc_netif_t *netif, uint8_t *fopts, size_t size);
-void gnrc_lorawan_calculate_mic(le_uint32_t *dev_addr, uint16_t fcnt,
+void gnrc_lorawan_calculate_mic(le_uint32_t *dev_addr, uint32_t fcnt,
         uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey, le_uint32_t *out);
-size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint16_t fcnt, uint8_t fctrl, uint8_t fopts_length, lorawan_buffer_t *buf);
+size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint32_t fcnt, uint8_t fctrl, uint8_t fopts_length, lorawan_buffer_t *buf);
 int gnrc_lorawan_fopts_mlme_link_check_req(gnrc_netif_t *netif, lorawan_buffer_t *buf);
 int gnrc_lorawan_fopt_read_cid(lorawan_buffer_t *fopt, uint8_t *cid);
 int gnrc_lorawan_perform_fopt(uint8_t cid, gnrc_netif_t *netif, lorawan_buffer_t *fopt);

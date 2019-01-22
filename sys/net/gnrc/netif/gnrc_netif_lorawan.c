@@ -153,8 +153,7 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
            0, 0,
            (long int) 0);
 #endif
-    gnrc_lorawan_process_pkt(netif, pkt);
-    return NULL;
+    return gnrc_lorawan_process_pkt(netif, pkt);
 }
 
 uint8_t pkt_buf[50];

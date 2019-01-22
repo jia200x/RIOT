@@ -23,7 +23,7 @@ typedef struct  __attribute__((packed)) {
     uint8_t len;
 } lorawan_block_t;
 
-void gnrc_lorawan_calculate_mic(le_uint32_t *dev_addr, uint16_t fcnt,
+void gnrc_lorawan_calculate_mic(le_uint32_t *dev_addr, uint32_t fcnt,
         uint8_t dir, gnrc_pktsnip_t *pkt, uint8_t *nwkskey, le_uint32_t *out)
 {
     /* block */
@@ -53,7 +53,7 @@ void gnrc_lorawan_calculate_mic(le_uint32_t *dev_addr, uint16_t fcnt,
     memcpy(out, digest, sizeof(le_uint32_t)); 
 }
 
-uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey)
+uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint32_t fcnt, gnrc_pktsnip_t *pkt, uint8_t *nwkskey)
 {
     /* block */
     lorawan_block_t block; 
@@ -82,7 +82,7 @@ uint32_t calculate_pkt_mic(uint8_t dir, uint8_t *dev_addr, uint16_t fcnt, gnrc_p
 }
 
 /* TODO: Add test for 0 payload */
-void gnrc_lorawan_encrypt_payload(uint8_t *payload, size_t size, le_uint32_t *dev_addr, uint16_t fcnt, uint8_t dir, uint8_t *appskey)
+void gnrc_lorawan_encrypt_payload(uint8_t *payload, size_t size, le_uint32_t *dev_addr, uint32_t fcnt, uint8_t dir, uint8_t *appskey)
 {
     uint8_t s_block[16];
     uint8_t a_block[16];
