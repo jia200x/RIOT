@@ -113,9 +113,9 @@ typedef enum {
  *
  * @return  An initialized netreg entry
  */
-#define GNRC_NETREG_ENTRY_INIT_MBOX(demux_ctx, mbox) { NULL, demux_ctx, \
+#define GNRC_NETREG_ENTRY_INIT_MBOX(demux_ctx, _mbox) { NULL, demux_ctx, \
                                                        GNRC_NETREG_TYPE_MBOX, \
-                                                       { .mbox = mbox } }
+                                                       { .mbox = _mbox } }
 #endif
 
 #if defined(MODULE_GNRC_NETAPI_CALLBACKS) || defined(DOXYGEN)
@@ -130,9 +130,9 @@ typedef enum {
  *
  * @return  An initialized netreg entry
  */
-#define GNRC_NETREG_ENTRY_INIT_CB(demux_ctx, cbd)   { NULL, demux_ctx, \
+#define GNRC_NETREG_ENTRY_INIT_CB(demux_ctx, _cbd)   { NULL, demux_ctx, \
                                                       GNRC_NETREG_TYPE_CB, \
-                                                      { .cbd = cbd } }
+                                                      { .cbd = _cbd } }
 /** @} */
 
 /**
