@@ -52,6 +52,7 @@ typedef struct {
     uint8_t fopts[32];
     uint8_t last_margin;
     uint8_t last_num_gateways;
+    uint8_t ack_requested;
 } gnrc_netif_lorawan_t;
 
 #ifdef __cplusplus

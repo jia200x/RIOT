@@ -228,6 +228,8 @@ gnrc_pktsnip_t *gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
             pkt = _process_join_accept(netif, pkt);
             break;
         case MTYPE_CNF_DOWNLINK:
+            netif->lorawan.ack_requested = true;
+            /* FALLTHRU */
         case MTYPE_UNCNF_DOWNLINK:
             pkt = gnrc_process_downlink(netif, pkt);
             if(pkt) {
@@ -291,7 +293,7 @@ gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_netif_t *netif, gnrc_pktsnip_t *p
     };
 
     gnrc_lorawan_build_hdr(netif->lorawan.confirmed_data ? MTYPE_CNF_UPLINK : MTYPE_UNCNF_UPLINK,
-           &netif->lorawan.dev_addr, netif->lorawan.fcnt, 0, fopts_length, &buf);
+           &netif->lorawan.dev_addr, netif->lorawan.fcnt, netif->lorawan.ack_requested, fopts_length, &buf);
 
     gnrc_lorawan_build_options(netif, &buf);
 

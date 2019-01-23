@@ -104,6 +104,7 @@ static void _init(gnrc_netif_t *netif)
     netif->dev->driver->set(netif->dev, NETOPT_ACK_REQ, &confirmed_data, sizeof(confirmed_data));
 
     netif->lorawan.joined = false;
+    netif->lorawan.ack_requested = false;
     /* TODO: Default port */
     netif->lorawan.port = 1;
     memset(netif->lorawan.fopts, 0, sizeof(netif->lorawan.fopts));
@@ -169,6 +170,8 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
 
     /* build join request */
     gnrc_pktsnip_t *pkt = gnrc_lorawan_build_uplink(netif, payload);
+
+    netif->lorawan.ack_requested = false;
 
     iolist_t iolist = {
         .iol_base = pkt->data,
