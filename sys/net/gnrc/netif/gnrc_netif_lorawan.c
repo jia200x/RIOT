@@ -20,9 +20,6 @@
 #include "net/gnrc/lorawan/lorawan.h"
 #include "net/netdev.h"
 #include "net/gnrc/netreg.h"
-#if 0
-#include "sx127x_netdev.h"
-#endif
 #include "net/lora.h"
 
 #define ENABLE_DEBUG    (0)
@@ -125,9 +122,7 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
     netdev_t *dev = netif->dev;
     int bytes_expected = dev->driver->recv(dev, NULL, 0, 0);
     int nread;
-#if 0
-    netdev_sx127x_lora_packet_info_t rx_info;
-#endif
+    struct netdev_radio_rx_info rx_info;
     gnrc_pktsnip_t *pkt = NULL;
 
     pkt = gnrc_pktbuf_add(NULL, NULL, bytes_expected, GNRC_NETTYPE_UNDEF);
@@ -137,11 +132,7 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
         dev->driver->recv(dev, NULL, bytes_expected, NULL);
         return NULL;
     }
-#if 0
     nread = dev->driver->recv(dev, pkt->data, bytes_expected, &rx_info);
-#else
-    nread = dev->driver->recv(dev, pkt->data, bytes_expected, NULL);
-#endif
     if (nread <= 0) {
         gnrc_pktbuf_release(pkt);
         return NULL;
@@ -152,17 +143,10 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
     }
     printf("\n");
     /* TODO: Time On Air from netdev! */
-#if 0
     printf("{Payload: \"%s\" (%d bytes), RSSI: %i, SNR: %i, TOA: %lu}\n",
            (char*) pkt->data, (int) pkt->size,
            rx_info.rssi, (int)rx_info.snr,
            (long int) 0);
-#else
-    printf("{Payload: \"%s\" (%d bytes), RSSI: %i, SNR: %i, TOA: %lu}\n",
-           (char*) pkt->data, (int) pkt->size,
-           0, 0,
-           (long int) 0);
-#endif
     return gnrc_lorawan_process_pkt(netif, pkt);
 }
 
