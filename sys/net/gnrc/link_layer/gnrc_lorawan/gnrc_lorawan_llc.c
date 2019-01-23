@@ -247,7 +247,7 @@ gnrc_pktsnip_t *gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
 }
 
 
-size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint32_t fcnt, uint8_t fctrl, uint8_t fopts_length, lorawan_buffer_t *buf)
+size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint32_t fcnt, uint8_t ack, uint8_t fopts_length, lorawan_buffer_t *buf)
 {
     assert(fopts_length < 16);
     lorawan_hdr_t *lw_hdr = (lorawan_hdr_t*) buf->data;
@@ -256,8 +256,9 @@ size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint32_t fcn
     lorawan_hdr_set_maj(lw_hdr, MAJOR_LRWAN_R1);
 
     lw_hdr->addr = *dev_addr;
-    lw_hdr->fctrl = fctrl;
+    lw_hdr->fctrl = 0;
 
+    lorawan_hdr_set_ack(lw_hdr, ack);
     lorawan_hdr_set_frame_opts_len(lw_hdr, fopts_length);
 
     lw_hdr->fcnt = byteorder_btols(byteorder_htons(fcnt));
