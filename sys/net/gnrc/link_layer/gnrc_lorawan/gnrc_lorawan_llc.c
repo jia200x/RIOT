@@ -236,6 +236,7 @@ gnrc_pktsnip_t *gnrc_lorawan_process_pkt(gnrc_netif_t *netif, gnrc_pktsnip_t *pk
                 }
                 printf("\n");
             }
+            pkt->type = GNRC_NETTYPE_LORAWAN;
             break;
         default:
             gnrc_pktbuf_release(pkt);

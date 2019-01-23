@@ -19,6 +19,7 @@
 #include "net/gnrc/netif/internal.h"
 #include "net/gnrc/lorawan/lorawan.h"
 #include "net/netdev.h"
+#include "net/gnrc/netreg.h"
 #if 0
 #include "sx127x_netdev.h"
 #endif
@@ -43,6 +44,16 @@ static const gnrc_netif_ops_t lorawan_ops = {
     .msg_handler = _msg_handler
 };
 
+static void _pass_on_packet(gnrc_pktsnip_t *pkt)
+{
+    /* throw away packet if no one is interested */
+    if (!gnrc_netapi_dispatch_receive(pkt->type, GNRC_NETREG_DEMUX_CTX_ALL, pkt)) {
+        DEBUG("gnrc_netif: unable to forward packet of type %i\n", pkt->type);
+        gnrc_pktbuf_release(pkt);
+        return;
+    }
+}
+
 static void _event_cb(netdev_t *dev, netdev_event_t event)
 {
     gnrc_netif_t *netif = (gnrc_netif_t *) dev->context;
@@ -62,10 +73,9 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
                     gnrc_pktsnip_t *pkt = netif->ops->recv(netif);
 
                     (void) pkt;
-                    /*
                     if (pkt) {
                         _pass_on_packet(pkt);
-                    }*/
+                    }
                 }
                 break;
             case NETDEV_EVENT_TX_COMPLETE:

@@ -84,7 +84,7 @@ void _test_cb(uint16_t cmd, gnrc_pktsnip_t *pkt, void *ctx)
     (void) ctx;
     (void) cmd;
     (void) pkt;
-    printf("AAA");
+    printf("AAA\n");
 }
 
 gnrc_netreg_entry_cbd_t _cbd = {
@@ -93,7 +93,7 @@ gnrc_netreg_entry_cbd_t _cbd = {
 };
 
 static gnrc_netreg_entry_t lorawan_entry = GNRC_NETREG_ENTRY_INIT_CB(
-        2, &_cbd
+        GNRC_NETREG_DEMUX_CTX_ALL, &_cbd
 );
 
 extern uint32_t calculate_mic(uint8_t *buf, size_t size, uint8_t *appkey);
