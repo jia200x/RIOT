@@ -338,6 +338,7 @@ static gnrc_pktsnip_t *_build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uin
 /*TODO: Move to gnrc_netif*/
 void gnrc_lorawan_send_join_request(gnrc_netif_t *netif)
 {
+    gnrc_lorawan_reset(netif);
     netdev_t *dev = netif->dev;
     netif->lorawan.state = LORAWAN_STATE_TX;
 

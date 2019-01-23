@@ -92,6 +92,24 @@ int gnrc_lorawan_get_pending_fopt(gnrc_netif_t *netif, uint8_t cid)
     return netif->lorawan.fopts[col] & (1<<row);
 }
 
+void gnrc_lorawan_reset(gnrc_netif_t *netif)
+{
+    uint8_t cr = LORA_CR_4_5;
+    netif->dev->driver->set(netif->dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
+
+    uint8_t syncword = LORA_SYNCWORD_PUBLIC;
+    netif->dev->driver->set(netif->dev, NETOPT_SYNCWORD, &syncword, sizeof(syncword));
+
+    uint8_t confirmed_data = false;
+    netif->dev->driver->set(netif->dev, NETOPT_ACK_REQ, &confirmed_data, sizeof(confirmed_data));
+
+    netif->lorawan.joined = false;
+    netif->lorawan.ack_requested = false;
+    /* TODO: Default port */
+    netif->lorawan.port = 1;
+    memset(netif->lorawan.fopts, 0, sizeof(netif->lorawan.fopts));
+}
+
 /* TODO: Merge into one function */
 static void _configure_rx_window(gnrc_netif_t *netif)
 {

@@ -94,20 +94,7 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
 static void _init(gnrc_netif_t *netif)
 {
     netif->dev->event_callback = _event_cb;
-    uint8_t cr = LORA_CR_4_5;
-    netif->dev->driver->set(netif->dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
-
-    uint8_t syncword = LORA_SYNCWORD_PUBLIC;
-    netif->dev->driver->set(netif->dev, NETOPT_SYNCWORD, &syncword, sizeof(syncword));
-
-    uint8_t confirmed_data = false;
-    netif->dev->driver->set(netif->dev, NETOPT_ACK_REQ, &confirmed_data, sizeof(confirmed_data));
-
-    netif->lorawan.joined = false;
-    netif->lorawan.ack_requested = false;
-    /* TODO: Default port */
-    netif->lorawan.port = 1;
-    memset(netif->lorawan.fopts, 0, sizeof(netif->lorawan.fopts));
+    gnrc_lorawan_reset(netif);
 }
 
 gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize,
