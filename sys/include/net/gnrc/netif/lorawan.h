@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-/* TODO: Only store neessary keys! */
+/* TODO: Only store necessary keys! */
 typedef struct {
     uint8_t deveui[GNRC_LORAWAN_EUI_LEN];
     uint8_t appeui[GNRC_LORAWAN_EUI_LEN];
@@ -53,6 +53,8 @@ typedef struct {
     uint8_t last_margin;
     uint8_t last_num_gateways;
     uint8_t ack_requested;
+    uint32_t channel[16];
+    uint8_t dr_range[16];
 } gnrc_netif_lorawan_t;
 
 #ifdef __cplusplus

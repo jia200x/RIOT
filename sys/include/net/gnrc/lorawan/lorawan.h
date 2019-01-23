@@ -90,6 +90,7 @@ int gnrc_lorawan_buffer_reset(lorawan_buffer_t *buf, uint8_t *data, size_t lengt
 gnrc_pktsnip_t *gnrc_process_downlink(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt);
 gnrc_pktsnip_t *gnrc_lorawan_get_mac_payload(gnrc_pktsnip_t *pkt, uint8_t *nwkskey);
 void gnrc_lorawan_reset(gnrc_netif_t *netif);
+void gnrc_lorawan_channels_init(gnrc_netif_t *netif);
 
 #ifdef __cplusplus
 }

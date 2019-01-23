@@ -108,6 +108,8 @@ void gnrc_lorawan_reset(gnrc_netif_t *netif)
     /* TODO: Default port */
     netif->lorawan.port = 1;
     memset(netif->lorawan.fopts, 0, sizeof(netif->lorawan.fopts));
+
+    gnrc_lorawan_channels_init(netif);
 }
 
 /* TODO: Merge into one function */
