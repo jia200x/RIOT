@@ -26,6 +26,8 @@
 #include "net/gnrc/netif.h"
 #include "net/gnrc/netif/hdr.h"
 #include "net/lora.h"
+#include "net/loramac.h"
+#include "fmt.h"
 
 #ifdef MODULE_NETSTATS
 #include "net/netstats.h"
@@ -75,6 +77,9 @@ static const struct {
     { "rx_single", NETOPT_SINGLE_RECEIVE },
     { "chan_hop", NETOPT_CHANNEL_HOP },
     { "checksum", NETOPT_CHECKSUM },
+    { "otaa", NETOPT_OTAA },
+    { "up", NETOPT_LINK_CONNECTED },
+    { "link_check", NETOPT_LINK_CHECK },
 };
 
 /* utility functions */
@@ -149,7 +154,14 @@ static void _set_usage(char *cmd_name)
          "       * \"addr\" - sets (short) address\n"
          "       * \"addr_long\" - sets long address\n"
          "       * \"addr_short\" - alias for \"addr\"\n"
+         "       * \"appeui\" - sets Application EUI\n"
+         "       * \"appkey\" - sets Application key\n"
+         "       * \"appskey\" - sets Application session key\n"
          "       * \"cca_threshold\" - set ED threshold during CCA in dBm\n"
+         "       * \"deveui\" - sets Device EUI\n"
+         "       * \"dr\" - sets datarate\n"
+         "       * \"rx2_dr\" - sets datarate of RX2 (lorawan)\n"
+         "       * \"nwkskey\" - sets Network Session Key\n"
          "       * \"freq\" - sets the \"channel\" center frequency\n"
          "       * \"channel\" - sets the frequency channel\n"
          "       * \"chan\" - alias for \"channel\"\n"
@@ -215,6 +227,22 @@ static void _print_netopt(netopt_t opt)
 
         case NETOPT_ADDRESS_LONG:
             printf("long address");
+            break;
+
+        case NETOPT_LORAWAN_APPKEY:
+            printf("AppKey");
+            break;
+
+        case NETOPT_LORAWAN_APPSKEY:
+            printf("AppSKey");
+            break;
+
+        case NETOPT_LORAWAN_NWKSKEY:
+            printf("NwkSKey");
+            break;
+
+        case NETOPT_LORAWAN_APPEUI:
+            printf("AppEUI");
             break;
 
         case NETOPT_SRC_LEN:
@@ -285,8 +313,24 @@ static void _print_netopt(netopt_t opt)
             printf("checksum");
             break;
 
+        case NETOPT_OTAA:
+            printf("otaa");
+            break;
+
+        case NETOPT_LINK_CHECK:
+            printf("link check");
+            break;
+
         case NETOPT_PHY_BUSY:
             printf("PHY busy");
+            break;
+
+        case NETOPT_LORAWAN_DR:
+            printf("datarate");
+            break;
+
+        case NETOPT_LORAWAN_RX2_DR:
+            printf("RX2 datarate");
             break;
 
         default:
@@ -478,6 +522,16 @@ static void _netif_list(kernel_pid_t iface)
         }
         line_thresh++;
     }
+    res = gnrc_netapi_get(iface, NETOPT_DEMOD_MARGIN, 0, &u8, sizeof(u8));
+    if (res >= 0) {
+        printf(" Demod margin.: %u ", (unsigned) u8);
+        line_thresh++;
+    }
+    res = gnrc_netapi_get(iface, NETOPT_NUM_GATEWAYS, 0, &u8, sizeof(u8));
+    if (res >= 0) {
+        printf(" Num gateways.: %u ", (unsigned) u8);
+        line_thresh++;
+    }
     line_thresh = _newline(0U, line_thresh);
     line_thresh = _netif_list_flag(iface, NETOPT_PROMISCUOUSMODE, "PROMISC  ",
                                    line_thresh);
@@ -494,13 +548,15 @@ static void _netif_list(kernel_pid_t iface)
     line_thresh = _netif_list_flag(iface, NETOPT_CSMA, "CSMA  ",
                                    line_thresh);
     line_thresh += _LINE_THRESHOLD + 1; /* enforce linebreak after this option */
-    line_thresh = _netif_list_flag(iface, NETOPT_AUTOCCA, "AUTOCCA",
+    line_thresh = _netif_list_flag(iface, NETOPT_AUTOCCA, "AUTOCCA ",
                                    line_thresh);
-    line_thresh = _netif_list_flag(iface, NETOPT_IQ_INVERT, "IQ_INVERT",
+    line_thresh = _netif_list_flag(iface, NETOPT_IQ_INVERT, "IQ_INVERT ",
                                    line_thresh);
-    line_thresh = _netif_list_flag(iface, NETOPT_SINGLE_RECEIVE, "RX_SINGLE",
+    line_thresh = _netif_list_flag(iface, NETOPT_SINGLE_RECEIVE, "RX_SINGLE ",
                                    line_thresh);
-    line_thresh = _netif_list_flag(iface, NETOPT_CHANNEL_HOP, "CHAN_HOP",
+    line_thresh = _netif_list_flag(iface, NETOPT_CHANNEL_HOP, "CHAN_HOP ",
+                                   line_thresh);
+    line_thresh = _netif_list_flag(iface, NETOPT_OTAA, "OTAA",
                                    line_thresh);
     res = gnrc_netapi_get(iface, NETOPT_MAX_PDU_SIZE, 0, &u16, sizeof(u16));
     if (res > 0) {
@@ -808,6 +864,36 @@ static int _netif_set_flag(kernel_pid_t iface, netopt_t opt,
     return 0;
 }
 
+static int _netif_set_lw_key(kernel_pid_t iface, netopt_t opt, char *key_str)
+{
+    /* This is the longest key */
+    uint8_t key[LORAMAC_APPKEY_LEN];
+
+    size_t key_len = fmt_hex_bytes(key, key_str);
+    size_t expected_len;
+    switch(opt) {
+        case NETOPT_LORAWAN_APPKEY:
+        case NETOPT_LORAWAN_APPSKEY:
+        case NETOPT_LORAWAN_NWKSKEY:
+            /* All keys have the same length as the APP KEY */
+            expected_len = LORAMAC_APPKEY_LEN;
+            break;
+        default:
+            /* Same rationale here */
+            expected_len = LORAMAC_DEVEUI_LEN;
+    }
+    if (!key_len || key_len != expected_len) {
+        puts("error: unable to parse key.\n");
+        return 1;
+    }
+
+    gnrc_netapi_set(iface, opt, 0,  &key, expected_len);
+    printf("success: set ");
+    _print_netopt(opt);
+    printf(" on interface %" PRIkernel_pid " to %s\n", iface, key_str);
+    return 0;
+}
+
 static int _netif_set_addr(kernel_pid_t iface, netopt_t opt, char *addr_str)
 {
     uint8_t addr[GNRC_NETIF_L2ADDR_MAXLEN];
@@ -1005,8 +1091,23 @@ static int _netif_set(char *cmd_name, kernel_pid_t iface, char *key, char *value
     if ((strcmp("addr", key) == 0) || (strcmp("addr_short", key) == 0)) {
         return _netif_set_addr(iface, NETOPT_ADDRESS, value);
     }
+    else if (strcmp("appeui", key) == 0) {
+        return _netif_set_lw_key(iface, NETOPT_LORAWAN_APPEUI, value);
+    }
+    else if (strcmp("appkey", key) == 0) {
+        return _netif_set_lw_key(iface, NETOPT_LORAWAN_APPKEY, value);
+    }
     else if (strcmp("addr_long", key) == 0) {
         return _netif_set_addr(iface, NETOPT_ADDRESS_LONG, value);
+    }
+    else if (strcmp("deveui", key) == 0) {
+        return _netif_set_addr(iface, NETOPT_ADDRESS_LONG, value);
+    }
+    else if (strcmp("appskey", key) == 0) {
+        return _netif_set_addr(iface, NETOPT_LORAWAN_APPSKEY, value);
+    }
+    else if (strcmp("nwkskey", key) == 0) {
+        return _netif_set_addr(iface, NETOPT_LORAWAN_NWKSKEY, value);
     }
     else if (strcmp("cca_threshold", key) == 0) {
         return _netif_set_u8(iface, NETOPT_CCA_THRESHOLD, 0, value);
@@ -1025,6 +1126,12 @@ static int _netif_set(char *cmd_name, kernel_pid_t iface, char *key, char *value
     }
     else if ((strcmp("channel", key) == 0) || (strcmp("chan", key) == 0)) {
         return _netif_set_u16(iface, NETOPT_CHANNEL, 0, value);
+    }
+    else if (strcmp("dr", key) == 0) {
+        return _netif_set_u8(iface, NETOPT_LORAWAN_DR, 0, value);
+    }
+    else if (strcmp("rx2_dr", key) == 0) {
+        return _netif_set_u8(iface, NETOPT_LORAWAN_RX2_DR, 0, value);
     }
     else if (strcmp("csma_retries", key) == 0) {
         return _netif_set_u8(iface, NETOPT_CSMA_RETRIES, 0, value);
