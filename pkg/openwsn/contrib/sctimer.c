@@ -14,27 +14,31 @@
  *
  * @author      Tengfei Chang <tengfei.chang@gmail.com>, July 2012
  * @author      Peter Kietzmann <peter.kietzmann@haw-hamburg.de>, July 2017
+ * @author      Michel Rottleuthner <michel.rottleuthner@haw-hamburg.de>, April 2019
  *
  * @}
  */
 
-#include "board_info.h"
 #include "sctimer.h"
 
 #include "periph/rtt.h"
 
-#define ENABLE_DEBUG    (0)
-#include "debug.h"
+#define LOG_LEVEL LOG_NONE
+#include "log.h"
 
-// TODO this is toooo hardware dependant
-// ========================== define ==========================================
-// 511 seconds @ 32768Hz clock
-#define TIMERLOOP_THRESHOLD          0xffffff
-// as 16kHz is used, the upper timer overflows when timer research to 0x7fffffff
-#define OVERFLOW_THRESHOLD           0x7fffffff
-#define MINIMUM_COMPAREVALE_ADVANCE  10
+#if RTT_FREQUENCY != 32768U
+    #error "RTT_FREQUENCY not supported"
+#endif
 
-// ========================== variable ========================================
+/**
+ * @brief   TODO
+ */
+#define OW_SCTIMER_MIN_COMP_ADVANCE     (10)
+
+/**
+ * @brief   TODO
+ */
+#define OW_SCTIMER_ISR_NOW_OFFSET       (10)
 
 typedef struct {
     sctimer_cbt sctimer_cb;
@@ -42,101 +46,43 @@ typedef struct {
     bool convertUnlock;
 } sctimer_vars_t;
 
+
 sctimer_vars_t sctimer_vars;
 
-static void sctimer_isr_internal(void *arg);
+static void sctimer_isr_internal(void *arg)
+{
+    (void)arg;
 
+    if (sctimer_vars.sctimer_cb != NULL) {
+        sctimer_vars.sctimer_cb();
+    }
+}
 
-/**
-   \brief Initialization sctimer.
- */
 void sctimer_init(void)
 {
-    DEBUG("sctimer_init\n");
+    LOG_DEBUG("%s\n", __FUNCTION__);
     memset(&sctimer_vars, 0, sizeof(sctimer_vars_t));
     rtt_init();
 }
 
 void sctimer_set_callback(sctimer_cbt cb)
 {
-    DEBUG("sctimer_set_callback\n");
+    LOG_DEBUG("%s\n", __FUNCTION__);
     sctimer_vars.sctimer_cb = cb;
 }
 
-/**
-   \brief set compare interrupt
- */
 void sctimer_setCompare(uint32_t val)
 {
-    DEBUG("sctimer_setCompare\n");
-    // enable the compare interrupt
-    /*
-       if (current Timer counter - val < TIMERLOOP_THRESHOLD){
-        // the timer is already late, schedule the ISR right now manually.
-        triggerTimerInterrupt();
-       } else {
-        if (val - current Timer counter < MINIMUM_COMPAREVALE_ADVANCE){}
-            // there is hardware limitation to schedule the timer within TIMERTHRESHOLD ticks
-            // schedule ISR right now manually
-            triggerTimerInterrupt();
-        } else {
-            // schedule the timer at val
-            setCompareValue(val);
-        }
-       }
-     */
-    // make sure convert flag conly toggle once within one overflow period
-    if (val > OVERFLOW_THRESHOLD && sctimer_vars.convertUnlock) {
-        // toggle convert
-        if (sctimer_vars.convert) {
-            sctimer_vars.convert = true;
-        }
-        else {
-            sctimer_vars.convert = false;
-        }
-        sctimer_vars.convertUnlock = false;
-    }
-
-    // un lock the changes of convert flag
-    if (val > TIMERLOOP_THRESHOLD && val < 2 * TIMERLOOP_THRESHOLD) {
-        sctimer_vars.convertUnlock = true;
-    }
-
-    // update value to be compared according to timer condition
-    if (val <= OVERFLOW_THRESHOLD) {
-        if (sctimer_vars.convert) {
-            val = val >> 1;
-            val |= 0x80000000;
-        }
-        else {
-            val = val >> 1;
-        }
-    }
-    else {
-        if (sctimer_vars.convert) {
-            val = val >> 1;
-        }
-        else {
-            val = val >> 1;
-            val |= 0x80000000;
-        }
-    }
     DISABLE_INTERRUPTS();
-    if (rtt_get_counter() - val < TIMERLOOP_THRESHOLD) {
-        // the timer is already late, schedule the ISR cb function manually
-        // It is not executed in interrupt context but won't be
-        // interrupted as interrupts were disabled
-        rtt_set_alarm(rtt_get_counter() + 2, sctimer_isr_internal, NULL);
+
+    uint32_t cnt = rtt_get_counter();
+
+    /* ATTENTION! This needs to be an unsigned type */
+    if ((int32_t)(val - cnt) < OW_SCTIMER_MIN_COMP_ADVANCE) {
+        rtt_set_alarm(cnt + OW_SCTIMER_ISR_NOW_OFFSET, sctimer_isr_internal, NULL);
     }
     else {
-        if (val - rtt_get_counter() < MINIMUM_COMPAREVALE_ADVANCE) {
-            //sctimer_isr_internal(NULL);
-            rtt_set_alarm(rtt_get_counter() + 2, sctimer_isr_internal, NULL);
-        }
-        else {
-            // schedule the timer at val
-            rtt_set_alarm(val, sctimer_isr_internal, NULL);
-        }
+        rtt_set_alarm(val, sctimer_isr_internal, NULL);
     }
 
     ENABLE_INTERRUPTS();
@@ -144,33 +90,18 @@ void sctimer_setCompare(uint32_t val)
 
 uint32_t sctimer_readCounter(void)
 {
-    uint32_t counter;
-
-    counter = rtt_get_counter();
-    counter = counter & OVERFLOW_THRESHOLD;
-    counter = counter << 1;
-    DEBUG("sctimer_readCounter:%" PRIu32 "\n", counter);
-    return counter;
+    uint32_t now = rtt_get_counter();
+    return now;
 }
 
 void sctimer_enable(void)
 {
-    DEBUG("sctimer_enable\n");
+    LOG_DEBUG("%s\n", __FUNCTION__);
     rtt_poweron();
 }
 
 void sctimer_disable(void)
 {
-    DEBUG("sctimer_disable\n");
+    LOG_DEBUG("%s\n", __FUNCTION__);
     rtt_poweroff();
-}
-
-void sctimer_isr_internal(void *arg)
-{
-    (void)arg;
-    DEBUG("sctimer_isr_internal\n");
-    // debugpins_isr_set();
-    if (sctimer_vars.sctimer_cb != NULL) {
-        sctimer_vars.sctimer_cb();
-    }
 }
