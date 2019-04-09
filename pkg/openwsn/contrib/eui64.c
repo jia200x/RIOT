@@ -26,5 +26,10 @@
 
 void eui64_get(uint8_t *addressToWrite)
 {
-    luid_get((void *)addressToWrite, IEEE802154_LONG_ADDRESS_LEN);
+    uint8_t addr[IEEE802154_LONG_ADDRESS_LEN];
+    luid_get((void *)addr, IEEE802154_LONG_ADDRESS_LEN);
+
+    for(unsigned i=0;i<IEEE802154_LONG_ADDRESS_LEN;i++) {
+        addressToWrite[i] = addr[IEEE802154_LONG_ADDRESS_LEN-i-1];
+    }
 }
