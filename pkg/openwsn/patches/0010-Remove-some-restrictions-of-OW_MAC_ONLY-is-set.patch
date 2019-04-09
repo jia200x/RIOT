@@ -1,0 +1,48 @@
+From 1e27210bbd2adf7e8e2eec7cfcc86a382fe97329 Mon Sep 17 00:00:00 2001
+From: Jose Alamos <jose.alamos@haw-hamburg.de>
+Date: Tue, 9 Apr 2019 12:12:48 +0200
+Subject: [PATCH 4/6] Remove some restrictions of OW_MAC_ONLY is set
+
+---
+ openstack/02b-MAChigh/sixtop.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/openstack/02b-MAChigh/sixtop.c b/openstack/02b-MAChigh/sixtop.c
+index 11b45d2c..c5121e80 100644
+--- a/openstack/02b-MAChigh/sixtop.c
++++ b/openstack/02b-MAChigh/sixtop.c
+@@ -368,6 +368,7 @@ owerror_t sixtop_send(OpenQueueEntry_t *msg) {
+ 
+     open_addr_t addressToWrite;
+     
++#ifndef OW_MAC_ONLY
+     if (
+         idmanager_getIsDAGroot() == FALSE               &&
+         (
+@@ -385,6 +386,7 @@ owerror_t sixtop_send(OpenQueueEntry_t *msg) {
+         return E_FAIL;
+     }
+ 
++#endif
+     // set metadata
+     msg->owner        = COMPONENT_SIXTOP;
+     msg->l2_frameType = IEEE154_TYPE_DATA;
+@@ -770,6 +772,7 @@ port_INLINE void sixtop_sendEB(void) {
+         return;
+     }
+ 
++#ifndef OW_MAC_ONLY
+     if (
+         idmanager_getIsDAGroot() == FALSE &&
+         (
+@@ -790,6 +793,7 @@ port_INLINE void sixtop_sendEB(void) {
+         return;
+     }
+    
++#endif
+     if (sixtop_vars.busySendingEB==TRUE) {
+         // don't continue if I'm still sending a previous EB
+         return;
+-- 
+2.21.0
+

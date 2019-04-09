@@ -1,0 +1,127 @@
+From 71248a6efadedb39f0aca3795e2a08c797399cb8 Mon Sep 17 00:00:00 2001
+From: Jose Alamos <jose.alamos@haw-hamburg.de>
+Date: Wed, 27 Mar 2019 17:01:39 +0100
+Subject: [PATCH 1/6] Replace scheduler with RIOT events
+
+---
+ openstack/02a-MAClow/IEEE802154E.c | 16 ++++++++++++++++
+ openstack/02b-MAChigh/sixtop.c     | 21 +++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
+
+diff --git a/openstack/02a-MAClow/IEEE802154E.c b/openstack/02a-MAClow/IEEE802154E.c
+index 8e205c05..a0219345 100644
+--- a/openstack/02a-MAClow/IEEE802154E.c
++++ b/openstack/02a-MAClow/IEEE802154E.c
+@@ -17,10 +17,18 @@
+ #include "sctimer.h"
+ #include "openrandom.h"
+ #include "msf.h"
++#ifdef OW_MAC_ONLY
++#include "event.h"
++#endif
+ 
+ //=========================== definition ======================================
+ 
+ //=========================== variables =======================================
++#ifdef OW_MAC_ONLY
++extern event_t ev_sixtop_notify_send_done;
++extern event_t ev_sixtop_notify_receive;
++extern event_queue_t queue;
++#endif
+ 
+ ieee154e_vars_t    ieee154e_vars;
+ ieee154e_stats_t   ieee154e_stats;
+@@ -2732,7 +2740,11 @@ void notif_sendDone(OpenQueueEntry_t* packetSent, owerror_t error) {
+     // COMPONENT_IEEE802154E_TO_RES so RES can knows it's for it
+     packetSent->owner              = COMPONENT_IEEE802154E_TO_SIXTOP;
+     // post RES's sendDone task
++#ifdef OW_MAC_ONLY
++    event_post(&queue, &ev_sixtop_notify_send_done);
++#else
+     scheduler_push_task(task_sixtopNotifSendDone,TASKPRIO_SIXTOP_NOTIF_TXDONE);
++#endif
+     // wake up the scheduler
+     SCHEDULER_WAKEUP();
+ }
+@@ -2746,7 +2758,11 @@ void notif_receive(OpenQueueEntry_t* packetReceived) {
+     // COMPONENT_IEEE802154E_TO_SIXTOP so sixtop can knows it's for it
+     packetReceived->owner          = COMPONENT_IEEE802154E_TO_SIXTOP;
+     // post RES's Receive task
++#ifdef OW_MAC_ONLY
++    event_post(&queue, &ev_sixtop_notify_receive);
++#else
+     scheduler_push_task(task_sixtopNotifReceive,TASKPRIO_SIXTOP_NOTIF_RX);
++#endif
+     // wake up the scheduler
+     SCHEDULER_WAKEUP();
+ }
+diff --git a/openstack/02b-MAChigh/sixtop.c b/openstack/02b-MAChigh/sixtop.c
+index 021b353c..f3107009 100644
+--- a/openstack/02b-MAChigh/sixtop.c
++++ b/openstack/02b-MAChigh/sixtop.c
+@@ -7,7 +7,9 @@
+ #include "iphc.h"
+ #include "packetfunctions.h"
+ #include "openrandom.h"
++#ifndef OW_MAC_ONLY
+ #include "scheduler.h"
++#endif
+ #include "opentimers.h"
+ #include "debugpins.h"
+ #include "leds.h"
+@@ -15,6 +17,9 @@
+ #include "IEEE802154_security.h"
+ #include "idmanager.h"
+ #include "schedule.h"
++#ifdef OW_MAC_ONLY
++#include "event.h"
++#endif
+ 
+ //=========================== define ==========================================
+ 
+@@ -27,6 +32,11 @@ sixtop_vars_t sixtop_vars;
+ 
+ //=========================== prototypes ======================================
+ 
++#ifdef OW_MAC_ONLY
++extern event_t ev_sixtop_management_fired;
++extern event_t ev_sixtop_sendEb_fired;
++extern event_queue_t queue;
++#endif
+ // send internal
+ owerror_t     sixtop_send_internal(
+    OpenQueueEntry_t*    msg,
+@@ -630,7 +640,12 @@ owerror_t sixtop_send_internal(
+ 
+ // timer interrupt callbacks
+ void sixtop_sendingEb_timer_cb(opentimers_id_t id){
++#ifdef OW_MAC_ONLY
++    //scheduler_push_task(timer_sixtop_sendEb_fired,TASKPRIO_SIXTOP);
++    event_post(&queue, &ev_sixtop_sendEb_fired);
++#else
+     scheduler_push_task(timer_sixtop_sendEb_fired,TASKPRIO_SIXTOP);
++#endif
+     // update the period
+     sixtop_vars.periodMaintenance  = 872 +(openrandom_get16b()&0xff);
+     opentimers_scheduleIn(
+@@ -643,11 +658,17 @@ void sixtop_sendingEb_timer_cb(opentimers_id_t id){
+ }
+ 
+ void sixtop_maintenance_timer_cb(opentimers_id_t id) {
++#ifdef OW_MAC_ONLY
++    event_post(&queue, &ev_sixtop_management_fired);
++#else
+     scheduler_push_task(timer_sixtop_management_fired,TASKPRIO_SIXTOP);
++#endif
+ }
+ 
+ void sixtop_timeout_timer_cb(opentimers_id_t id) {
++#ifndef OW_MAC_ONLY
+     scheduler_push_task(timer_sixtop_six2six_timeout_fired,TASKPRIO_SIXTOP_TIMEOUT);
++#endif
+ }
+ 
+ //======= EB/KA task
+-- 
+2.21.0
+

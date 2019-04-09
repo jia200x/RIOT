@@ -1,0 +1,247 @@
+From 427b05f7912212f4f489b3b27b02591fb8cfb4a1 Mon Sep 17 00:00:00 2001
+From: Jose Alamos <jose.alamos@haw-hamburg.de>
+Date: Tue, 9 Apr 2019 14:08:24 +0200
+Subject: [PATCH 5/6] implement role manager
+
+---
+ openstack/02a-MAClow/IEEE802154E.c | 32 ++++++++++++++++++++++++++++++
+ openstack/02b-MAChigh/schedule.c   |  4 ++++
+ openstack/02b-MAChigh/sixtop.c     |  6 ++++++
+ openstack/cross-layers/idmanager.c | 28 ++++++++++++++++++++++++++
+ openstack/cross-layers/idmanager.h | 16 +++++++++++++++
+ 5 files changed, 86 insertions(+)
+
+diff --git a/openstack/02a-MAClow/IEEE802154E.c b/openstack/02a-MAClow/IEEE802154E.c
+index a3229551..86b964bc 100644
+--- a/openstack/02a-MAClow/IEEE802154E.c
++++ b/openstack/02a-MAClow/IEEE802154E.c
+@@ -140,7 +140,11 @@ void ieee154e_init(void) {
+         sizeof(ieee154e_vars.chTemplate)
+     );
+     
++#ifdef OW_MAC_ONLY
++    if (idmanager_isPanCoordinator()==true) {
++#else
+     if (idmanager_getIsDAGroot()==TRUE) {
++#endif
+         changeIsSync(TRUE);
+     } else {
+         changeIsSync(FALSE);
+@@ -300,7 +304,11 @@ void isr_ieee154e_newSlot(opentimers_id_t id) {
+     ieee154e_vars.slotDuration          = TsSlotDuration;
+     // radiotimer_setPeriod(ieee154e_vars.slotDuration);
+    if (ieee154e_vars.isSync==FALSE) {
++#ifdef OW_MAC_ONLY
++      if (idmanager_isPanCoordinator()==true) {
++#else
+       if (idmanager_getIsDAGroot()==TRUE) {
++#endif
+          changeIsSync(TRUE);
+          ieee154e_resetAsn();
+          ieee154e_vars.nextActiveSlotOffset = schedule_getNextActiveSlotOffset();
+@@ -839,7 +847,11 @@ port_INLINE void activity_ti1ORri1(void) {
+     }
+     
+     // desynchronize if needed
++#ifdef OW_MAC_ONLY
++    if (idmanager_isPanCoordinator()==false) {
++#else
+     if (idmanager_getIsDAGroot()==FALSE) {
++#endif
+         if(ieee154e_vars.deSyncTimeout > ieee154e_vars.numOfSleepSlots){
+             ieee154e_vars.deSyncTimeout -= ieee154e_vars.numOfSleepSlots;
+         } else {
+@@ -892,7 +904,11 @@ port_INLINE void activity_ti1ORri1(void) {
+         
+         // find the next one
+         ieee154e_vars.nextActiveSlotOffset = schedule_getNextActiveSlotOffset();
++#ifdef OW_MAC_ONLY
++        if (idmanager_getIsSlotSkip() && idmanager_isPanCoordinator()==false) {
++#else
+         if (idmanager_getIsSlotSkip() && idmanager_getIsDAGroot()==FALSE) {
++#endif
+             if (ieee154e_vars.nextActiveSlotOffset>ieee154e_vars.slotOffset) {
+                 ieee154e_vars.numOfSleepSlots = ieee154e_vars.nextActiveSlotOffset-ieee154e_vars.slotOffset;
+             } else {
+@@ -1098,7 +1114,11 @@ port_INLINE void activity_ti1ORri1(void) {
+                 ieee154e_vars.nextActiveSlotOffset = schedule_getNextActiveSlotOffset();
+             }
+             // possibly skip additional slots if enabled
++#ifdef OW_MAC_ONLY
++            if (idmanager_getIsSlotSkip() && idmanager_isPanCoordinator()==false) {
++#else
+             if (idmanager_getIsSlotSkip() && idmanager_getIsDAGroot()==FALSE) {
++#endif
+                 if (ieee154e_vars.nextActiveSlotOffset>ieee154e_vars.slotOffset) {
+                     ieee154e_vars.numOfSleepSlots = ieee154e_vars.nextActiveSlotOffset-ieee154e_vars.slotOffset+NUMSERIALRX-1;
+                 } else {
+@@ -1594,7 +1614,11 @@ port_INLINE void activity_ti9(PORT_TIMER_WIDTH capturedTime) {
+         }
+         
+         if (
++#ifdef OW_MAC_ONLY
++            idmanager_isPanCoordinator()==false &&
++#else
+             idmanager_getIsDAGroot()==FALSE &&
++#endif
+             icmpv6rpl_isPreferredParent(&(ieee154e_vars.ackReceived->l2_nextORpreviousHop))
+         ) {
+             synchronizeAck(ieee802514_header.timeCorrection);
+@@ -1968,7 +1992,11 @@ port_INLINE void activity_ri5(PORT_TIMER_WIDTH capturedTime) {
+             // or in case I'm in the middle of the join process when parent is not yet selected
+             // or in case I don't have a dedicated cell to my parent yet
+             if (
++#ifdef OW_MAC_ONLY
++                idmanager_isPanCoordinator()                                    == false && 
++#else
+                 idmanager_getIsDAGroot()                                    == FALSE && 
++#endif
+                 (
+                     icmpv6rpl_isPreferredParent(&(ieee154e_vars.dataReceived->l2_nextORpreviousHop)) ||
+                     IEEE802154_security_isConfigured()                      == FALSE ||
+@@ -2201,7 +2229,11 @@ port_INLINE void activity_ri9(PORT_TIMER_WIDTH capturedTime) {
+    // clear local variable
+    ieee154e_vars.ackToSend = NULL;
+    
++#ifdef OW_MAC_ONLY
++    if ((idmanager_isPanCoordinator()==false && 
++#else
+     if ((idmanager_getIsDAGroot()==FALSE && 
++#endif
+         icmpv6rpl_isPreferredParent(&(ieee154e_vars.dataReceived->l2_nextORpreviousHop))) ||
+         IEEE802154_security_isConfigured() == FALSE) {
+         synchronizePacket(ieee154e_vars.syncCapturedTime);
+diff --git a/openstack/02b-MAChigh/schedule.c b/openstack/02b-MAChigh/schedule.c
+index 1a5a691a..0f80d421 100644
+--- a/openstack/02b-MAChigh/schedule.c
++++ b/openstack/02b-MAChigh/schedule.c
+@@ -43,7 +43,11 @@ void schedule_init(void) {
+     schedule_vars.maxActiveSlots = MAXACTIVESLOTS;
+     
+     start_slotOffset = SCHEDULE_MINIMAL_6TISCH_SLOTOFFSET;
++#ifdef OW_MAC_ONLY
++    if (idmanager_isPanCoordinator()==true) {
++#else
+     if (idmanager_getIsDAGroot()==TRUE) {
++#endif
+         schedule_startDAGroot();
+     }
+     
+diff --git a/openstack/02b-MAChigh/sixtop.c b/openstack/02b-MAChigh/sixtop.c
+index c5121e80..23038bd3 100644
+--- a/openstack/02b-MAChigh/sixtop.c
++++ b/openstack/02b-MAChigh/sixtop.c
+@@ -743,6 +743,7 @@ This is one of the MAC management tasks. This function inlines in the
+ timers_res_fired() function, but is declared as a separate function for better
+ readability of the code.
+ */
++
+ port_INLINE void sixtop_sendEB(void) {
+     OpenQueueEntry_t* eb;
+     uint8_t     i;
+@@ -754,8 +755,13 @@ port_INLINE void sixtop_sendEB(void) {
+     if (
+         (ieee154e_isSynch()==FALSE)                     ||
+         (IEEE802154_security_isConfigured()==FALSE)     ||
++#ifdef OW_MAC_ONLY
++        (idmanager_isPanCoordinator() == false &&
++         idmanager_isCoordinator() == false)
++#else
+         (icmpv6rpl_getMyDAGrank()==DEFAULTDAGRANK)      ||
+         icmpv6rpl_daoSent()==FALSE
++#endif
+     ) {
+         // I'm not sync'ed, or did not join, or did not acquire a DAGrank or did not send out a DAO
+         // before starting to advertize the network, we need to make sure that we are reachable downwards,
+diff --git a/openstack/cross-layers/idmanager.c b/openstack/cross-layers/idmanager.c
+index 2e123c39..247ebae9 100644
+--- a/openstack/cross-layers/idmanager.c
++++ b/openstack/cross-layers/idmanager.c
+@@ -25,8 +25,14 @@ void idmanager_init(void) {
+    // isDAGroot
+ #ifdef DAGROOT
+    idmanager_vars.isDAGroot            = TRUE;
++#ifdef OW_MAC_ONLY
++   idmanager_vars.role     = ROLE_PAN_COORDINATOR;
++#endif
+ #else
+    idmanager_vars.isDAGroot            = FALSE;
++#ifdef OW_MAC_ONLY
++   idmanager_vars.role     = ROLE_LEAF;
++#endif
+ #endif
+    
+    // myPANID
+@@ -98,6 +104,28 @@ bool idmanager_getIsSlotSkip(void) {
+    return res;
+ }
+ 
++#ifdef OW_MAC_ONLY
++owerror_t idmanager_setRole(idmanager_role_t newRole)
++{
++   INTERRUPT_DECLARATION();
++   DISABLE_INTERRUPTS();
++   idmanager_vars.role = newRole;
++   ENABLE_INTERRUPTS();
++   return E_SUCCESS;
++}
++
++bool idmanager_isCoordinator(void)
++{
++    return idmanager_vars.role == ROLE_PAN_COORDINATOR ||
++        idmanager_vars.role == ROLE_COORDINATOR;
++}
++
++bool idmanager_isPanCoordinator(void)
++{
++    return idmanager_vars.role == ROLE_PAN_COORDINATOR;
++}
++
++#endif
+ open_addr_t* idmanager_getMyID(uint8_t type) {
+    open_addr_t* res;
+    INTERRUPT_DECLARATION();
+diff --git a/openstack/cross-layers/idmanager.h b/openstack/cross-layers/idmanager.h
+index 89c40632..8196d762 100644
+--- a/openstack/cross-layers/idmanager.h
++++ b/openstack/cross-layers/idmanager.h
+@@ -34,6 +34,14 @@ typedef struct {
+ 
+ END_PACK
+ 
++#ifdef OW_MAC_ONLY
++typedef enum {
++    ROLE_PAN_COORDINATOR=0,
++    ROLE_COORDINATOR,
++    ROLE_LEAF
++} idmanager_role_t;
++
++#endif
+ //=========================== module variables ================================
+ 
+ typedef struct {
+@@ -45,6 +53,9 @@ typedef struct {
+    bool          slotSkip;
+    uint8_t       joinKey[16];
+    asn_t         joinAsn;
++#ifdef OW_MAC_ONLY
++   idmanager_role_t  role;
++#endif
+ } idmanager_vars_t;
+ 
+ //=========================== prototypes ======================================
+@@ -60,6 +71,11 @@ void         idmanager_triggerAboutRoot(void);
+ void         idmanager_setJoinKey(uint8_t *key);
+ void         idmanager_setJoinAsn(asn_t *asn);
+ void         idmanager_getJoinKey(uint8_t **pKey);
++#ifdef OW_MAC_ONLY
++owerror_t    idmanager_setRole(idmanager_role_t newRole);
++bool         idmanager_isPanCoordinator(void);
++bool         idmanager_isCoordinator(void);
++#endif
+ 
+ bool         debugPrint_id(void);
+ bool         debugPrint_joined(void);
+-- 
+2.21.0
+

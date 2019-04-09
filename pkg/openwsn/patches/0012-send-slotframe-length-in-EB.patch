@@ -1,0 +1,29 @@
+From bef9e6f2309f67081ff1b857eb20c368a2c6742b Mon Sep 17 00:00:00 2001
+From: Jose Alamos <jose.alamos@haw-hamburg.de>
+Date: Fri, 5 Apr 2019 17:57:50 +0200
+Subject: [PATCH 6/6] send slotframe length in EB
+
+---
+ openstack/02b-MAChigh/sixtop.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/openstack/02b-MAChigh/sixtop.c b/openstack/02b-MAChigh/sixtop.c
+index 23038bd3..6eaf328e 100644
+--- a/openstack/02b-MAChigh/sixtop.c
++++ b/openstack/02b-MAChigh/sixtop.c
+@@ -848,7 +848,11 @@ port_INLINE void sixtop_sendEB(void) {
+         eb->payload[0] = (uint8_t)(temp16b & 0x00ff);
+         eb->payload[1] = (uint8_t)((temp16b & 0xff00)>>8);
+     }
+-    
++
++#ifdef OW_MAC_ONLY
++    eb->payload[EB_SLOTFRAME_LEN_OFFSET] = schedule_getFrameLength();
++#endif
++
+     // Keep a pointer to where the ASN will be
+     // Note: the actual value of the current ASN and JP will be written by the
+     //    IEEE802.15.4e when transmitting
+-- 
+2.21.0
+

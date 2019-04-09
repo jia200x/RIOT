@@ -1,0 +1,78 @@
+From d728072a49bbdfb4be08a8c41420df9e91616ab1 Mon Sep 17 00:00:00 2001
+From: Jose Alamos <jose.alamos@haw-hamburg.de>
+Date: Thu, 28 Mar 2019 14:01:46 +0100
+Subject: [PATCH 2/6] Add RIOT specific callbacks
+
+---
+ openstack/02a-MAClow/IEEE802154E.c |  8 ++++++++
+ openstack/02b-MAChigh/sixtop.c     | 12 ++++++++++++
+ 2 files changed, 20 insertions(+)
+
+diff --git a/openstack/02a-MAClow/IEEE802154E.c b/openstack/02a-MAClow/IEEE802154E.c
+index a0219345..a3229551 100644
+--- a/openstack/02a-MAClow/IEEE802154E.c
++++ b/openstack/02a-MAClow/IEEE802154E.c
+@@ -759,6 +759,10 @@ port_INLINE void activity_synchronize_endOfFrame(PORT_TIMER_WIDTH capturedTime)
+       
+       // declare synchronized
+       changeIsSync(TRUE);
++
++#ifdef OW_MAC_ONLY
++      ieee154e_indicate_sync();
++#endif
+       // log the info
+       openserial_printInfo(COMPONENT_IEEE802154E,ERR_SYNCHRONIZED,
+                             (errorparameter_t)ieee154e_vars.slotOffset,
+@@ -844,6 +848,10 @@ port_INLINE void activity_ti1ORri1(void) {
+         
+             // declare myself desynchronized
+             changeIsSync(FALSE);
++
++#ifdef OW_MAC_ONLY
++            ieee154e_indicate_sync_loss();
++#endif
+             
+             // log the error
+             openserial_printError(COMPONENT_IEEE802154E,ERR_DESYNCHRONIZED,
+diff --git a/openstack/02b-MAChigh/sixtop.c b/openstack/02b-MAChigh/sixtop.c
+index f3107009..11b45d2c 100644
+--- a/openstack/02b-MAChigh/sixtop.c
++++ b/openstack/02b-MAChigh/sixtop.c
+@@ -22,6 +22,10 @@
+ #endif
+ 
+ //=========================== define ==========================================
++#ifdef OW_MAC_ONLY
++extern void upper_sendDone(OpenQueueEntry_t* msg, owerror_t error);
++extern void upper_receive(OpenQueueEntry_t* msg);
++#endif
+ 
+ // in seconds: sixtop maintaince is called every 30 seconds
+ #define MAINTENANCE_PERIOD        30
+@@ -462,7 +466,11 @@ void task_sixtopNotifSendDone(void) {
+             break;
+         default:
+             // send the rest up the stack
++#ifdef OW_MAC_ONLY
++            upper_sendDone(msg,msg->l2_sendDoneError);
++#else
+             iphc_sendDone(msg,msg->l2_sendDoneError);
++#endif
+             break;
+     }
+ }
+@@ -527,7 +535,11 @@ void task_sixtopNotifReceive(void) {
+                 break;
+             }
+             // send to upper layer
++#ifdef OW_MAC_ONLY
++            upper_receive(msg);
++#else
+             iphc_receive(msg);
++#endif
+         } else {
+             // free up the RAM
+             openqueue_freePacketBuffer(msg);
+-- 
+2.21.0
+
