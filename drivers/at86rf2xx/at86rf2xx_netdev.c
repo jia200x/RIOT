@@ -94,20 +94,25 @@ static int _init(netdev_t *netdev)
 static int _send(netdev_t *netdev, const iolist_t *iolist)
 {
     at86rf2xx_t *dev = (at86rf2xx_t *)netdev;
-    size_t len = 0;
+
+    uint8_t psdu_len = iolist_size(iolist) + IEEE802154_FCS_LEN;
+
+    if (psdu_len > AT86RF2XX_MAX_PKT_LENGTH) {
+        DEBUG("[at86rf2xx] error: packet too large (%u byte) to be send\n",
+              (unsigned) psdu_len);
+        return -EOVERFLOW;
+    }
 
     at86rf2xx_tx_prepare(dev);
+
+    /* Write PHDR */
+    at86rf2xx_tx_load(dev, &psdu_len, 1);
 
     /* load packet data into FIFO */
     for (const iolist_t *iol = iolist; iol; iol = iol->iol_next) {
         /* current packet data + FCS too long */
-        if ((len + iol->iol_len + 2) > AT86RF2XX_MAX_PKT_LENGTH) {
-            DEBUG("[at86rf2xx] error: packet too large (%u byte) to be send\n",
-                  (unsigned)len + 2);
-            return -EOVERFLOW;
-        }
         if (iol->iol_len) {
-            len = at86rf2xx_tx_load(dev, iol->iol_base, iol->iol_len, len);
+            at86rf2xx_tx_load(dev, iol->iol_base, iol->iol_len);
         }
     }
 
@@ -117,7 +122,7 @@ static int _send(netdev_t *netdev, const iolist_t *iolist)
     }
     /* return the number of bytes that were actually loaded into the frame
      * buffer/send out */
-    return (int)len;
+    return (int) psdu_len;
 }
 
 static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)

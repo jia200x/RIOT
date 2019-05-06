@@ -502,12 +502,11 @@ void at86rf2xx_tx_prepare(at86rf2xx_t *dev);
  * @param[in,out] dev       device to write data to
  * @param[in] data          buffer containing the data to load
  * @param[in] len           number of bytes in @p buffer
- * @param[in] offset        offset used when writing data to internal buffer
  *
  * @return                  offset + number of bytes written
  */
 size_t at86rf2xx_tx_load(at86rf2xx_t *dev, const uint8_t *data,
-                         size_t len, size_t offset);
+                         size_t len);
 
 /**
  * @brief   Trigger sending of data previously loaded into transmit buffer

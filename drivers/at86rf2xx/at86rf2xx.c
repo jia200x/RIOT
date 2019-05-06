@@ -132,13 +132,17 @@ void at86rf2xx_reset(at86rf2xx_t *dev)
 
 size_t at86rf2xx_send(at86rf2xx_t *dev, const uint8_t *data, size_t len)
 {
+    uint8_t psdu_len = len + IEEE802154_FCS_LEN;
+
     /* check data length */
-    if (len > AT86RF2XX_MAX_PKT_LENGTH) {
+    if (psdu_len > AT86RF2XX_MAX_PKT_LENGTH) {
         DEBUG("[at86rf2xx] Error: data to send exceeds max packet size\n");
         return 0;
     }
+
     at86rf2xx_tx_prepare(dev);
-    at86rf2xx_tx_load(dev, data, len, 0);
+    at86rf2xx_tx_load(dev, &psdu_len, 1);
+    at86rf2xx_tx_load(dev, data, len);
     at86rf2xx_tx_exec(dev);
     return len;
 }
@@ -152,23 +156,21 @@ void at86rf2xx_tx_prepare(at86rf2xx_t *dev)
     if (state != AT86RF2XX_STATE_TX_ARET_ON) {
         dev->idle_state = state;
     }
-    dev->tx_frame_len = IEEE802154_FCS_LEN;
+    dev->tx_frame_len = 0;
 }
 
 size_t at86rf2xx_tx_load(at86rf2xx_t *dev, const uint8_t *data,
-                         size_t len, size_t offset)
+                         size_t len)
 {
+    at86rf2xx_sram_write(dev, dev->tx_frame_len, data, len);
     dev->tx_frame_len += (uint8_t)len;
-    at86rf2xx_sram_write(dev, offset + 1, data, len);
-    return offset + len;
+    return len;
 }
 
 void at86rf2xx_tx_exec(const at86rf2xx_t *dev)
 {
     netdev_t *netdev = (netdev_t *)dev;
 
-    /* write frame length field in FIFO */
-    at86rf2xx_sram_write(dev, 0, &(dev->tx_frame_len), 1);
     /* trigger sending of pre-loaded frame */
     at86rf2xx_reg_write(dev, AT86RF2XX_REG__TRX_STATE,
                         AT86RF2XX_TRX_STATE__TX_START);
