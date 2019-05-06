@@ -78,6 +78,27 @@ typedef enum {
                                          *   with the multiplexed preamble */
 } netdev_ieee802154_cca_mode_t;
 
+typedef struct netdev_ieee802154 netdev_ieee802154_t;
+
+typedef struct {
+    void (*prepare)(netdev_ieee802154_t *netdev);
+    void (*tx_load)(netdev_ieee802154_t *netdev, const uint8_t *data, size_t len);
+    void (*tx_exec)(netdev_ieee802154_t *netdev);
+    void (*read)(netdev_ieee802154_t *netdev, uint8_t *buf, size_t len);
+    void (*on)(void);
+    void (*off)(void);
+    void (*ed)(netdev_ieee802154_t *netdev, uint8_t *level);
+    void (*set_channel)(netdev_ieee802154_t *netdev, uint8_t page, uint8_t channel);
+    void (*set_addr)(netdev_ieee802154_t *netdev, uint8_t *addr);
+    void (*set_tx_power)(netdev_ieee802154_t *netdev, int32_t power);
+    void (*set_cca_mode)(netdev_ieee802154_t *netdev, uint8_t mode);
+    void (*set_csma_params)(netdev_ieee802154_t *netdev, uint8_t min_be, uint8_t max_be, uint8_t retries);
+    void (*set_frame_retries)(netdev_ieee802154_t *netdev, uint8_t retries);
+    void (*set_promiscuous)(netdev_ieee802154_t *netdev, const uint8_t enable);
+    void (*set_trx_state)(netdev_ieee802154_t *netdev, uint8_t state);
+    void (*op_handler)(netdev_ieee802154_t *netdev, int option, void *val);
+} netdev_ieee802154_rf_ops_t;
+
 /**
  * @brief Extended structure to hold IEEE 802.15.4 driver state
  *
@@ -86,7 +107,8 @@ typedef enum {
  * Supposed to be extended by driver implementations.
  * The extended structure should contain all variable driver state.
  */
-typedef struct {
+
+struct netdev_ieee802154 {
     netdev_t netdev;                        /**< @ref netdev_t base class */
     /**
      * @brief IEEE 802.15.4 specific fields
@@ -113,8 +135,9 @@ typedef struct {
     uint8_t seq;                            /**< sequence number */
     uint8_t chan;                           /**< channel */
     uint16_t flags;                         /**< flags as defined above */
+    const netdev_ieee802154_rf_ops_t *rf_ops;
     /** @} */
-} netdev_ieee802154_t;
+};
 
 /**
  * @brief   Received packet status information for IEEE 802.15.4 radios
