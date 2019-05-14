@@ -177,8 +177,8 @@ static void _init(gnrc_netif_t *netif)
     _memcpy_reversed(netif->lorawan.appeui, _appeui, sizeof(_appeui));
 
     gnrc_lorawan_setup(&netif->lorawan.mac, netif->dev);
-    gnrc_lorawan_init(&netif->lorawan.mac, netif->lorawan.nwkskey, netif->lorawan.appskey);
     netif->lorawan.mac.netdev.driver->set(&netif->lorawan.mac.netdev, NETOPT_ADDRESS, _devaddr, sizeof(_devaddr));
+    gnrc_lorawan_init(&netif->lorawan.mac, netif->lorawan.nwkskey, netif->lorawan.appskey);
 }
 
 gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize,
@@ -342,6 +342,13 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
         case NETOPT_LINK_CHECK:
             netif->flags |= GNRC_NETIF_FLAGS_LINK_CHECK;
             break;
+        case NETOPT_STATE:
+#if CONFIG_GNRC_LORAWAN_ENABLE_LPM_STORAGE
+            if(*((netopt_state_t*) opt->data) == NETOPT_STATE_OFF) {
+                gnrc_lorawan_shutdown(&netif->lorawan.mac);
+            }
+#endif
+            /* FALLTHRU */
         default:
             res = netif->lorawan.mac.netdev.driver->set(&netif->lorawan.mac.netdev, opt->opt, opt->data, opt->data_len);
     }

@@ -44,6 +44,54 @@ static void _sleep_radio(gnrc_lorawan_t *mac)
     netdev_set_pass((netdev_t *) mac, NETOPT_STATE, &state, sizeof(state));
 }
 
+#if CONFIG_GNRC_LORAWAN_ENABLE_LPM_STORAGE
+static void _save_restore_mac(gnrc_lorawan_t *mac, bool save)
+{
+    int (*f)(uint8_t pos, uint8_t *buf, size_t len);
+    f = save ? gnrc_lorawan_save_cb : gnrc_lorawan_restore_cb;
+    uint8_t pos=0;
+    f(pos, mac->nwkskey, 16);
+    pos += 16;
+    f(pos, mac->appskey, 16);
+    pos += 16;
+    f(pos, (uint8_t*) &mac->dev_addr, sizeof(mac->dev_addr));
+    pos += 4;
+    f(pos, &mac->dl_settings, 1);
+    pos += 1;
+    f(pos, &mac->rx_delay, 1);
+    pos += 1;
+    f(pos, (uint8_t*) &mac->mlme.nid, sizeof(mac->mlme.nid));
+    pos += sizeof(mac->mlme.nid);
+
+    for(unsigned i=GNRC_LORAWAN_DEFAULT_CHANNELS; i < 8; i++) {
+        f(pos, (uint8_t*) &mac->channel[i], sizeof(uint32_t));
+        pos += sizeof(uint32_t);
+    }
+    f(pos, (uint8_t*) &mac->mcps.fcnt, sizeof(uint32_t));
+    pos += 4;
+    f(pos, (uint8_t*) &mac->mcps.fcnt_down, sizeof(uint32_t));
+    pos += 4;
+    f(pos, &mac->mlme.activation, 1);
+    f(pos, NULL, 0);
+}
+
+void gnrc_lorawan_shutdown(gnrc_lorawan_t *mac)
+{
+    if(mac->busy) {
+        mac->shutdown_req = true;
+    } else {
+        gnrc_lorawan_perform_save(mac);
+    }
+}
+void gnrc_lorawan_perform_save(gnrc_lorawan_t *mac)
+{
+    _save_restore_mac(mac, true);
+    /* Disable MAC */
+    mac->mlme.activation = MLME_ACTIVATION_NONE;
+    gnrc_lorawan_save_cb(0, NULL, 0);
+}
+#endif
+
 void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey)
 {
     mac->nwkskey = nwkskey;
@@ -51,6 +99,10 @@ void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey)
     mac->busy = false;
     gnrc_lorawan_mlme_backoff_init(mac);
     gnrc_lorawan_reset(mac);
+#if CONFIG_GNRC_LORAWAN_ENABLE_LPM_STORAGE
+    mac->shutdown_req = false;
+    _save_restore_mac(mac, false);
+#endif
 }
 
 void gnrc_lorawan_reset(gnrc_lorawan_t *mac)

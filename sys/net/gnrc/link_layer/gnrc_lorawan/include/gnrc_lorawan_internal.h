@@ -190,7 +190,8 @@ typedef struct {
     uint8_t *appskey;                               /**< pointer to Application SKey buffer */
     uint32_t channel[GNRC_LORAWAN_MAX_CHANNELS];    /**< channel array */
     uint32_t toa;                                   /**< Time on Air of the last transmission */
-    uint32_t busy;                                  /**< MAC busy flag */
+    int busy;                                       /**< MAC busy  */
+    int shutdown_req;                               /**< MAC Shutdown request */
     le_uint32_t dev_addr;                           /**< Device address */
     int state;                                      /**< state of MAC layer */
     uint8_t dl_settings;                            /**< downlink settings */
@@ -427,6 +428,14 @@ void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt);
 void gnrc_lorawan_open_rx_window(gnrc_lorawan_t *mac);
 
 /**
+ * @brief save internal MAC state in non-volatile storage and shutdown
+ *        the MAC layer gracefully.
+ *
+ * @param mac
+ */
+void gnrc_lorawan_perform_save(gnrc_lorawan_t *mac);
+
+/**
  * @brief Reset the MLME layer
  *
  *        To be called by @ref gnrc_lorawan_reset
@@ -492,6 +501,11 @@ static inline int gnrc_lorawan_mac_acquire(gnrc_lorawan_t *mac)
  */
 static inline void gnrc_lorawan_mac_release(gnrc_lorawan_t *mac)
 {
+#ifdef CONFIG_GNRC_LORAWAN_ENABLE_LPM_STORAGE
+    if(mac->shutdown_req) {
+        gnrc_lorawan_perform_save(mac);
+    }
+#endif
     mac->busy = false;
 }
 

@@ -59,4 +59,7 @@ CFLAGS += -DLORAMAC_DEFAULT_RX2_DR=LORAMAC_DR_3
 # Set default messages to unconfirmable
 CFLAGS += -DLORAMAC_DEFAULT_TX_MODE=LORAMAC_TX_UNCNF
 
+# Uncomment to enable mac state retention (see documentation)
+#CFLAGS += -DCONFIG_GNRC_LORAWAN_ENABLE_LPM_STORAGE
+
 include $(RIOTBASE)/Makefile.include

@@ -43,6 +43,14 @@ extern "C" {
 #define CONFIG_GNRC_LORAWAN_MIN_SYMBOLS_TIMEOUT 50
 #endif
 
+/**
+ * @brief enable or disable low power mode callbacks
+ */
+#ifndef CONFIG_GNRC_LORAWAN_ENABLE_LPM_STORAGE
+#define CONFIG_GNRC_LORAWAN_ENABLE_LPM_STORAGE (0)
+#endif
+
+
 #define GNRC_LORAWAN_REQ_STATUS_SUCCESS (0)     /**< MLME or MCPS request successful status */
 #define GNRC_LORAWAN_REQ_STATUS_DEFERRED (1)    /**< the MLME or MCPS confirm message is asynchronous */
 
@@ -181,6 +189,48 @@ void gnrc_lorawan_recv(gnrc_lorawan_t *mac);
  * @param lower pointer to the lower netdev device (radio)
  */
 void gnrc_lorawan_setup(gnrc_lorawan_t *mac, netdev_t *lower);
+
+#if CONFIG_GNRC_LORAWAN_ENABLE_LPM_STORAGE || DOXYGEN
+/**
+ * @brief Request a graceful MAC shutdown.
+ *
+ *        When shutdown procedure finishes, an asynchronous call to
+ *        @reg gnrc_lorawan_save_cb will be called.
+ *
+ *        The MAC will be disabled after a successful shutdown.
+ *
+ * @note @ref CONFIG_GNRC_LORAWAN_ENABLE_LPM_STORAGE must be set in order
+ * @note to use this feature.
+ *
+ * @param mac pointer to the MAC descriptor
+ */
+void gnrc_lorawan_shutdown(gnrc_lorawan_t *mac);
+
+/**
+ * @brief Application-defined callback for saving MAC state in a non-volatile
+ *        storage.
+ *
+ *        It will be called if CONFIG_GNRC_LORAWAN_ENABLE_LPM_STORAGE is enabled.
+ *        It's safe to go to low power mode inside this function
+ *
+ * @param buf Buffer containing internal MAC state to be saved.
+ * @param len Number of bytes to be saved
+ *
+ */
+int gnrc_lorawan_save_cb(uint8_t pos, uint8_t *buf, size_t len);
+
+/**
+ * @brief Application-defined callback for restoring MAC state from a
+ *        non-volatile storage
+ *
+ * @param buf Buffer containing internal MAC state to be saved.
+ * @param len Number of bytes to be saved
+ *
+ * @return number of bytes written in the non-volatile storage
+ * @return negative number for ignoring restore data
+ */
+int gnrc_lorawan_restore_cb(uint8_t pos, uint8_t *buf, size_t len);
+#endif
 
 #ifdef __cplusplus
 }
