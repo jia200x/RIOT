@@ -288,7 +288,7 @@ static int send(int iface, le_uint16_t dst_pan, uint8_t *dst, size_t dst_len,
         .iol_len = (size_t)res
     };
 
-    res = dev->netdev.driver->send((netdev_t *)dev, &iol_hdr);
+    res = netdev_ieee802154_send((netdev_ieee802154_t *)dev, &iol_hdr);
     if (res < 0) {
         puts("txtsnd: Error on sending");
         return 1;

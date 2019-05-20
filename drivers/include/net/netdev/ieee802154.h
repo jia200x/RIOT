@@ -80,24 +80,41 @@ typedef enum {
 
 typedef struct netdev_ieee802154 netdev_ieee802154_t;
 
+typedef enum {
+    NETDEV_IEEE802154_CMD_TX_NOW,
+} rf_ops_cmd_t;
+
+typedef enum {
+    NETDEV_IEEE802154_STATE_TRX_OFF,
+    NETDEV_IEEE802154_STATE_RX_ON,
+    NETDEV_IEEE802154_STATE_TX_ON,
+} netdev_ieee802154_trx_state_t;
+
+typedef enum {
+    IEEE802154_EXT_ED,
+    IEEE802154_EXT_SET_HW_ADDR,
+    IEEE802154_EXT_SET_CCA_MODE,
+    IEEE802154_EXT_SET_CSMA_PARAMS,
+    IEEE802154_EXT_SET_FRAME_RETRIES,
+    IEEE802154_EXT_PROMISCUOUS
+} ieee802154_ext_t;
+
 typedef struct {
     void (*prepare)(netdev_ieee802154_t *netdev);
     void (*tx_load)(netdev_ieee802154_t *netdev, const uint8_t *data, size_t len);
-    void (*tx_exec)(netdev_ieee802154_t *netdev);
-    void (*read)(netdev_ieee802154_t *netdev, uint8_t *buf, size_t len);
-    void (*on)(void);
-    void (*off)(void);
-    void (*ed)(netdev_ieee802154_t *netdev, uint8_t *level);
+    void (*cmd)(netdev_ieee802154_t *netdev, rf_ops_cmd_t cmd);
+    void (*on)(netdev_ieee802154_t *netdev);
+    void (*off)(netdev_ieee802154_t *netdev);
     void (*set_channel)(netdev_ieee802154_t *netdev, uint8_t page, uint8_t channel);
-    void (*set_addr)(netdev_ieee802154_t *netdev, uint8_t *addr);
     void (*set_tx_power)(netdev_ieee802154_t *netdev, int32_t power);
-    void (*set_cca_mode)(netdev_ieee802154_t *netdev, uint8_t mode);
-    void (*set_csma_params)(netdev_ieee802154_t *netdev, uint8_t min_be, uint8_t max_be, uint8_t retries);
-    void (*set_frame_retries)(netdev_ieee802154_t *netdev, uint8_t retries);
-    void (*set_promiscuous)(netdev_ieee802154_t *netdev, const uint8_t enable);
-    void (*set_trx_state)(netdev_ieee802154_t *netdev, uint8_t state);
-    void (*op_handler)(netdev_ieee802154_t *netdev, int option, void *val);
+    void (*set_trx_state)(netdev_ieee802154_t *netdev, netdev_ieee802154_trx_state_t state);
+    void (*extended)(netdev_ieee802154_t *netdev, ieee802154_ext_t opt, void *data);
 } netdev_ieee802154_rf_ops_t;
+
+typedef struct {
+    void (*rx_done_cb)(netdev_ieee802154_t *netdev, uint8_t *buf, size_t psdu_len, int16_t rssi, uint8_t lqi);
+    void (*tx_done_cb)(netdev_ieee802154_t *netdev, int status);
+} netdev_ieee802154_cb_t;
 
 /**
  * @brief Extended structure to hold IEEE 802.15.4 driver state
@@ -136,6 +153,7 @@ struct netdev_ieee802154 {
     uint8_t chan;                           /**< channel */
     uint16_t flags;                         /**< flags as defined above */
     const netdev_ieee802154_rf_ops_t *rf_ops;
+    const netdev_ieee802154_cb_t callbacks;
     /** @} */
 };
 
@@ -214,6 +232,8 @@ int netdev_ieee802154_set(netdev_ieee802154_t *dev, netopt_t opt, const void *va
  * @return 1            fails if packet is not for the device or pan
  */
 int netdev_ieee802154_dst_filter(netdev_ieee802154_t *dev, const uint8_t *mhr);
+
+int netdev_ieee802154_send(netdev_ieee802154_t *dev, const iolist_t *psdu);
 
 #ifdef __cplusplus
 }

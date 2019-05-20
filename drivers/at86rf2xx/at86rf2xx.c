@@ -49,6 +49,8 @@ void at86rf2xx_setup(at86rf2xx_t *dev, const at86rf2xx_params_t *params)
     /* radio state is P_ON when first powered-on */
     dev->state = AT86RF2XX_STATE_P_ON;
     dev->pending_tx = 0;
+    netdev_ieee802154_t *ieee802154_dev = (netdev_ieee802154_t*) dev;
+    ieee802154_dev->rf_ops = &at86rf2xx_rf_ops;
 }
 
 void at86rf2xx_reset(at86rf2xx_t *dev)

@@ -29,6 +29,7 @@ extern "C" {
  * @brief   Reference to the netdev device driver struct
  */
 extern const netdev_driver_t at86rf2xx_driver;
+extern const netdev_ieee802154_rf_ops_t at86rf2xx_rf_ops;
 
 #ifdef __cplusplus
 }

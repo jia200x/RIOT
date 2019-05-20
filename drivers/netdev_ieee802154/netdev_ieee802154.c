@@ -279,4 +279,47 @@ int netdev_ieee802154_dst_filter(netdev_ieee802154_t *dev, const uint8_t *mhr)
     return 1;
 }
 
+int netdev_ieee802154_prepare(netdev_ieee802154_t *dev, const iolist_t *psdu)
+{
+    /* TODO: Ask radio caps */
+    uint8_t psdu_len = iolist_size(psdu) + IEEE802154_FCS_LEN;
+
+    if (psdu_len > IEEE802154_FRAME_LEN_MAX) {
+        DEBUG("[at86rf2xx] error: packet too large (%u byte) to be send\n",
+              (unsigned) psdu_len);
+        return -EOVERFLOW;
+    }
+
+    dev->rf_ops->prepare(dev);
+
+    /* Write PHDR */
+    dev->rf_ops->tx_load(dev, &psdu_len, 1);
+
+    /* load packet data into FIFO */
+    for (const iolist_t *iol = psdu; iol; iol = iol->iol_next) {
+        /* current packet data + FCS too long */
+        if (iol->iol_len) {
+            dev->rf_ops->tx_load(dev, iol->iol_base, iol->iol_len);
+        }
+    }
+
+    /* return the number of bytes that were actually loaded into the frame
+     * buffer/send out */
+    return (int)psdu_len;
+}
+
+void netdev_ieee802154_transmit(netdev_ieee802154_t *dev)
+{
+    dev->rf_ops->cmd(dev, NETDEV_IEEE802154_CMD_TX_NOW);
+}
+
+int netdev_ieee802154_send(netdev_ieee802154_t *dev, const iolist_t *psdu)
+{
+    int res;
+    if((res = netdev_ieee802154_prepare(dev, psdu))) {
+        netdev_ieee802154_transmit(dev);
+    }
+    return res;
+}
+
 /** @} */
