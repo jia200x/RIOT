@@ -36,8 +36,19 @@ static kernel_pid_t _recv_pid;
 
 at86rf2xx_t devs[AT86RF2XX_NUM];
 
+static int _set_channel(int argc, char **argv)
+{
+    (void) argc;
+    netdev_ieee802154_t *dev = (netdev_ieee802154_t *)(&devs[0]);
+    uint8_t channel = atoi(argv[1]);
+    netdev_ieee802154_pib_set(dev, PIB_CHANNEL, &channel, sizeof(uint8_t));
+    puts("OK");
+    return 0;
+}
+
 static const shell_command_t shell_commands[] = {
     { "ifconfig", "Configure netdev", ifconfig },
+    { "set_channel", "set channel", _set_channel },
     { "txtsnd", "Send IEEE 802.15.4 packet", txtsnd },
     { NULL, NULL, NULL }
 };

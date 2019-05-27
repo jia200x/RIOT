@@ -322,4 +322,77 @@ int netdev_ieee802154_send(netdev_ieee802154_t *dev, const iolist_t *psdu)
     return res;
 }
 
+int netdev_ieee802154_pib_set(netdev_ieee802154_t *dev, ieee802154_pib_t pib, const void *value,
+                          size_t value_len)
+{
+    /* TODO: Add SubGhz radio */
+    (void) value_len;
+    int res = -ENOTSUP;
+    switch(pib) {
+        case PIB_CHANNEL: {
+            uint8_t chan = (((const uint16_t *)value)[0]) & UINT8_MAX;
+            dev->rf_ops->set_channel(dev, dev->page,
+                    chan);
+            dev->chan = chan;
+            res = 0;
+            break;
+          }
+        case PIB_PAGE: {
+            uint8_t page = (((const uint16_t *)value)[0]) & UINT8_MAX;
+            dev->rf_ops->set_channel(dev, page, dev->chan);
+            res = 0;
+            break;
+       }
+    }
+    return res;
+}
+
+int netdev_ieee802154_trx_state(netdev_ieee802154_t *dev, ieee802154_phy_const_t state)
+{
+    if(netdev->state == state) {
+        return state;
+    }
+
+    int current_state = netdev->state;
+    int res = IEEE802154_PHY_UNSUPPORTED_ATTRIBUTE;
+
+    switch(state) {
+        case IEEE802154_PHY_TX_ON:
+            if(current_state == IEEE802154_PHY_BUSY_RX) {
+                return current_state;
+            }
+            netdev->rf_ops->set_trx_state(netdev, state);
+            netdev->state = state;
+            break;
+        case IEEE802154_PHY_RX_ON:
+            break;
+        case IEEE802154_PHY_TRX_OFF:
+            break;
+        case IEEE802154_PHY_FORCE_TRX_OFF:
+            break;
+        default:
+            break;
+    }
+}
+
+void netdev_ieee802154_tx_start(netdev_ieee802154_t netdev)
+{
+    netdev->state = IEEE802154_PHY_BUSY_TX;
+}
+
+void netdev_ieee802154_tx_done(netdev_ieee802154_t netdev)
+{
+    netdev->state = IEEE802154_PHY_TX_ON;
+}
+
+void netdev_ieee802154_rx_start(netdev_ieee802154_t netdev)
+{
+    netdev->state = IEEE802154_PHY_BUSY_RX;
+}
+
+void netdev_ieee802154_rx_done(netdev_ieee802154_t netdev)
+{
+    netdev->state = IEEE802154_PHY_RX_ON;
+}
+
 /** @} */

@@ -58,37 +58,10 @@ const netdev_driver_t at86rf2xx_driver = {
     .set = _set,
 };
 
-static void _irq_handler(void *arg)
-{
-    netdev_t *dev = (netdev_t *) arg;
-
-    if (dev->event_callback) {
-        dev->event_callback(dev, NETDEV_EVENT_ISR);
-    }
-}
-
 static int _init(netdev_t *netdev)
 {
-    at86rf2xx_t *dev = (at86rf2xx_t *)netdev;
-
-    /* initialize GPIOs */
-    spi_init_cs(dev->params.spi, dev->params.cs_pin);
-    gpio_init(dev->params.sleep_pin, GPIO_OUT);
-    gpio_clear(dev->params.sleep_pin);
-    gpio_init(dev->params.reset_pin, GPIO_OUT);
-    gpio_set(dev->params.reset_pin);
-    gpio_init_int(dev->params.int_pin, GPIO_IN, GPIO_RISING, _irq_handler, dev);
-
-    /* reset device to default values and put it into RX state */
-    at86rf2xx_reset(dev);
-
-    /* test if the SPI is set up correctly and the device is responding */
-    if (at86rf2xx_reg_read(dev, AT86RF2XX_REG__PART_NUM) != AT86RF2XX_PARTNUM) {
-        DEBUG("[at86rf2xx] error: unable to read correct part number\n");
-        return -1;
-    }
-
-    return 0;
+    netdev_ieee802154_t *netdev_ieee802154 = (netdev_ieee802154_t*) netdev;
+    return netdev_ieee802154->rf_ops->init(netdev_ieee802154);
 }
 
 static int _send(netdev_t *netdev, const iolist_t *iolist)
@@ -292,22 +265,22 @@ static int _get(netdev_t *netdev, netopt_t opt, void *val, size_t max_len)
             }
             return sizeof(netopt_enable_t);
 
-        case NETOPT_RX_START_IRQ:
+        case NETOPT_RX_START_IRQ: /* TBR */
             *((netopt_enable_t *)val) =
                 !!(dev->flags & AT86RF2XX_OPT_TELL_RX_START);
             return sizeof(netopt_enable_t);
 
-        case NETOPT_RX_END_IRQ:
+        case NETOPT_RX_END_IRQ: /* TBR */
             *((netopt_enable_t *)val) =
                 !!(dev->flags & AT86RF2XX_OPT_TELL_RX_END);
             return sizeof(netopt_enable_t);
 
-        case NETOPT_TX_START_IRQ:
+        case NETOPT_TX_START_IRQ: /* TBR */
             *((netopt_enable_t *)val) =
                 !!(dev->flags & AT86RF2XX_OPT_TELL_TX_START);
             return sizeof(netopt_enable_t);
 
-        case NETOPT_TX_END_IRQ:
+        case NETOPT_TX_END_IRQ: /* TBR */
             *((netopt_enable_t *)val) =
                 !!(dev->flags & AT86RF2XX_OPT_TELL_TX_END);
             return sizeof(netopt_enable_t);
@@ -405,6 +378,8 @@ static int _get(netdev_t *netdev, netopt_t opt, void *val, size_t max_len)
 static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
 {
     at86rf2xx_t *dev = (at86rf2xx_t *) netdev;
+    netdev_ieee802154_t *netdev_ieee802154 = (netdev_ieee802154_t*) netdev;
+    ieee802154_address_filter_t addr_filt;
     uint8_t old_state = at86rf2xx_get_status(dev);
     int res = -ENOTSUP;
 
@@ -423,17 +398,26 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
     switch (opt) {
         case NETOPT_ADDRESS:
             assert(len <= sizeof(uint16_t));
-            at86rf2xx_set_addr_short(dev, *((const uint16_t *)val));
+            addr_filt.type = IEEE802154_SHORT_ADDR;
+            addr_filt.short_addr = *((const uint16_t *)val);
+            netdev_ieee802154->rf_ops->extended(netdev_ieee802154, 
+                    IEEE802154_EXT_SET_HW_ADDR, &addr_filt);
             /* don't set res to set netdev_ieee802154_t::short_addr */
             break;
         case NETOPT_ADDRESS_LONG:
             assert(len <= sizeof(uint64_t));
-            at86rf2xx_set_addr_long(dev, *((const uint64_t *)val));
+            addr_filt.type = IEEE802154_LONG_ADDR;
+            addr_filt.short_addr = *((const uint64_t *)val);
+            netdev_ieee802154->rf_ops->extended(netdev_ieee802154, 
+                    IEEE802154_EXT_SET_HW_ADDR, &addr_filt);
             /* don't set res to set netdev_ieee802154_t::long_addr */
             break;
         case NETOPT_NID:
             assert(len <= sizeof(uint16_t));
-            at86rf2xx_set_pan(dev, *((const uint16_t *)val));
+            addr_filt.type = IEEE802154_PAN_ID;
+            addr_filt.short_addr = *((const uint16_t *)val);
+            netdev_ieee802154->rf_ops->extended(netdev_ieee802154, 
+                    IEEE802154_EXT_SET_HW_ADDR, &addr_filt);
             /* don't set res to set netdev_ieee802154_t::pan */
             break;
         case NETOPT_CHANNEL:
@@ -447,7 +431,13 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
                 res = -EINVAL;
                 break;
             }
-            at86rf2xx_set_chan(dev, chan);
+#ifdef MODULE_AT86RF212B
+            netdev_ieee802154->rf_ops->set_channel(netdev_ieee802154, dev->page,
+                    chan);
+#else
+            netdev_ieee802154->rf_ops->set_channel(netdev_ieee802154, 0,
+                    chan);
+#endif
             /* don't set res to set netdev_ieee802154_t::chan */
             break;
 
@@ -459,7 +449,7 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
                 res = -EINVAL;
             }
             else {
-                at86rf2xx_set_page(dev, page);
+                netdev_ieee802154->rf_ops->set_channel(netdev_ieee802154, page, dev->netdev.channel);
                 res = sizeof(uint16_t);
             }
 #else
@@ -475,7 +465,7 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
 
         case NETOPT_TX_POWER:
             assert(len <= sizeof(int16_t));
-            at86rf2xx_set_txpower(dev, *((const int16_t *)val));
+            netdev_ieee802154->rf_ops->set_tx_power(netdev_ieee802154, *((const int16_t*) val));
             res = sizeof(uint16_t);
             break;
 
@@ -484,7 +474,7 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
             res = _set_state(dev, *((const netopt_state_t *)val));
             break;
 
-        case NETOPT_AUTOACK:
+        case NETOPT_AUTOACK: /* TBR */
             at86rf2xx_set_option(dev, AT86RF2XX_OPT_AUTOACK,
                                  ((const bool *)val)[0]);
             res = sizeof(netopt_enable_t);
@@ -502,15 +492,14 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
             res = sizeof(uint8_t);
             break;
 
-        case NETOPT_PRELOADING:
+        case NETOPT_PRELOADING: /** TBR */
             at86rf2xx_set_option(dev, AT86RF2XX_OPT_PRELOADING,
                                  ((const bool *)val)[0]);
             res = sizeof(netopt_enable_t);
             break;
 
         case NETOPT_PROMISCUOUSMODE:
-            at86rf2xx_set_option(dev, AT86RF2XX_OPT_PROMISCUOUS,
-                                 ((const bool *)val)[0]);
+            netdev_ieee802154->rf_ops->extended(netdev_ieee802154, IEEE802154_EXT_PROMISCUOUS, val);
             res = sizeof(netopt_enable_t);
             break;
 
@@ -544,7 +533,8 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
             res = sizeof(netopt_enable_t);
             break;
 
-        case NETOPT_CSMA_RETRIES:
+        case NETOPT_CSMA_RETRIES: /* TBR */
+
             assert(len <= sizeof(uint8_t));
             if (!(dev->flags & AT86RF2XX_OPT_CSMA) ||
                 (*((uint8_t *)val) > 5)) {
@@ -557,7 +547,7 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
             }
             break;
 
-        case NETOPT_CCA_THRESHOLD:
+        case NETOPT_CCA_THRESHOLD: /* TBR */
             assert(len <= sizeof(int8_t));
             at86rf2xx_set_cca_threshold(dev, *((const int8_t *)val));
             res = sizeof(int8_t);

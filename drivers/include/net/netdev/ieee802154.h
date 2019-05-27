@@ -85,10 +85,18 @@ typedef enum {
 } rf_ops_cmd_t;
 
 typedef enum {
-    NETDEV_IEEE802154_STATE_TRX_OFF,
-    NETDEV_IEEE802154_STATE_RX_ON,
-    NETDEV_IEEE802154_STATE_TX_ON,
-} netdev_ieee802154_trx_state_t;
+    IEEE802154_PHY_BUSY,
+    IEEE802154_PHY_BUSY_RX,
+    IEEE802154_PHY_BUSY_TX,
+    IEEE802154_PHY_FORCE_TRX_OFF,
+    IEEE802154_PHY_IDLE,
+    IEEE802154_PHY_INVALID_PARAMETER,
+    IEEE802154_PHY_RX_ON,
+    IEEE802154_PHY_SUCCESS,
+    IEEE802154_PHY_TRX_OFF,
+    IEEE802154_PHY_TX_ON,
+    IEEE802154_PHY_UNSUPPORTED_ATTRIBUTE
+} ieee802154_phy_const_t;
 
 typedef enum {
     IEEE802154_EXT_ED,
@@ -96,25 +104,49 @@ typedef enum {
     IEEE802154_EXT_SET_CCA_MODE,
     IEEE802154_EXT_SET_CSMA_PARAMS,
     IEEE802154_EXT_SET_FRAME_RETRIES,
-    IEEE802154_EXT_PROMISCUOUS
+    IEEE802154_EXT_PROMISCUOUS,
+    IEEE802154_EXT_SET_FRAME_PENDING,
 } ieee802154_ext_t;
 
+typedef enum {
+    IEEE802154_SHORT_ADDR,
+    IEEE802154_LONG_ADDR,
+    IEEE802154_PAN_ID
+} ieee802154_addr_type_t;
+
 typedef struct {
+    ieee802154_addr_type_t type;
+    union {
+        uint64_t long_addr;
+        uint16_t short_addr;
+        uint16_t pan_id;
+    };
+} ieee802154_address_filter_t;
+
+typedef struct {
+    int (*init)(netdev_ieee802154_t *netdev);
     void (*prepare)(netdev_ieee802154_t *netdev);
     void (*tx_load)(netdev_ieee802154_t *netdev, const uint8_t *data, size_t len);
     void (*cmd)(netdev_ieee802154_t *netdev, rf_ops_cmd_t cmd);
     void (*on)(netdev_ieee802154_t *netdev);
     void (*off)(netdev_ieee802154_t *netdev);
-    void (*set_channel)(netdev_ieee802154_t *netdev, uint8_t page, uint8_t channel);
+    int (*set_channel)(netdev_ieee802154_t *netdev, uint8_t page, uint8_t channel);
     void (*set_tx_power)(netdev_ieee802154_t *netdev, int32_t power);
-    void (*set_trx_state)(netdev_ieee802154_t *netdev, netdev_ieee802154_trx_state_t state);
-    void (*extended)(netdev_ieee802154_t *netdev, ieee802154_ext_t opt, void *data);
+    int (*set_trx_state)(netdev_ieee802154_t *netdev, ieee802154_phy_const_t state);
+    int (*extended)(netdev_ieee802154_t *netdev, ieee802154_ext_t opt, const void *data);
 } netdev_ieee802154_rf_ops_t;
 
 typedef struct {
     void (*rx_done_cb)(netdev_ieee802154_t *netdev, uint8_t *buf, size_t psdu_len, int16_t rssi, uint8_t lqi);
     void (*tx_done_cb)(netdev_ieee802154_t *netdev, int status);
+    void (*rx_start_cb)(netdev_ieee802154_t *netdev);
+    void (*tx_start_cb)(netdev_ieee802154_t *netdev);
 } netdev_ieee802154_cb_t;
+
+typedef enum {
+    PIB_CHANNEL,
+    PIB_PAGE,
+} ieee802154_pib_t;
 
 /**
  * @brief Extended structure to hold IEEE 802.15.4 driver state
@@ -151,9 +183,11 @@ struct netdev_ieee802154 {
     uint8_t long_addr[IEEE802154_LONG_ADDRESS_LEN];
     uint8_t seq;                            /**< sequence number */
     uint8_t chan;                           /**< channel */
+    uint8_t page;                           /**< page */
     uint16_t flags;                         /**< flags as defined above */
     const netdev_ieee802154_rf_ops_t *rf_ops;
     const netdev_ieee802154_cb_t callbacks;
+    ieee802154_trx_state_t state;
     /** @} */
 };
 
@@ -161,6 +195,12 @@ struct netdev_ieee802154 {
  * @brief   Received packet status information for IEEE 802.15.4 radios
  */
 typedef struct netdev_radio_rx_info netdev_ieee802154_rx_info_t;
+
+int netdev_ieee802154_init(netdev_ieee802154_t *dev);
+int netdev_ieee802154_on(netdev_ieee802154_t *dev);
+int netdev_ieee802154_off(netdev_ieee802154_t *dev);
+int netdev_ieee802154_set_trx_state(netdev_ieee802154_t *dev);
+int netdev_ieee802154_ed(netdev_ieee802154_t *dev);
 
 /**
  * @brief   Reset function for ieee802154 common fields
@@ -188,6 +228,12 @@ void netdev_ieee802154_reset(netdev_ieee802154_t *dev);
  */
 int netdev_ieee802154_get(netdev_ieee802154_t *dev, netopt_t opt, void *value,
                           size_t max_len);
+
+int netdev_ieee802154_pib_set(netdev_ieee802154_t *dev, ieee802154_pib_t pib, const void *value,
+                          size_t value_len);
+
+int netdev_ieee802154_pib_get(netdev_ieee802154_t *dev, ieee802154_pib_t pib, const void *value,
+                          size_t value_len);
 
 /**
  * @brief   Fallback function for netdev IEEE 802.15.4 devices' _set function
