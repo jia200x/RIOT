@@ -399,7 +399,7 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
         case NETOPT_ADDRESS:
             assert(len <= sizeof(uint16_t));
             addr_filt.type = IEEE802154_SHORT_ADDR;
-            addr_filt.short_addr = *((const uint16_t *)val);
+            addr_filt.param.short_addr = *((const uint16_t *)val);
             netdev_ieee802154->rf_ops->extended(netdev_ieee802154, 
                     IEEE802154_EXT_SET_HW_ADDR, &addr_filt);
             /* don't set res to set netdev_ieee802154_t::short_addr */
@@ -407,7 +407,7 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
         case NETOPT_ADDRESS_LONG:
             assert(len <= sizeof(uint64_t));
             addr_filt.type = IEEE802154_LONG_ADDR;
-            addr_filt.short_addr = *((const uint64_t *)val);
+            addr_filt.param.short_addr = *((const uint64_t *)val);
             netdev_ieee802154->rf_ops->extended(netdev_ieee802154, 
                     IEEE802154_EXT_SET_HW_ADDR, &addr_filt);
             /* don't set res to set netdev_ieee802154_t::long_addr */
@@ -415,7 +415,7 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
         case NETOPT_NID:
             assert(len <= sizeof(uint16_t));
             addr_filt.type = IEEE802154_PAN_ID;
-            addr_filt.short_addr = *((const uint16_t *)val);
+            addr_filt.param.short_addr = *((const uint16_t *)val);
             netdev_ieee802154->rf_ops->extended(netdev_ieee802154, 
                     IEEE802154_EXT_SET_HW_ADDR, &addr_filt);
             /* don't set res to set netdev_ieee802154_t::pan */

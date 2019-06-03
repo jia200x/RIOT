@@ -282,13 +282,24 @@ int netdev_ieee802154_dst_filter(netdev_ieee802154_t *dev, const uint8_t *mhr)
 int netdev_ieee802154_prepare(netdev_ieee802154_t *dev, const iolist_t *psdu)
 {
     /* TODO: Ask radio caps */
-    uint8_t psdu_len = iolist_size(psdu) + IEEE802154_FCS_LEN;
+    uint8_t psdu_len;
+    if(dev->state != IEEE802154_PHY_TX_ON) {
+        return dev->state;
+    }
 
+    if(dev->flags & NETDEV_IEEE802154_TX_BUSY) {
+        return IEEE802154_PHY_BUSY_TX;
+    }
+
+    dev->flags |= NETDEV_IEEE802154_TX_BUSY;
+    psdu_len = iolist_size(psdu) + IEEE802154_FCS_LEN;
+
+    /* TODO: This is not a responsability of PHY!!! 
     if (psdu_len > IEEE802154_FRAME_LEN_MAX) {
         DEBUG("[at86rf2xx] error: packet too large (%u byte) to be send\n",
               (unsigned) psdu_len);
         return -EOVERFLOW;
-    }
+    }*/
 
     dev->rf_ops->prepare(dev);
 
@@ -305,7 +316,7 @@ int netdev_ieee802154_prepare(netdev_ieee802154_t *dev, const iolist_t *psdu)
 
     /* return the number of bytes that were actually loaded into the frame
      * buffer/send out */
-    return (int)psdu_len;
+    return IEEE802154_PHY_SUCCESS;
 }
 
 void netdev_ieee802154_transmit(netdev_ieee802154_t *dev)
@@ -322,77 +333,139 @@ int netdev_ieee802154_send(netdev_ieee802154_t *dev, const iolist_t *psdu)
     return res;
 }
 
-int netdev_ieee802154_pib_set(netdev_ieee802154_t *dev, ieee802154_pib_t pib, const void *value,
-                          size_t value_len)
+int netdev_ieee802154_set_channel(netdev_ieee802154_t *dev, uint16_t channel)
 {
-    /* TODO: Add SubGhz radio */
-    (void) value_len;
-    int res = -ENOTSUP;
-    switch(pib) {
-        case PIB_CHANNEL: {
-            uint8_t chan = (((const uint16_t *)value)[0]) & UINT8_MAX;
-            dev->rf_ops->set_channel(dev, dev->page,
-                    chan);
-            dev->chan = chan;
-            res = 0;
-            break;
-          }
-        case PIB_PAGE: {
-            uint8_t page = (((const uint16_t *)value)[0]) & UINT8_MAX;
-            dev->rf_ops->set_channel(dev, page, dev->chan);
-            res = 0;
-            break;
-       }
-    }
-    return res;
+    /*TODO: Add restrictions for channel */
+    dev->rf_ops->set_channel(dev, dev->page,
+            (uint8_t) channel);
+    dev->chan = channel;
+    return IEEE802154_PHY_SUCCESS;
 }
 
-int netdev_ieee802154_trx_state(netdev_ieee802154_t *dev, ieee802154_phy_const_t state)
+int netdev_ieee802154_set_page(netdev_ieee802154_t *dev, uint16_t page)
 {
-    if(netdev->state == state) {
+    dev->rf_ops->set_channel(dev, (uint8_t) page, dev->chan);
+    dev->page = page;
+    return IEEE802154_PHY_SUCCESS;
+}
+
+int netdev_ieee802154_set_cca_mode(netdev_ieee802154_t *dev, 
+        netdev_ieee802154_cca_mode_t mode, ieee802154_cca_opt_t opt)
+{
+    (void) dev;
+    (void) mode;
+    (void) opt;
+    return IEEE802154_PHY_SUCCESS;
+}
+
+int netdev_ieee802154_set_trx_state(netdev_ieee802154_t *dev, ieee802154_phy_const_t state)
+{
+    int res;
+
+    if(dev->state == state) {
         return state;
     }
+    if(dev->state == IEEE802154_PHY_TRX_OFF && state == IEEE802154_PHY_FORCE_TRX_OFF) {
+        return IEEE802154_PHY_TRX_OFF;
+    }
 
-    int current_state = netdev->state;
-    int res = IEEE802154_PHY_UNSUPPORTED_ATTRIBUTE;
+    if(state != IEEE802154_PHY_FORCE_TRX_OFF &&
+            (dev->flags & (NETDEV_IEEE802154_TX_BUSY |
+                           NETDEV_IEEE802154_RX_BUSY))) {
+        return (dev->flags & NETDEV_IEEE802154_RX_BUSY) ? IEEE802154_PHY_BUSY_RX
+            : IEEE802154_PHY_BUSY_TX;
+    }
 
     switch(state) {
         case IEEE802154_PHY_TX_ON:
-            if(current_state == IEEE802154_PHY_BUSY_RX) {
-                return current_state;
-            }
-            netdev->rf_ops->set_trx_state(netdev, state);
-            netdev->state = state;
-            break;
         case IEEE802154_PHY_RX_ON:
-            break;
         case IEEE802154_PHY_TRX_OFF:
+            dev->rf_ops->set_trx_state(dev, state);
+            dev->state = state;
+            res = IEEE802154_PHY_SUCCESS;
             break;
         case IEEE802154_PHY_FORCE_TRX_OFF:
+            dev->rf_ops->set_trx_state(dev, IEEE802154_PHY_FORCE_TRX_OFF);
+            dev->state = IEEE802154_PHY_TRX_OFF;
+            dev->flags &= ~(NETDEV_IEEE802154_TX_BUSY | NETDEV_IEEE802154_RX_BUSY);
+            res = IEEE802154_PHY_SUCCESS;
             break;
         default:
+            res = IEEE802154_PHY_UNSUPPORTED_ATTRIBUTE;
             break;
+    }
+
+    return res;
+}
+
+int netdev_ieee802154_off(netdev_ieee802154_t *dev)
+{
+    dev->rf_ops->off(dev);    
+
+    return IEEE802154_PHY_SUCCESS;
+}
+
+int netdev_ieee802154_on(netdev_ieee802154_t *dev)
+{
+    dev->rf_ops->on(dev);    
+
+    return IEEE802154_PHY_SUCCESS;
+}
+
+int netdev_ieee802154_cca(netdev_ieee802154_t *dev)
+{
+    if(dev->state == IEEE802154_PHY_TRX_OFF ||
+            dev->state == IEEE802154_PHY_TX_ON) {
+        return dev->state;      
+    }
+
+    dev->rf_ops->cca(dev);
+    return IEEE802154_PHY_SUCCESS;
+}
+
+int netdev_ieee802154_ed(netdev_ieee802154_t *dev)
+{
+    if(dev->state == IEEE802154_PHY_TRX_OFF ||
+            dev->state == IEEE802154_PHY_TX_ON) {
+        return dev->state;      
+    }
+
+    dev->rf_ops->ed(dev);
+    return IEEE802154_PHY_SUCCESS;
+}
+
+void netdev_ieee802154_tx_start(netdev_ieee802154_t *dev)
+{
+    if(dev->callbacks.tx_start_cb) {
+        dev->callbacks.tx_start_cb(dev);
     }
 }
 
-void netdev_ieee802154_tx_start(netdev_ieee802154_t netdev)
+void netdev_ieee802154_tx_done(netdev_ieee802154_t *dev, int status)
 {
-    netdev->state = IEEE802154_PHY_BUSY_TX;
+    dev->flags &= ~NETDEV_IEEE802154_TX_BUSY;
+
+    if(dev->callbacks.tx_done_cb) {
+        dev->callbacks.tx_done_cb(dev, status);
+    }
 }
 
-void netdev_ieee802154_tx_done(netdev_ieee802154_t netdev)
+void netdev_ieee802154_rx_start(netdev_ieee802154_t *dev)
 {
-    netdev->state = IEEE802154_PHY_TX_ON;
+    dev->flags |= NETDEV_IEEE802154_RX_BUSY;
+
+    if(dev->callbacks.rx_start_cb) {
+        dev->callbacks.rx_start_cb(dev);
+    }
 }
 
-void netdev_ieee802154_rx_start(netdev_ieee802154_t netdev)
+void netdev_ieee802154_rx_done(netdev_ieee802154_t *dev, uint8_t *buf, size_t psdu_len, int16_t rssi, uint8_t lqi)
 {
-    netdev->state = IEEE802154_PHY_BUSY_RX;
-}
+    dev->flags &= ~NETDEV_IEEE802154_RX_BUSY;
 
-void netdev_ieee802154_rx_done(netdev_ieee802154_t netdev)
-{
-    netdev->state = IEEE802154_PHY_RX_ON;
+    if(dev->callbacks.rx_done_cb) {
+        dev->callbacks.rx_done_cb(dev, buf, psdu_len, rssi, lqi);
+    }
 }
 
 /** @} */

@@ -41,7 +41,7 @@ static int _set_channel(int argc, char **argv)
     (void) argc;
     netdev_ieee802154_t *dev = (netdev_ieee802154_t *)(&devs[0]);
     uint8_t channel = atoi(argv[1]);
-    netdev_ieee802154_pib_set(dev, PIB_CHANNEL, &channel, sizeof(uint8_t));
+    netdev_ieee802154_set_channel(dev, channel);
     puts("OK");
     return 0;
 }
