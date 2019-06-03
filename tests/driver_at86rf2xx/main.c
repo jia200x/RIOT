@@ -35,6 +35,7 @@ static char stack[_STACKSIZE];
 static kernel_pid_t _recv_pid;
 
 at86rf2xx_t devs[AT86RF2XX_NUM];
+event_queue_t eq;
 
 #if 0
 static int _set_channel(int argc, char **argv)
@@ -86,14 +87,10 @@ void *_recv_thread(void *arg)
 {
     (void)arg;
     while (1) {
-        msg_t msg;
         msg_receive(&msg);
         if (msg.type == MSG_TYPE_ISR) {
             netdev_t *dev = msg.content.ptr;
             dev->driver->isr(dev);
-        }
-        else {
-            puts("unexpected message type");
         }
     }
 }
