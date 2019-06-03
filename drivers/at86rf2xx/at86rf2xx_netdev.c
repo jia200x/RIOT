@@ -60,14 +60,19 @@ const netdev_driver_t at86rf2xx_driver = {
 
 static int _init(netdev_t *netdev)
 {
-    netdev_ieee802154_t *netdev_ieee802154 = (netdev_ieee802154_t*) netdev;
-    return netdev_ieee802154->rf_ops->init(netdev_ieee802154);
+    (void) netdev;
+    return 0;
+    //netdev_ieee802154_t *netdev_ieee802154 = (netdev_ieee802154_t*) netdev;
+    //return netdev_ieee802154->rf_ops->init(netdev_ieee802154);
 }
 
 static int _send(netdev_t *netdev, const iolist_t *iolist)
 {
-    netdev_ieee802154_t *netdev_ieee802154 = (netdev_ieee802154_t*) netdev;
-    return netdev_ieee802154_send(netdev_ieee802154, iolist);
+    (void) netdev;
+    (void) iolist;
+    return 0;
+    //netdev_ieee802154_t *netdev_ieee802154 = (netdev_ieee802154_t*) netdev;
+    //return netdev_ieee802154_send(netdev_ieee802154, iolist);
 }
 
 static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)
@@ -246,15 +251,6 @@ static int _get(netdev_t *netdev, netopt_t opt, void *val, size_t max_len)
             assert(max_len >= sizeof(netopt_state_t));
             *((netopt_state_t *)val) = _get_state(dev);
             return sizeof(netopt_state_t);
-
-        case NETOPT_PRELOADING:
-            if (dev->flags & AT86RF2XX_OPT_PRELOADING) {
-                *((netopt_enable_t *)val) = NETOPT_ENABLE;
-            }
-            else {
-                *((netopt_enable_t *)val) = NETOPT_DISABLE;
-            }
-            return sizeof(netopt_enable_t);
 
         case NETOPT_PROMISCUOUSMODE:
             if (dev->flags & AT86RF2XX_OPT_PROMISCUOUS) {
@@ -492,38 +488,8 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
             res = sizeof(uint8_t);
             break;
 
-        case NETOPT_PRELOADING: /** TBR */
-            at86rf2xx_set_option(dev, AT86RF2XX_OPT_PRELOADING,
-                                 ((const bool *)val)[0]);
-            res = sizeof(netopt_enable_t);
-            break;
-
         case NETOPT_PROMISCUOUSMODE:
             netdev_ieee802154->rf_ops->extended(netdev_ieee802154, IEEE802154_EXT_PROMISCUOUS, val);
-            res = sizeof(netopt_enable_t);
-            break;
-
-        case NETOPT_RX_START_IRQ:
-            at86rf2xx_set_option(dev, AT86RF2XX_OPT_TELL_RX_START,
-                                 ((const bool *)val)[0]);
-            res = sizeof(netopt_enable_t);
-            break;
-
-        case NETOPT_RX_END_IRQ:
-            at86rf2xx_set_option(dev, AT86RF2XX_OPT_TELL_RX_END,
-                                 ((const bool *)val)[0]);
-            res = sizeof(netopt_enable_t);
-            break;
-
-        case NETOPT_TX_START_IRQ:
-            at86rf2xx_set_option(dev, AT86RF2XX_OPT_TELL_TX_START,
-                                 ((const bool *)val)[0]);
-            res = sizeof(netopt_enable_t);
-            break;
-
-        case NETOPT_TX_END_IRQ:
-            at86rf2xx_set_option(dev, AT86RF2XX_OPT_TELL_TX_END,
-                                 ((const bool *)val)[0]);
             res = sizeof(netopt_enable_t);
             break;
 
