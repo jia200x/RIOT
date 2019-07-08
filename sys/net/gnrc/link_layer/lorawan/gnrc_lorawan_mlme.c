@@ -105,6 +105,7 @@ static int gnrc_lorawan_send_join_request(gnrc_lorawan_t *mac, uint8_t *deveui,
 void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
 {
     int status;
+    mlme_confirm_t *mlme_confirm;
 
     if (mac->mlme.activation != MLME_ACTIVATION_NONE) {
         status = -EBADMSG;
@@ -155,8 +156,7 @@ void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
     status = GNRC_LORAWAN_REQ_STATUS_SUCCESS;
 
 out:
-    gnrc_pktbuf_release(pkt);
-    mlme_confirm_t *mlme_confirm = _mlme_allocate(mac);
+    mlme_confirm = _mlme_allocate(mac);
     mlme_confirm->type = MLME_JOIN;
     mlme_confirm->status = status;
 

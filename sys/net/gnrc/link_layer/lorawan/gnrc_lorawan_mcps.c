@@ -37,17 +37,19 @@ static inline void *_mcps_allocate(gnrc_lorawan_t *mac)
     return mac->mcps_buf;
 }
 
-int gnrc_lorawan_mic_is_valid(gnrc_pktsnip_t *mic, uint8_t *nwkskey)
+int gnrc_lorawan_mic_is_valid(uint8_t *buf, size_t len, uint8_t *nwkskey)
 {
     le_uint32_t calc_mic;
 
-    assert(mic->size == MIC_SIZE);
-    assert(mic->next->data);
-    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t *) mic->next->data;
+    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t *) buf;
 
     uint32_t fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
-    gnrc_lorawan_calculate_mic(&lw_hdr->addr, fcnt, GNRC_LORAWAN_DIR_DOWNLINK, (iolist_t *) mic->next, nwkskey, &calc_mic);
-    return calc_mic.u32 == ((le_uint32_t *) mic->data)->u32;
+    iolist_t data = {
+        .iol_base = buf,
+        .iol_len = len-MIC_SIZE
+    };
+    gnrc_lorawan_calculate_mic(&lw_hdr->addr, fcnt, GNRC_LORAWAN_DIR_DOWNLINK, (iolist_t *) &data, nwkskey, &calc_mic);
+    return calc_mic.u32 == ((le_uint32_t *) (buf+data.iol_len))->u32;
 }
 
 uint32_t gnrc_lorawan_fcnt_stol(uint32_t fcnt_down, uint16_t s_fcnt)
@@ -67,15 +69,18 @@ void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt
     int release = true;
     int error = true;
 
-    /* mark MIC */
-    if (!(data = gnrc_pktbuf_mark(pkt, (pkt->size - MIC_SIZE > 0) ? pkt->size - MIC_SIZE : 0, GNRC_NETTYPE_UNDEF))) {
-        DEBUG("gnrc_lorawan: failed to mark MIC\n");
+    uint8_t *buf = pkt->data;
+    size_t len = pkt->size;
+
+    /* NOTE: MIC is in pkt */
+    if (!gnrc_lorawan_mic_is_valid(buf, len, mac->nwkskey)) {
+        DEBUG("gnrc_lorawan: invalid MIC\n");
         goto out;
     }
 
-    /* NOTE: MIC is in pkt */
-    if (!gnrc_lorawan_mic_is_valid(pkt, mac->nwkskey)) {
-        DEBUG("gnrc_lorawan: invalid MIC\n");
+    /* mark MIC */
+    if (!(data = gnrc_pktbuf_mark(pkt, (pkt->size - MIC_SIZE > 0) ? pkt->size - MIC_SIZE : 0, GNRC_NETTYPE_UNDEF))) {
+        DEBUG("gnrc_lorawan: failed to mark MIC\n");
         goto out;
     }
 
