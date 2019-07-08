@@ -8,6 +8,9 @@ USEMODULE += auto_init_gnrc_netif
 USEMODULE += gnrc_lorawan
 USEMODULE += gnrc_netapi_callbacks
 
+BOARD ?= b-l072z-lrwan1
+RIOTBASE ?= ../../
+
 # Turn on developer helpers
 DEVELHELP ?= 1
 
