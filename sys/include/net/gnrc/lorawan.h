@@ -229,6 +229,17 @@ void gnrc_lorawan_recv(gnrc_lorawan_t *mac);
  */
 void gnrc_lorawan_setup(gnrc_lorawan_t *mac, netdev_t *lower);
 
+/**
+ * @brief Tell the MAC layer the timer was fired
+ *
+ * @param mac pointer to the MAC descriptor
+ */
+void gnrc_lorawan_timer_fired(gnrc_lorawan_t *mac);
+
+void gnrc_lorawan_timer_stop(gnrc_lorawan_t *mac);
+void gnrc_lorawan_timer_set(gnrc_lorawan_t *mac, uint32_t secs);
+void gnrc_lorawan_timer_usleep(gnrc_lorawan_t *mac, uint32_t us);
+
 #ifdef __cplusplus
 }
 #endif

@@ -217,10 +217,7 @@ static void _msg_handler(gnrc_netif_t *netif, msg_t *msg)
     (void) msg;
     switch (msg->type) {
         case MSG_TYPE_TIMEOUT:
-            gnrc_lorawan_open_rx_window(&netif->lorawan.mac);
-            break;
-        case MSG_TYPE_MCPS_ACK_TIMEOUT:
-            gnrc_lorawan_mcps_event(&netif->lorawan.mac, MCPS_EVENT_ACK_TIMEOUT, 0);
+            gnrc_lorawan_timer_fired(&netif->lorawan.mac);
             break;
         case MSG_TYPE_MLME_BACKOFF_EXPIRE:
             gnrc_lorawan_mlme_backoff_expire(&netif->lorawan.mac);

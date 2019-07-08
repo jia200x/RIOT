@@ -35,7 +35,6 @@ extern "C" {
 #endif
 
 #define MSG_TYPE_TIMEOUT             (0x3457)           /**< Timeout message type */
-#define MSG_TYPE_MCPS_ACK_TIMEOUT    (0x3458)           /**< ACK timeout message type */
 #define MSG_TYPE_MLME_BACKOFF_EXPIRE (0x3459)           /**< Backoff timer expiration message type */
 
 #define MTYPE_MASK           0xE0                       /**< MHDR mtype mask */
@@ -165,8 +164,6 @@ typedef struct {
  * @brief GNRC LoRaWAN mac descriptor */
 typedef struct {
     netdev_t netdev;                                /**< netdev for the MAC layer */
-    xtimer_t rx;                                    /**< RX timer */
-    msg_t msg;                                      /**< MAC layer message descriptor */
     gnrc_lorawan_mcps_t mcps;                       /**< MCPS descriptor */
     gnrc_lorawan_mlme_t mlme;                       /**< MLME descriptor */
     void *mlme_buf;                                 /**< pointer to MLME buffer */

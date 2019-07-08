@@ -27,11 +27,6 @@
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 
-/* This factor is used for converting "real" seconds into microcontroller
- * microseconds. This is done in order to correct timer drift.
- */
-#define _DRIFT_FACTOR (int) (US_PER_SEC * 100 / (100 + CONFIG_GNRC_LORAWAN_TIMER_DRIFT))
-
 #define GNRC_LORAWAN_DL_RX2_DR_MASK       (0x0F)  /**< DL Settings DR Offset mask */
 #define GNRC_LORAWAN_DL_RX2_DR_POS        (0)     /**< DL Settings DR Offset pos */
 #define GNRC_LORAWAN_DL_DR_OFFSET_MASK    (0x70)  /**< DL Settings RX2 DR mask */
@@ -132,10 +127,9 @@ static void _configure_rx_window(gnrc_lorawan_t *mac, uint32_t channel_freq, uin
 
 void gnrc_lorawan_open_rx_window(gnrc_lorawan_t *mac)
 {
-    mac->msg.type = MSG_TYPE_TIMEOUT;
     /* Switch to RX state */
     if (mac->state == LORAWAN_STATE_RX_1) {
-        xtimer_set_msg(&mac->rx, _DRIFT_FACTOR, &mac->msg, thread_getpid());
+        gnrc_lorawan_timer_set(mac, 1000);
     }
     uint8_t state = NETOPT_STATE_RX;
     netdev_set_pass(&mac->netdev, NETOPT_STATE, &state, sizeof(state));
@@ -143,7 +137,6 @@ void gnrc_lorawan_open_rx_window(gnrc_lorawan_t *mac)
 
 void gnrc_lorawan_event_tx_complete(gnrc_lorawan_t *mac)
 {
-    mac->msg.type = MSG_TYPE_TIMEOUT;
     mac->state = LORAWAN_STATE_RX_1;
 
     int rx_1;
@@ -151,7 +144,7 @@ void gnrc_lorawan_event_tx_complete(gnrc_lorawan_t *mac)
     rx_1 = mac->mlme.activation == MLME_ACTIVATION_NONE ?
            LORAMAC_DEFAULT_JOIN_DELAY1 : mac->rx_delay;
 
-    xtimer_set_msg(&mac->rx, rx_1 * _DRIFT_FACTOR, &mac->msg, thread_getpid());
+    gnrc_lorawan_timer_set(mac, rx_1*1000);
 
     uint8_t dr_offset = (mac->dl_settings & GNRC_LORAWAN_DL_DR_OFFSET_MASK) >>
         GNRC_LORAWAN_DL_DR_OFFSET_POS;
@@ -244,7 +237,7 @@ void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt, uint8_t dr)
 void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
 {
     mac->state = LORAWAN_STATE_IDLE;
-    xtimer_remove(&mac->rx);
+    gnrc_lorawan_timer_stop(mac);
 
     uint8_t *p = pkt->data;
 
@@ -345,6 +338,17 @@ void gnrc_lorawan_recv(gnrc_lorawan_t *mac)
     }
 
     gnrc_lorawan_process_pkt(mac, pkt);
+}
+
+void gnrc_lorawan_timer_fired(gnrc_lorawan_t *mac)
+{
+    if(mac->state == LORAWAN_STATE_IDLE)
+    {
+        gnrc_lorawan_mcps_event(mac, MCPS_EVENT_ACK_TIMEOUT, 0);
+    }
+    else {
+        gnrc_lorawan_open_rx_window(mac);
+    }
 }
 
 /** @} */
