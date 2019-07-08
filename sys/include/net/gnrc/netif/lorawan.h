@@ -31,6 +31,8 @@ typedef struct {
     gnrc_lorawan_t mac;                     /**< gnrc lorawan mac descriptor */
     xtimer_t rx;                                    /**< RX timer */
     msg_t msg;                                      /**< MAC layer message descriptor */
+    xtimer_t backoff_timer;                 /**< timer used for backoff expiration */
+    msg_t backoff_msg;                      /**< msg for backoff expiration */
     uint8_t nwkskey[LORAMAC_NWKSKEY_LEN];   /**< network SKey buffer */
     uint8_t appskey[LORAMAC_APPSKEY_LEN];   /**< App SKey buffer */
     uint8_t demod_margin;                   /**< value of last demodulation margin */

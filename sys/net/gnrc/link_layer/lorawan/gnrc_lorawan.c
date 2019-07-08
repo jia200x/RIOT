@@ -42,10 +42,7 @@ static inline void gnrc_lorawan_mlme_reset(gnrc_lorawan_t *mac)
 
 static inline void gnrc_lorawan_mlme_backoff_init(gnrc_lorawan_t *mac)
 {
-    mac->mlme.backoff_msg.type = MSG_TYPE_MLME_BACKOFF_EXPIRE;
     mac->mlme.backoff_state = 0;
-
-    gnrc_lorawan_mlme_backoff_expire(mac);
 }
 
 static inline void gnrc_lorawan_mcps_reset(gnrc_lorawan_t *mac)

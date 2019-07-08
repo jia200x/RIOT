@@ -177,6 +177,12 @@ static void _init(gnrc_netif_t *netif)
 
     gnrc_lorawan_setup(&netif->lorawan.mac, netif->dev);
     netif->lorawan.mac.netdev.driver->set(&netif->lorawan.mac.netdev, NETOPT_ADDRESS, _devaddr, sizeof(_devaddr));
+
+    netif->lorawan.backoff_msg.type = MSG_TYPE_MLME_BACKOFF_EXPIRE;
+    gnrc_lorawan_mlme_backoff_expire(&netif->lorawan.mac);
+    xtimer_set_msg(&netif->lorawan.backoff_timer,
+                   GNRC_LORAWAN_BACKOFF_WINDOW_TICK,
+                   &netif->lorawan.backoff_msg, thread_getpid());
     gnrc_lorawan_init(&netif->lorawan.mac, netif->lorawan.nwkskey, netif->lorawan.appskey);
 }
 
@@ -221,6 +227,9 @@ static void _msg_handler(gnrc_netif_t *netif, msg_t *msg)
             break;
         case MSG_TYPE_MLME_BACKOFF_EXPIRE:
             gnrc_lorawan_mlme_backoff_expire(&netif->lorawan.mac);
+            xtimer_set_msg(&netif->lorawan.backoff_timer,
+                           GNRC_LORAWAN_BACKOFF_WINDOW_TICK,
+                           &netif->lorawan.backoff_msg, thread_getpid());
         default:
             break;
     }

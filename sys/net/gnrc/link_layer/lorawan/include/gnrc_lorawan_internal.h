@@ -150,8 +150,6 @@ typedef struct {
  * @brief MLME service access point descriptor
  */
 typedef struct {
-    xtimer_t backoff_timer;     /**< timer used for backoff expiration */
-    msg_t backoff_msg;          /**< msg for backoff expiration */
     uint8_t activation;         /**< Activation mechanism of the MAC layer */
     int pending_mlme_opts;  /**< holds pending mlme opts */
     uint32_t nid;               /**< current Network ID */
