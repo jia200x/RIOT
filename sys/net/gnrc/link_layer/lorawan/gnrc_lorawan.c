@@ -241,7 +241,7 @@ void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
     uint8_t mtype = (*p & MTYPE_MASK) >> 5;
     switch (mtype) {
         case MTYPE_JOIN_ACCEPT:
-            gnrc_lorawan_mlme_process_join(mac, pkt);
+            gnrc_lorawan_mlme_process_join(mac, pkt->data, pkt->size);
             gnrc_pktbuf_release(pkt);
             break;
         case MTYPE_CNF_DOWNLINK:

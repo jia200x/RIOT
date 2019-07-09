@@ -347,9 +347,10 @@ void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt, uint8_t dr)
  * @brief Process join accept message
  *
  * @param[in] mac pointer to the MAC descriptor
- * @param[in] pkt the Join Accept packet
+ * @param[in] data pointer to the Join Accept packet
+ * @param[in] size size of the Join Accept packet
  */
-void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt);
+void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, uint8_t *data, size_t size);
 
 /**
  * @brief Inform the MAC layer that no packet was received during reception.

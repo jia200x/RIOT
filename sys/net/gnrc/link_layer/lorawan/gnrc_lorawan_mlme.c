@@ -102,7 +102,7 @@ static int gnrc_lorawan_send_join_request(gnrc_lorawan_t *mac, uint8_t *deveui,
     return GNRC_LORAWAN_REQ_STATUS_DEFERRED;
 }
 
-void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
+void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, uint8_t *data, size_t size)
 {
     int status;
     mlme_confirm_t *mlme_confirm;
@@ -112,23 +112,23 @@ void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
         goto out;
     }
 
-    if (pkt->size != GNRC_LORAWAN_JOIN_ACCEPT_MAX_SIZE - CFLIST_SIZE &&
-        pkt->size != GNRC_LORAWAN_JOIN_ACCEPT_MAX_SIZE) {
+    if (size != GNRC_LORAWAN_JOIN_ACCEPT_MAX_SIZE - CFLIST_SIZE &&
+        size != GNRC_LORAWAN_JOIN_ACCEPT_MAX_SIZE) {
         status = -EBADMSG;
         goto out;
     }
 
     /* Substract 1 from join accept max size, since the MHDR was already read */
     uint8_t out[GNRC_LORAWAN_JOIN_ACCEPT_MAX_SIZE - 1];
-    uint8_t has_cflist = (pkt->size - 1) >= CFLIST_SIZE;
-    gnrc_lorawan_decrypt_join_accept(mac->appskey, ((uint8_t *) pkt->data) + 1,
+    uint8_t has_cflist = (size - 1) >= CFLIST_SIZE;
+    gnrc_lorawan_decrypt_join_accept(mac->appskey, ((uint8_t *) data) + 1,
                                      has_cflist, out);
-    memcpy(((uint8_t *) pkt->data) + 1, out, pkt->size - 1);
+    memcpy(((uint8_t *) data) + 1, out, size - 1);
 
-    iolist_t io = { .iol_base = pkt->data, .iol_len = pkt->size - MIC_SIZE,
+    iolist_t io = { .iol_base = data, .iol_len = size - MIC_SIZE,
                     .iol_next = NULL };
     le_uint32_t mic;
-    le_uint32_t *expected_mic = (le_uint32_t *) (((uint8_t *) pkt->data) + pkt->size - MIC_SIZE);
+    le_uint32_t *expected_mic = (le_uint32_t *) (((uint8_t *) data) + size - MIC_SIZE);
     gnrc_lorawan_calculate_join_mic(&io, mac->appskey, &mic);
     if (mic.u32 != expected_mic->u32) {
         DEBUG("gnrc_lorawan_mlme: wrong MIC.\n");
@@ -136,7 +136,7 @@ void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
         goto out;
     }
 
-    lorawan_join_accept_t *ja_hdr = (lorawan_join_accept_t *) pkt->data;
+    lorawan_join_accept_t *ja_hdr = (lorawan_join_accept_t *) data;
     gnrc_lorawan_generate_session_keys(ja_hdr->app_nonce, mac->mlme.dev_nonce, mac->appskey, mac->nwkskey, mac->appskey);
 
     le_uint32_t le_nid;
