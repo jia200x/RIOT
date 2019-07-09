@@ -195,7 +195,6 @@ void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt
         DEBUG("gnrc_lorawan: release packet\n");
         gnrc_pktbuf_release(pkt);
     }
-    puts("A");
 }
 
 size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint32_t fcnt, uint8_t ack, uint8_t fopts_length, lorawan_buffer_t *buf)
