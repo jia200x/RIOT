@@ -246,7 +246,8 @@ void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
             break;
         case MTYPE_CNF_DOWNLINK:
         case MTYPE_UNCNF_DOWNLINK:
-            gnrc_lorawan_mcps_process_downlink(mac, pkt);
+            gnrc_lorawan_mcps_process_downlink(mac, pkt->data, pkt->size);
+            gnrc_pktbuf_release(pkt);
             break;
         default:
             gnrc_pktbuf_release(pkt);

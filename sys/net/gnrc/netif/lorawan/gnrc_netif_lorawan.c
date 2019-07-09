@@ -77,6 +77,7 @@ static void _mac_cb(netdev_t *dev, netdev_event_t event)
 
     mcps_confirm_t *mcps_confirm;
     mcps_indication_t *mcps_indication;
+    gnrc_pktsnip_t *pkt;
 
     switch (event) {
         case NETDEV_EVENT_MLME_INDICATION:
@@ -84,8 +85,10 @@ static void _mac_cb(netdev_t *dev, netdev_event_t event)
             break;
         case NETDEV_EVENT_MCPS_INDICATION:
             mcps_indication = mac->mcps_buf;
-            if (!gnrc_netapi_dispatch_receive(GNRC_NETTYPE_LORAWAN, mcps_indication->data.port, mcps_indication->data.pkt)) {
-                gnrc_pktbuf_release(mcps_indication->data.pkt);
+             pkt = gnrc_pktbuf_add(NULL, mcps_indication->data.pkt->iol_base, mcps_indication->data.pkt->iol_len, GNRC_NETTYPE_LORAWAN);
+
+            if (!gnrc_netapi_dispatch_receive(GNRC_NETTYPE_LORAWAN, mcps_indication->data.port, pkt)) {
+                gnrc_pktbuf_release(pkt);
             }
             break;
         case NETDEV_EVENT_MLME_CONFIRM:
@@ -210,7 +213,7 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
         mlme_request.type = MLME_LINK_CHECK;
         gnrc_lorawan_mlme_request(&netif->lorawan.mac, &mlme_request, &mlme_confirm);
     }
-    mcps_request_t req = { .type = netif->lorawan.ack_req ? MCPS_CONFIRMED : MCPS_UNCONFIRMED, .data.pkt = payload, .data.port = netif->lorawan.port,
+    mcps_request_t req = { .type = netif->lorawan.ack_req ? MCPS_CONFIRMED : MCPS_UNCONFIRMED, .data.pkt = (iolist_t*) payload, .data.port = netif->lorawan.port,
                            .data.dr = netif->lorawan.datarate };
     mcps_confirm_t conf;
     gnrc_lorawan_mcps_request(&netif->lorawan.mac, &req, &conf);

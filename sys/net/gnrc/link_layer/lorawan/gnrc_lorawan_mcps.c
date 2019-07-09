@@ -126,10 +126,9 @@ int gnrc_lorawan_parse_dl(gnrc_lorawan_t *mac, uint8_t *buf, size_t len,
     return 0;
 }
 
-void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
+void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, uint8_t *buf,
+        size_t len)
 {
-    uint8_t *buf = pkt->data;
-    size_t len = pkt->size;
     struct parsed_packet _pkt;
 
     /* NOTE: MIC is in pkt */
@@ -183,17 +182,11 @@ void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt
     }
 
     if (_pkt.port) {
-        pkt->type = GNRC_NETTYPE_LORAWAN;
-
         mcps_indication_t *mcps_indication = _mcps_allocate(mac);
         mcps_indication->type = _pkt.ack_req;
-        mcps_indication->data.pkt = pkt;
+        mcps_indication->data.pkt = &_pkt.enc_payload;;
         mcps_indication->data.port = _pkt.port;
         mac->netdev.event_callback((netdev_t *) mac, NETDEV_EVENT_MCPS_INDICATION);
-    }
-    else {
-        DEBUG("gnrc_lorawan: release packet\n");
-        gnrc_pktbuf_release(pkt);
     }
 }
 
@@ -306,7 +299,7 @@ void gnrc_lorawan_mcps_event(gnrc_lorawan_t *mac, int event, int data)
 void gnrc_lorawan_mcps_request(gnrc_lorawan_t *mac, const mcps_request_t *mcps_request, mcps_confirm_t *mcps_confirm)
 {
     int release = true;
-    gnrc_pktsnip_t *pkt = mcps_request->data.pkt;
+    gnrc_pktsnip_t *pkt = (gnrc_pktsnip_t*) mcps_request->data.pkt;
 
     if (mac->mlme.activation == MLME_ACTIVATION_NONE) {
         DEBUG("gnrc_lorawan_mcps: LoRaWAN not activated\n");

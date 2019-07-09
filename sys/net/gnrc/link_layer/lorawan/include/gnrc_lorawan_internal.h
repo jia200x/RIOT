@@ -129,7 +129,7 @@ typedef struct {
  * @brief MCPS data
  */
 typedef struct {
-    gnrc_pktsnip_t *pkt;    /**< packet of the request */
+    iolist_t *pkt;    /**< packet of the request */
     uint8_t port;           /**< port of the request */
     uint8_t dr;             /**< datarate of the request */
 } mcps_data_t;
@@ -310,9 +310,11 @@ size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint32_t fcn
  * @brief Process an MCPS downlink message (confirmable or non comfirmable)
  *
  * @param[in] mac pointer to the MAC descriptor
- * @param[in] pkt pointer to the downlink message
+ * @param[in] buf pointer to the downlink message
+ * @param[in] len size of the downlink message
  */
-void  gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt);
+void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, uint8_t *buf,
+        size_t len);
 
 /**
  * @brief Init regional channel settings.
