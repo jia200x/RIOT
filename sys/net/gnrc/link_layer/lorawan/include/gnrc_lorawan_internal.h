@@ -397,9 +397,10 @@ void gnrc_lorawan_mlme_backoff_expire(gnrc_lorawan_t *mac);
  *        Intended to be called right after reception from the radio
  *
  * @param[in] mac pointer to the MAC descriptor
- * @param[in] pkt the received packet
+ * @param[in] data pointer to the received packet
+ * @param[in] size size of the received packet
  */
-void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt);
+void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, uint8_t *data, size_t size);
 
 /**
  * @brief Open a reception window

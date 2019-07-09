@@ -231,27 +231,24 @@ void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt, uint8_t dr)
 
 }
 
-void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
+void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, uint8_t *data, size_t size)
 {
     mac->state = LORAWAN_STATE_IDLE;
     gnrc_lorawan_timer_stop(mac);
 
-    uint8_t *p = pkt->data;
-
-    uint8_t mtype = (*p & MTYPE_MASK) >> 5;
+    uint8_t mtype = (*data & MTYPE_MASK) >> 5;
     switch (mtype) {
         case MTYPE_JOIN_ACCEPT:
-            gnrc_lorawan_mlme_process_join(mac, pkt->data, pkt->size);
+            gnrc_lorawan_mlme_process_join(mac, data, size);
             break;
         case MTYPE_CNF_DOWNLINK:
         case MTYPE_UNCNF_DOWNLINK:
-            gnrc_lorawan_mcps_process_downlink(mac, pkt->data, pkt->size);
+            gnrc_lorawan_mcps_process_downlink(mac, data, size);
             break;
         default:
             break;
     }
 
-    gnrc_pktbuf_release(pkt);
     gnrc_lorawan_mac_release(mac);
 }
 
@@ -334,7 +331,8 @@ void gnrc_lorawan_recv(gnrc_lorawan_t *mac)
         return;
     }
 
-    gnrc_lorawan_process_pkt(mac, pkt);
+    gnrc_lorawan_process_pkt(mac, pkt->data, pkt->size);
+    gnrc_pktbuf_release(pkt);
 }
 
 void gnrc_lorawan_timer_fired(gnrc_lorawan_t *mac)
