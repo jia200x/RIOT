@@ -74,10 +74,10 @@ static void _mlme_confirm(gnrc_netif_t *netif, mlme_confirm_t *confirm)
 static void _mac_cb(netdev_t *dev, netdev_event_t event)
 {
     gnrc_lorawan_t *mac = (gnrc_lorawan_t *) dev;
+    gnrc_netif_lorawan_t *netif = (gnrc_netif_lorawan_t*) mac;
 
     mcps_confirm_t *mcps_confirm;
     mcps_indication_t *mcps_indication;
-    gnrc_pktsnip_t *pkt;
 
     switch (event) {
         case NETDEV_EVENT_MLME_INDICATION:
@@ -85,10 +85,10 @@ static void _mac_cb(netdev_t *dev, netdev_event_t event)
             break;
         case NETDEV_EVENT_MCPS_INDICATION:
             mcps_indication = mac->mcps_buf;
-             pkt = gnrc_pktbuf_add(NULL, mcps_indication->data.pkt->iol_base, mcps_indication->data.pkt->iol_len, GNRC_NETTYPE_LORAWAN);
+             //pkt = gnrc_pktbuf_add(NULL, mcps_indication->data.pkt->iol_base, mcps_indication->data.pkt->iol_len, GNRC_NETTYPE_LORAWAN);
 
-            if (!gnrc_netapi_dispatch_receive(GNRC_NETTYPE_LORAWAN, mcps_indication->data.port, pkt)) {
-                gnrc_pktbuf_release(pkt);
+            if (gnrc_netapi_dispatch_receive(GNRC_NETTYPE_LORAWAN, mcps_indication->data.port, netif->rx_pkt)) {
+               netif->rx_pkt = NULL; 
             }
             break;
         case NETDEV_EVENT_MLME_CONFIRM:
@@ -217,8 +217,14 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
         return NULL;
     }
 
+    netif->lorawan.rx_pkt = pkt;
     gnrc_lorawan_process_pkt((gnrc_lorawan_t*) mac, pkt->data, pkt->size);
-    gnrc_pktbuf_release(pkt);
+
+    if(netif->lorawan.rx_pkt) {
+        gnrc_pktbuf_release(pkt);
+        netif->lorawan.rx_pkt = NULL;
+    }
+
     return NULL;
 }
 
