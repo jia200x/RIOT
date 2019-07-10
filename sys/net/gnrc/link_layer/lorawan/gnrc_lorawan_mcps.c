@@ -212,18 +212,15 @@ size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint32_t fcn
     return sizeof(lorawan_hdr_t);
 }
 
-gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *payload, int confirmed_data, uint8_t port)
+gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *enc_payload, int confirmed_data, uint8_t port)
 {
-    /* Encrypt payload (it's block encryption so we can use the same buffer!) */
-    gnrc_lorawan_encrypt_payload((iolist_t *) payload, &mac->dev_addr, mac->mcps.fcnt, GNRC_LORAWAN_DIR_UPLINK, port ? mac->appskey : mac->nwkskey);
-
     /* We try to allocate the whole header with fopts at once */
     uint8_t fopts_length = gnrc_lorawan_build_options(mac, NULL);
 
-    gnrc_pktsnip_t *mac_hdr = gnrc_pktbuf_add(payload, NULL, sizeof(lorawan_hdr_t) + fopts_length + 1, GNRC_NETTYPE_UNDEF);
+    gnrc_pktsnip_t *mac_hdr = gnrc_pktbuf_add(enc_payload, NULL, sizeof(lorawan_hdr_t) + fopts_length + 1, GNRC_NETTYPE_UNDEF);
 
     if (!mac_hdr) {
-        gnrc_pktbuf_release_error(payload, -ENOBUFS);
+        gnrc_pktbuf_release_error(enc_payload, -ENOBUFS);
         return NULL;
     }
 
@@ -251,7 +248,7 @@ gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *p
     gnrc_lorawan_calculate_mic(&mac->dev_addr, mac->mcps.fcnt, GNRC_LORAWAN_DIR_UPLINK,
                                (iolist_t *) mac_hdr, mac->nwkskey, mic->data);
 
-    LL_APPEND(payload, mic);
+    LL_APPEND(enc_payload, mic);
 
     return mac_hdr;
 }
@@ -324,6 +321,10 @@ void gnrc_lorawan_mcps_request(gnrc_lorawan_t *mac, const mcps_request_t *mcps_r
     }
 
     int waiting_for_ack = mcps_request->type == MCPS_CONFIRMED;
+
+    /* Encrypt payload (it's block encryption so we can use the same buffer!) */
+    gnrc_lorawan_encrypt_payload((iolist_t*) pkt, &mac->dev_addr, mac->mcps.fcnt, GNRC_LORAWAN_DIR_UPLINK, mcps_request->data.port ? mac->appskey : mac->nwkskey);
+
     if (!(pkt = gnrc_lorawan_build_uplink(mac, pkt, waiting_for_ack, mcps_request->data.port))) {
         /* This function releases the pkt if fails */
         release = false;
