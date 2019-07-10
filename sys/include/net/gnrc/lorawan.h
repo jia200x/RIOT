@@ -213,15 +213,6 @@ void gnrc_lorawan_mcps_request(gnrc_lorawan_t *mac, const mcps_request_t *mcps_r
                                mcps_confirm_t *mcps_confirm);
 
 /**
- * @brief Fetch a LoRaWAN packet from the radio.
- *
- *        To be called on radio RX done event.
- *
- * @param[in] mac pointer to the MAC descriptor
- */
-void gnrc_lorawan_recv(gnrc_lorawan_t *mac);
-
-/**
  * @brief Setup GNRC LoRaWAN netdev layers
  *
  * @param mac pointer to the MAC descriptor

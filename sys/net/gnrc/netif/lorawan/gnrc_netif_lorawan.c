@@ -132,7 +132,7 @@ static void _driver_cb(netdev_t *dev, netdev_event_t event)
         DEBUG("gnrc_netif: event triggered -> %i\n", event);
         switch (event) {
             case NETDEV_EVENT_RX_COMPLETE:
-                gnrc_lorawan_recv(mac);
+                netif->ops->recv(netif);
                 break;
             case NETDEV_EVENT_TX_COMPLETE:
                 gnrc_lorawan_event_tx_complete(mac);
@@ -199,9 +199,27 @@ gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize,
 
 static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
 {
-    (void) netif;
-    /* Unused */
-    return 0;
+    netdev_t *mac = &netif->lorawan.mac.netdev;
+    int bytes_expected = netdev_recv_pass(mac, NULL, 0, 0);
+    int nread;
+    struct netdev_radio_rx_info rx_info;
+    gnrc_pktsnip_t *pkt = gnrc_pktbuf_add(NULL, NULL, bytes_expected, GNRC_NETTYPE_UNDEF);
+    if (pkt == NULL) {
+        DEBUG("_recv_ieee802154: cannot allocate pktsnip.\n");
+        /* Discard packet on netdev device */
+        netdev_recv_pass(mac, NULL, bytes_expected, NULL);
+        return NULL;
+    }
+
+    nread = netdev_recv_pass(mac, pkt->data, bytes_expected, &rx_info);
+    if (nread <= 0) {
+        gnrc_pktbuf_release(pkt);
+        return NULL;
+    }
+
+    gnrc_lorawan_process_pkt((gnrc_lorawan_t*) mac, pkt->data, pkt->size);
+    gnrc_pktbuf_release(pkt);
+    return NULL;
 }
 
 static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
