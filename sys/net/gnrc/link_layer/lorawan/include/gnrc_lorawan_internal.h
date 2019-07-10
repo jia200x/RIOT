@@ -239,7 +239,8 @@ int gnrc_lorawan_set_dr(gnrc_lorawan_t *mac, uint8_t datarate);
  * @return full LoRaWAN frame including payload
  * @return NULL if packet buffer is full. `payload` is released
  */
-gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *payload, int confirmed_data, uint8_t port);
+void gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *payload, int confirmed_data, uint8_t port,
+        gnrc_pktsnip_t *mac_hdr, gnrc_pktsnip_t *mic);
 
 /**
  * @brief pick a random available LoRaWAN channel
