@@ -205,15 +205,9 @@ static uint32_t lora_time_on_air(size_t payload_size, uint8_t dr, uint8_t cr)
     return t_preamble + t_payload;
 }
 
-void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt, uint8_t dr)
+void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, iolist_t *io, uint8_t dr)
 {
     mac->state = LORAWAN_STATE_TX;
-
-    iolist_t iolist = {
-        .iol_base = pkt->data,
-        .iol_len = pkt->size,
-        .iol_next = (iolist_t *) pkt->next
-    };
 
     uint32_t chan = gnrc_lorawan_pick_channel(mac);
     _config_radio(mac, chan, dr, false);
@@ -223,9 +217,9 @@ void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt, uint8_t dr)
     uint8_t cr;
     netdev_get_pass(&mac->netdev, NETOPT_CODING_RATE, &cr, sizeof(cr));
 
-    mac->toa = lora_time_on_air(gnrc_pkt_len(pkt), dr, cr + 4);
+    mac->toa = lora_time_on_air(iolist_size(io), dr, cr + 4);
 
-    if (netdev_send_pass(&mac->netdev, &iolist) == -ENOTSUP) {
+    if (netdev_send_pass(&mac->netdev, io) == -ENOTSUP) {
         DEBUG("gnrc_lorawan: Cannot send: radio is still transmitting");
     }
 

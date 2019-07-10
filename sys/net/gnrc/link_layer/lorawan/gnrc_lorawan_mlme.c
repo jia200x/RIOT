@@ -45,32 +45,27 @@ static int _buffer_reset(lorawan_buffer_t *buf, uint8_t *data, size_t length)
     return 0;
 }
 
-static gnrc_pktsnip_t *_build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *appkey, uint8_t *dev_nonce)
+static void _build_join_req_pkt(uint8_t *appeui, uint8_t *deveui,
+        uint8_t *appkey, uint8_t *dev_nonce, void *out)
 {
-    gnrc_pktsnip_t *pkt = gnrc_pktbuf_add(NULL, NULL, sizeof(lorawan_join_request_t), GNRC_NETTYPE_UNDEF);
+    lorawan_join_request_t *hdr = out;
 
-    if (pkt) {
-        lorawan_join_request_t *hdr = (lorawan_join_request_t *) pkt->data;
+    hdr->mt_maj = 0;
+    lorawan_hdr_set_mtype((lorawan_hdr_t *) hdr, MTYPE_JOIN_REQUEST);
+    lorawan_hdr_set_maj((lorawan_hdr_t *) hdr, MAJOR_LRWAN_R1);
 
-        hdr->mt_maj = 0;
-        lorawan_hdr_set_mtype((lorawan_hdr_t *) hdr, MTYPE_JOIN_REQUEST);
-        lorawan_hdr_set_maj((lorawan_hdr_t *) hdr, MAJOR_LRWAN_R1);
+    le_uint64_t l_appeui = *((le_uint64_t *) appeui);
+    le_uint64_t l_deveui = *((le_uint64_t *) deveui);
 
-        le_uint64_t l_appeui = *((le_uint64_t *) appeui);
-        le_uint64_t l_deveui = *((le_uint64_t *) deveui);
+    hdr->app_eui = l_appeui;
+    hdr->dev_eui = l_deveui;
 
-        hdr->app_eui = l_appeui;
-        hdr->dev_eui = l_deveui;
+    le_uint16_t l_dev_nonce = *((le_uint16_t *) dev_nonce);
+    hdr->dev_nonce = l_dev_nonce;
 
-        le_uint16_t l_dev_nonce = *((le_uint16_t *) dev_nonce);
-        hdr->dev_nonce = l_dev_nonce;
-
-        iolist_t io = { .iol_base = pkt->data, .iol_len = JOIN_REQUEST_SIZE - MIC_SIZE,
-                        .iol_next = NULL };
-        gnrc_lorawan_calculate_join_mic(&io, appkey, &hdr->mic);
-    }
-
-    return pkt;
+    iolist_t io = { .iol_base = out, .iol_len = JOIN_REQUEST_SIZE - MIC_SIZE,
+                    .iol_next = NULL };
+    gnrc_lorawan_calculate_join_mic(&io, appkey, &hdr->mic);
 }
 
 static int gnrc_lorawan_send_join_request(gnrc_lorawan_t *mac, uint8_t *deveui,
@@ -86,18 +81,23 @@ static int gnrc_lorawan_send_join_request(gnrc_lorawan_t *mac, uint8_t *deveui,
     mac->mlme.dev_nonce[1] = (random_number >> 8) & 0xFF;
 
     /* build join request */
-    gnrc_pktsnip_t *pkt = _build_join_req_pkt(appeui, deveui, appkey, mac->mlme.dev_nonce);
-    if (!pkt) {
-        return -ENOBUFS;
-    }
+    uint8_t pkt[sizeof(lorawan_join_request_t)];
+    _build_join_req_pkt(appeui, deveui, appkey,
+            mac->mlme.dev_nonce, pkt);
 
     /* We need a random delay for join request. Otherwise there might be
      * network congestion if a group of nodes start at the same time */
     gnrc_lorawan_timer_usleep(mac, random_uint32() & GNRC_LORAWAN_JOIN_DELAY_U32_MASK);
-    gnrc_lorawan_send_pkt(mac, pkt, dr);
+
+    iolist_t io = {
+        .iol_base = pkt,
+        .iol_len = sizeof(lorawan_join_request_t),
+        .iol_next = NULL
+    };
+
+    gnrc_lorawan_send_pkt(mac, &io, dr);
 
     mac->mlme.backoff_budget -= mac->toa;
-    gnrc_pktbuf_release(pkt);
 
     return GNRC_LORAWAN_REQ_STATUS_DEFERRED;
 }

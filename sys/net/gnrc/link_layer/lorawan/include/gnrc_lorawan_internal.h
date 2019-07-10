@@ -338,10 +338,10 @@ void gnrc_lorawan_reset(gnrc_lorawan_t *mac);
  * @brief Send a LoRaWAN packet
  *
  * @param[in] mac pointer to the MAC descriptor
- * @param[in] pkt the packet to be sent
+ * @param[in] io the packet to be sent
  * @param[in] dr the datarate used for the transmission
  */
-void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt, uint8_t dr);
+void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, iolist_t *io, uint8_t dr);
 
 /**
  * @brief Process join accept message

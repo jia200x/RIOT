@@ -276,7 +276,7 @@ void gnrc_lorawan_mcps_event(gnrc_lorawan_t *mac, int event, int data)
     }
 
     if (event == MCPS_EVENT_ACK_TIMEOUT) {
-        gnrc_lorawan_send_pkt(mac, mac->mcps.outgoing_pkt, mac->last_dr);
+        gnrc_lorawan_send_pkt(mac, (iolist_t*) mac->mcps.outgoing_pkt, mac->last_dr);
     }
     else {
         int state = mac->mcps.waiting_for_ack ? MCPS_CONFIRMED : MCPS_UNCONFIRMED;
@@ -345,7 +345,7 @@ void gnrc_lorawan_mcps_request(gnrc_lorawan_t *mac, const mcps_request_t *mcps_r
     assert(mac->mcps.outgoing_pkt == NULL);
     mac->mcps.outgoing_pkt = pkt;
 
-    gnrc_lorawan_send_pkt(mac, pkt, mcps_request->data.dr);
+    gnrc_lorawan_send_pkt(mac, (iolist_t*) pkt, mcps_request->data.dr);
     mcps_confirm->status = GNRC_LORAWAN_REQ_STATUS_DEFERRED;
 out:
 
