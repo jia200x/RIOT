@@ -27,12 +27,6 @@
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 
-static inline void *_mlme_allocate(gnrc_lorawan_t *mac)
-{
-    mac->netdev.event_callback((netdev_t *) mac, NETDEV_EVENT_MLME_GET_BUFFER);
-    return mac->mlme_buf;
-}
-
 static int _buffer_reset(lorawan_buffer_t *buf, uint8_t *data, size_t length)
 {
     if (!buf || !data || !length) {
@@ -105,7 +99,7 @@ static int gnrc_lorawan_send_join_request(gnrc_lorawan_t *mac, uint8_t *deveui,
 void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, uint8_t *data, size_t size)
 {
     int status;
-    mlme_confirm_t *mlme_confirm;
+    mlme_confirm_t mlme_confirm;
 
     if (mac->mlme.activation != MLME_ACTIVATION_NONE) {
         status = -EBADMSG;
@@ -156,11 +150,10 @@ void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, uint8_t *data, size_t s
     status = GNRC_LORAWAN_REQ_STATUS_SUCCESS;
 
 out:
-    mlme_confirm = _mlme_allocate(mac);
-    mlme_confirm->type = MLME_JOIN;
-    mlme_confirm->status = status;
+    mlme_confirm.type = MLME_JOIN;
+    mlme_confirm.status = status;
 
-    mac->netdev.event_callback((netdev_t *) mac, NETDEV_EVENT_MLME_CONFIRM);
+    gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
 }
 
 void gnrc_lorawan_mlme_backoff_expire(gnrc_lorawan_t *mac)
@@ -281,13 +274,13 @@ static int _mlme_link_check_ans(gnrc_lorawan_t *mac, lorawan_buffer_t *fopt)
     }
     fopt->index++;
 
-    mlme_confirm_t *mlme_confirm = _mlme_allocate(mac);
-    mlme_confirm->link_req.margin = fopt->data[fopt->index++];
-    mlme_confirm->link_req.num_gateways = fopt->data[fopt->index++];
+    mlme_confirm_t mlme_confirm;
+    mlme_confirm.link_req.margin = fopt->data[fopt->index++];
+    mlme_confirm.link_req.num_gateways = fopt->data[fopt->index++];
 
-    mlme_confirm->type = MLME_LINK_CHECK;
-    mlme_confirm->status = GNRC_LORAWAN_REQ_STATUS_SUCCESS;
-    mac->netdev.event_callback(&mac->netdev, NETDEV_EVENT_MLME_CONFIRM);
+    mlme_confirm.type = MLME_LINK_CHECK;
+    mlme_confirm.status = GNRC_LORAWAN_REQ_STATUS_SUCCESS;
+    gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
 
     mac->mlme.pending_mlme_opts &= ~GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ;
 
@@ -327,17 +320,17 @@ uint8_t gnrc_lorawan_build_options(gnrc_lorawan_t *mac, lorawan_buffer_t *buf)
 
 void gnrc_lorawan_mlme_no_rx(gnrc_lorawan_t *mac)
 {
-    mlme_confirm_t *mlme_confirm = _mlme_allocate(mac);
+    mlme_confirm_t mlme_confirm;
 
-    mlme_confirm->status = -ETIMEDOUT;
+    mlme_confirm.status = -ETIMEDOUT;
 
     if (mac->mlme.activation == MLME_ACTIVATION_NONE) {
-        mlme_confirm->type = MLME_JOIN;
-        mac->netdev.event_callback(&mac->netdev, NETDEV_EVENT_MLME_CONFIRM);
+        mlme_confirm.type = MLME_JOIN;
+        gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
     }
     else if (mac->mlme.pending_mlme_opts & GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ) {
-        mlme_confirm->type = MLME_LINK_CHECK;
-        mac->netdev.event_callback(&mac->netdev, NETDEV_EVENT_MLME_CONFIRM);
+        mlme_confirm.type = MLME_LINK_CHECK;
+        gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
         mac->mlme.pending_mlme_opts &= ~GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ;
     }
 }

@@ -34,12 +34,6 @@
 uint8_t tx_buf[250];
 size_t tx_len;
 
-static inline void *_mcps_allocate(gnrc_lorawan_t *mac)
-{
-    mac->netdev.event_callback((netdev_t *) mac, NETDEV_EVENT_MCPS_GET_BUFFER);
-    return mac->mcps_buf;
-}
-
 int gnrc_lorawan_mic_is_valid(uint8_t *buf, size_t len, uint8_t *nwkskey)
 {
     le_uint32_t calc_mic;
@@ -179,17 +173,17 @@ void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, uint8_t *buf,
     gnrc_lorawan_mcps_event(mac, MCPS_EVENT_RX, _pkt.ack);
 
     if (_pkt.frame_pending) {
-        mcps_indication_t *mcps_indication = _mcps_allocate(mac);
-        mcps_indication->type = MLME_SCHEDULE_UPLINK;
-        mac->netdev.event_callback((netdev_t *) mac, NETDEV_EVENT_MLME_INDICATION);
+        mlme_indication_t mlme_indication;
+        mlme_indication.type = MLME_SCHEDULE_UPLINK;
+        gnrc_lorawan_mlme_indication(mac, &mlme_indication);
     }
 
     if (_pkt.port) {
-        mcps_indication_t *mcps_indication = _mcps_allocate(mac);
-        mcps_indication->type = _pkt.ack_req;
-        mcps_indication->data.pkt = &_pkt.enc_payload;;
-        mcps_indication->data.port = _pkt.port;
-        mac->netdev.event_callback((netdev_t *) mac, NETDEV_EVENT_MCPS_INDICATION);
+        mcps_indication_t mcps_indication;
+        mcps_indication.type = _pkt.ack_req;
+        mcps_indication.data.pkt = &_pkt.enc_payload;;
+        mcps_indication.data.port = _pkt.port;
+        gnrc_lorawan_mcps_indication(mac, &mcps_indication);
     }
 }
 
@@ -258,11 +252,11 @@ static void _end_of_tx(gnrc_lorawan_t *mac, int type, int status)
 {
     mac->mcps.waiting_for_ack = false;
 
-    mcps_confirm_t *mcps_confirm = _mcps_allocate(mac);
+    mcps_confirm_t mcps_confirm;
 
-    mcps_confirm->type = type;
-    mcps_confirm->status = status;
-    mac->netdev.event_callback((netdev_t *) mac, NETDEV_EVENT_MCPS_CONFIRM);
+    mcps_confirm.type = type;
+    mcps_confirm.status = status;
+    gnrc_lorawan_mcps_confirm(mac, &mcps_confirm);
 
     mac->mcps.fcnt += 1;
 }

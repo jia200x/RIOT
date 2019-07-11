@@ -230,6 +230,11 @@ void gnrc_lorawan_timer_stop(gnrc_lorawan_t *mac);
 void gnrc_lorawan_timer_set(gnrc_lorawan_t *mac, uint32_t secs);
 void gnrc_lorawan_timer_usleep(gnrc_lorawan_t *mac, uint32_t us);
 
+void gnrc_lorawan_mcps_indication(gnrc_lorawan_t *mac, mcps_indication_t *ind);
+void gnrc_lorawan_mlme_indication(gnrc_lorawan_t *mac, mlme_indication_t *ind);
+void gnrc_lorawan_mcps_confirm(gnrc_lorawan_t *mac, mcps_confirm_t *confirm);
+void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm);
+
 #ifdef __cplusplus
 }
 #endif
