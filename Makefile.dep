@@ -42,7 +42,6 @@ endif
 
 ifneq (,$(filter gnrc_lorawan,$(USEMODULE)))
   USEMODULE += xtimer
-  USEMODULE += random
   USEMODULE += hashes
   USEMODULE += crypto
   USEMODULE += netdev_layer

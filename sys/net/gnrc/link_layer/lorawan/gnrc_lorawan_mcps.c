@@ -23,8 +23,6 @@
 
 #include "net/lorawan/hdr.h"
 
-#include "random.h"
-
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 
@@ -264,7 +262,7 @@ void gnrc_lorawan_mcps_event(gnrc_lorawan_t *mac, int event, int data)
     if (state == MCPS_CONFIRMED && ((event == MCPS_EVENT_RX && !data) ||
                                     event == MCPS_EVENT_NO_RX)) {
         if (mac->mcps.nb_trials-- > 0) {
-            gnrc_lorawan_timer_set(mac, 1000 + random_uint32_range(0, 2000));
+            gnrc_lorawan_timer_set(mac, 1000 + (gnrc_lorawan_random_get(mac) & 0x7FF));
         }
         else {
             _end_of_tx(mac, MCPS_CONFIRMED, -ETIMEDOUT);

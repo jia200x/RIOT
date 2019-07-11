@@ -20,7 +20,6 @@
 #include "net/gnrc/lorawan/region.h"
 #include "errno.h"
 #include "net/gnrc/pktbuf.h"
-#include "random.h"
 
 #include "net/lorawan/hdr.h"
 
@@ -65,11 +64,8 @@ static void _build_join_req_pkt(uint8_t *appeui, uint8_t *deveui,
 static int gnrc_lorawan_send_join_request(gnrc_lorawan_t *mac, uint8_t *deveui,
                                           uint8_t *appeui, uint8_t *appkey, uint8_t dr)
 {
-    netdev_t *dev = mac->netdev.lower;
-
     /* Dev Nonce */
-    uint32_t random_number;
-    dev->driver->get(dev, NETOPT_RANDOM, &random_number, sizeof(random_number));
+    uint32_t random_number = gnrc_lorawan_random_get(mac);
 
     mac->mlme.dev_nonce[0] = random_number & 0xFF;
     mac->mlme.dev_nonce[1] = (random_number >> 8) & 0xFF;
@@ -81,7 +77,7 @@ static int gnrc_lorawan_send_join_request(gnrc_lorawan_t *mac, uint8_t *deveui,
 
     /* We need a random delay for join request. Otherwise there might be
      * network congestion if a group of nodes start at the same time */
-    gnrc_lorawan_timer_usleep(mac, random_uint32() & GNRC_LORAWAN_JOIN_DELAY_U32_MASK);
+    gnrc_lorawan_timer_usleep(mac, gnrc_lorawan_random_get(mac) & GNRC_LORAWAN_JOIN_DELAY_U32_MASK);
 
     iolist_t io = {
         .iol_base = pkt,
