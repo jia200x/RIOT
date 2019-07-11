@@ -269,10 +269,6 @@ static void _end_of_tx(gnrc_lorawan_t *mac, int type, int status)
 
 void gnrc_lorawan_mcps_event(gnrc_lorawan_t *mac, int event, int data)
 {
-    if (mac->mlme.activation == MLME_ACTIVATION_NONE) {
-        return;
-    }
-
     int state = mac->mcps.waiting_for_ack ? MCPS_CONFIRMED : MCPS_UNCONFIRMED;
     if (state == MCPS_CONFIRMED && ((event == MCPS_EVENT_RX && !data) ||
                                     event == MCPS_EVENT_NO_RX)) {

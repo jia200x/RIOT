@@ -309,6 +309,7 @@ void gnrc_lorawan_setup(gnrc_lorawan_t *mac, netdev_t *lower)
 
 extern uint8_t *tx_buf;
 extern size_t tx_len;
+
 void gnrc_lorawan_timer_fired(gnrc_lorawan_t *mac)
 {
     if(mac->state == LORAWAN_STATE_IDLE)
