@@ -236,6 +236,16 @@ void gnrc_lorawan_mlme_indication(gnrc_lorawan_t *mac, mlme_indication_t *ind);
 void gnrc_lorawan_mcps_confirm(gnrc_lorawan_t *mac, mcps_confirm_t *confirm);
 void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm);
 uint32_t gnrc_lorawan_random_get(gnrc_lorawan_t *mac);
+void gnrc_lorawan_radio_sleep(gnrc_lorawan_t *mac);
+void gnrc_lorawan_radio_set_cr(gnrc_lorawan_t *mac, uint8_t cr);
+void gnrc_lorawan_radio_set_syncword(gnrc_lorawan_t *mac, uint8_t syncword);
+void gnrc_lorawan_radio_set_frequency(gnrc_lorawan_t *mac, uint32_t channel);
+void gnrc_lorawan_radio_set_iq_invert(gnrc_lorawan_t *mac, int invert);
+void gnrc_lorawan_radio_set_rx_symbol_timeout(gnrc_lorawan_t *mac, uint16_t timeout);
+void gnrc_lorawan_radio_rx_on(gnrc_lorawan_t *mac);
+void gnrc_lorawan_radio_set_sf(gnrc_lorawan_t *mac, uint8_t sf);
+void gnrc_lorawan_radio_set_bw(gnrc_lorawan_t *mac, uint8_t bw);
+void gnrc_lorawan_radio_send(gnrc_lorawan_t *mac, iolist_t *io);
 
 #ifdef __cplusplus
 }

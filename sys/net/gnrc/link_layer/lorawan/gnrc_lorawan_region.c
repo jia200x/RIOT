@@ -22,16 +22,12 @@ static uint8_t dr_bw[GNRC_LORAWAN_DATARATES_NUMOF] = { LORA_BW_125_KHZ, LORA_BW_
 
 int gnrc_lorawan_set_dr(gnrc_lorawan_t *mac, uint8_t datarate)
 {
-    netdev_t *dev = mac->netdev.lower;
-
     if (!gnrc_lorawan_validate_dr(datarate)) {
         return -EINVAL;
     }
-    uint8_t bw = dr_bw[datarate];
-    uint8_t sf = dr_sf[datarate];
 
-    dev->driver->set(dev, NETOPT_BANDWIDTH, &bw, sizeof(bw));
-    dev->driver->set(dev, NETOPT_SPREADING_FACTOR, &sf, sizeof(sf));
+    gnrc_lorawan_radio_set_sf(mac, dr_sf[datarate]);
+    gnrc_lorawan_radio_set_bw(mac, dr_bw[datarate]);
 
     return 0;
 }
@@ -81,10 +77,7 @@ void gnrc_lorawan_channels_init(gnrc_lorawan_t *mac)
 
 uint32_t gnrc_lorawan_pick_channel(gnrc_lorawan_t *mac)
 {
-    netdev_t *netdev = mac->netdev.lower;
-    uint32_t random_number;
-
-    netdev->driver->get(netdev, NETOPT_RANDOM, &random_number, sizeof(random_number));
+    uint32_t random_number = gnrc_lorawan_random_get(mac);
 
     return _get_nth_channel(mac, 1 + (random_number % _get_num_used_channels(mac)));
 }

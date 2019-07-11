@@ -168,12 +168,16 @@ static void _init(gnrc_netif_t *netif)
     gnrc_lorawan_setup(&netif->lorawan.mac, netif->dev);
     netif->lorawan.mac.netdev.driver->set(&netif->lorawan.mac.netdev, NETOPT_ADDRESS, _devaddr, sizeof(_devaddr));
 
+    uint32_t rx_timeout = 0;
+    netdev_set_pass(&netif->lorawan.mac.netdev, NETOPT_RX_TIMEOUT, &rx_timeout, sizeof(rx_timeout));
+
     netif->lorawan.backoff_msg.type = MSG_TYPE_MLME_BACKOFF_EXPIRE;
     gnrc_lorawan_mlme_backoff_expire(&netif->lorawan.mac);
     xtimer_set_msg(&netif->lorawan.backoff_timer,
                    GNRC_LORAWAN_BACKOFF_WINDOW_TICK,
                    &netif->lorawan.backoff_msg, thread_getpid());
     netif->lorawan.outgoing_pkt = NULL;
+
     gnrc_lorawan_init(&netif->lorawan.mac, netif->lorawan.nwkskey, netif->lorawan.appskey,
             tx_buf);
 }

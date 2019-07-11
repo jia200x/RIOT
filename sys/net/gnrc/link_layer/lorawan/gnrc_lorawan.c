@@ -59,13 +59,6 @@ static inline void _set_rx2_dr(gnrc_lorawan_t *mac, uint8_t rx2_dr)
         GNRC_LORAWAN_DL_RX2_DR_MASK;
 }
 
-static void _sleep_radio(gnrc_lorawan_t *mac)
-{
-    netopt_state_t state = NETOPT_STATE_SLEEP;
-
-    netdev_set_pass((netdev_t *) mac, NETOPT_STATE, &state, sizeof(state));
-}
-
 void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey,
         uint8_t *tx_buf)
 {
@@ -79,18 +72,9 @@ void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey,
 
 void gnrc_lorawan_reset(gnrc_lorawan_t *mac)
 {
-    uint8_t cr = LORA_CR_4_5;
-
-    netdev_set_pass(&mac->netdev, NETOPT_CODING_RATE, &cr, sizeof(cr));
-
-    uint8_t syncword = LORAMAC_DEFAULT_PUBLIC_NETWORK ? LORA_SYNCWORD_PUBLIC
-                                                      : LORA_SYNCWORD_PRIVATE;
-    netdev_set_pass(&mac->netdev, NETOPT_SYNCWORD, &syncword, sizeof(syncword));
-
-    /* Continuous reception */
-    uint32_t rx_timeout = 0;
-    netdev_set_pass(&mac->netdev, NETOPT_RX_TIMEOUT, &rx_timeout, sizeof(rx_timeout));
-
+    gnrc_lorawan_radio_set_cr(mac, LORA_CR_4_5);
+    gnrc_lorawan_radio_set_syncword(mac, LORAMAC_DEFAULT_PUBLIC_NETWORK ? LORA_SYNCWORD_PUBLIC
+                                                      : LORA_SYNCWORD_PRIVATE);
     _set_rx2_dr(mac, LORAMAC_DEFAULT_RX2_DR);
 
     mac->toa = 0;
@@ -103,20 +87,16 @@ void gnrc_lorawan_reset(gnrc_lorawan_t *mac)
 static void _config_radio(gnrc_lorawan_t *mac, uint32_t channel_freq, uint8_t dr, int rx)
 {
     if (channel_freq != 0) {
-        netdev_set_pass(&mac->netdev, NETOPT_CHANNEL_FREQUENCY, &channel_freq, sizeof(channel_freq));
+        gnrc_lorawan_radio_set_frequency(mac, channel_freq); 
     }
 
-    netopt_enable_t iq_invert = rx;
-    netdev_set_pass(&mac->netdev, NETOPT_IQ_INVERT, &iq_invert, sizeof(iq_invert));
+    gnrc_lorawan_radio_set_iq_invert(mac, rx);
 
     gnrc_lorawan_set_dr(mac, dr);
 
     if (rx) {
         /* Switch to single listen mode */
-        const netopt_enable_t single = true;
-        netdev_set_pass(&mac->netdev, NETOPT_SINGLE_RECEIVE, &single, sizeof(single));
-        const uint16_t timeout = CONFIG_GNRC_LORAWAN_MIN_SYMBOLS_TIMEOUT;
-        netdev_set_pass(&mac->netdev, NETOPT_RX_SYMBOL_TIMEOUT, &timeout, sizeof(timeout));
+        gnrc_lorawan_radio_set_rx_symbol_timeout(mac, CONFIG_GNRC_LORAWAN_MIN_SYMBOLS_TIMEOUT);
     }
 }
 
@@ -131,8 +111,7 @@ void gnrc_lorawan_open_rx_window(gnrc_lorawan_t *mac)
     if (mac->state == LORAWAN_STATE_RX_1) {
         gnrc_lorawan_timer_set(mac, 1000);
     }
-    uint8_t state = NETOPT_STATE_RX;
-    netdev_set_pass(&mac->netdev, NETOPT_STATE, &state, sizeof(state));
+    gnrc_lorawan_radio_rx_on(mac);
 }
 
 void gnrc_lorawan_event_tx_complete(gnrc_lorawan_t *mac)
@@ -150,7 +129,7 @@ void gnrc_lorawan_event_tx_complete(gnrc_lorawan_t *mac)
         GNRC_LORAWAN_DL_DR_OFFSET_POS;
     _configure_rx_window(mac, 0, gnrc_lorawan_rx1_get_dr_offset(mac->last_dr, dr_offset));
 
-    _sleep_radio(mac);
+    gnrc_lorawan_radio_sleep(mac);
 }
 
 void gnrc_lorawan_event_timeout(gnrc_lorawan_t *mac)
@@ -170,7 +149,7 @@ void gnrc_lorawan_event_timeout(gnrc_lorawan_t *mac)
         default:
             assert(false);
     }
-    _sleep_radio(mac);
+    gnrc_lorawan_radio_sleep(mac);
 }
 
 /* This function uses a precomputed table to calculate time on air without
@@ -216,21 +195,14 @@ void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, iolist_t *io, uint8_t dr)
     _config_radio(mac, chan, dr, false);
 
     mac->last_dr = dr;
+    mac->toa = lora_time_on_air(iolist_size(io), dr, LORA_CR_4_5 + 4);
 
-    uint8_t cr;
-    netdev_get_pass(&mac->netdev, NETOPT_CODING_RATE, &cr, sizeof(cr));
-
-    mac->toa = lora_time_on_air(iolist_size(io), dr, cr + 4);
-
-    if (netdev_send_pass(&mac->netdev, io) == -ENOTSUP) {
-        DEBUG("gnrc_lorawan: Cannot send: radio is still transmitting");
-    }
-
+    gnrc_lorawan_radio_send(mac, io);
 }
 
 void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, uint8_t *data, size_t size)
 {
-    _sleep_radio(mac);
+    gnrc_lorawan_radio_sleep(mac);
     mac->state = LORAWAN_STATE_IDLE;
     gnrc_lorawan_timer_stop(mac);
 
