@@ -31,8 +31,8 @@
 #define _16_UPPER_BITMASK 0xFFFF0000
 #define _16_LOWER_BITMASK 0xFFFF
 
-static uint8_t tx_buf[250];
-static size_t tx_len;
+uint8_t tx_buf[250];
+size_t tx_len;
 
 static inline void *_mcps_allocate(gnrc_lorawan_t *mac)
 {
@@ -273,28 +273,18 @@ void gnrc_lorawan_mcps_event(gnrc_lorawan_t *mac, int event, int data)
         return;
     }
 
-    if (event == MCPS_EVENT_ACK_TIMEOUT) {
-        iolist_t pkt = {
-            .iol_base = tx_buf,
-            .iol_len = tx_len,
-            .iol_next = NULL
-        };
-        gnrc_lorawan_send_pkt(mac, &pkt, mac->last_dr);
-    }
-    else {
-        int state = mac->mcps.waiting_for_ack ? MCPS_CONFIRMED : MCPS_UNCONFIRMED;
-        if (state == MCPS_CONFIRMED && ((event == MCPS_EVENT_RX && !data) ||
-                                        event == MCPS_EVENT_NO_RX)) {
-            if (mac->mcps.nb_trials-- > 0) {
-                gnrc_lorawan_timer_set(mac, 1000 + random_uint32_range(0, 2000));
-            }
-            else {
-                _end_of_tx(mac, MCPS_CONFIRMED, -ETIMEDOUT);
-            }
+    int state = mac->mcps.waiting_for_ack ? MCPS_CONFIRMED : MCPS_UNCONFIRMED;
+    if (state == MCPS_CONFIRMED && ((event == MCPS_EVENT_RX && !data) ||
+                                    event == MCPS_EVENT_NO_RX)) {
+        if (mac->mcps.nb_trials-- > 0) {
+            gnrc_lorawan_timer_set(mac, 1000 + random_uint32_range(0, 2000));
         }
         else {
-            _end_of_tx(mac, state, GNRC_LORAWAN_REQ_STATUS_SUCCESS);
+            _end_of_tx(mac, MCPS_CONFIRMED, -ETIMEDOUT);
         }
+    }
+    else {
+        _end_of_tx(mac, state, GNRC_LORAWAN_REQ_STATUS_SUCCESS);
     }
 }
 

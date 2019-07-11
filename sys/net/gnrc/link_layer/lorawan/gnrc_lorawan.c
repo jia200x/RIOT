@@ -307,11 +307,18 @@ void gnrc_lorawan_setup(gnrc_lorawan_t *mac, netdev_t *lower)
     lower->context = mac;
 }
 
+extern uint8_t *tx_buf;
+extern size_t tx_len;
 void gnrc_lorawan_timer_fired(gnrc_lorawan_t *mac)
 {
     if(mac->state == LORAWAN_STATE_IDLE)
     {
-        gnrc_lorawan_mcps_event(mac, MCPS_EVENT_ACK_TIMEOUT, 0);
+        iolist_t pkt = {
+            .iol_base = tx_buf,
+            .iol_len = tx_len,
+            .iol_next = NULL
+        };
+        gnrc_lorawan_send_pkt(mac, &pkt, mac->last_dr);
     }
     else {
         gnrc_lorawan_open_rx_window(mac);
