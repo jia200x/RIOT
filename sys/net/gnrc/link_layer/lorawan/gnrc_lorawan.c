@@ -52,12 +52,6 @@ static inline void gnrc_lorawan_mcps_reset(gnrc_lorawan_t *mac)
     mac->mcps.fcnt = 0;
     mac->mcps.fcnt_down = 0;
 }
-static inline void _set_rx2_dr(gnrc_lorawan_t *mac, uint8_t rx2_dr)
-{
-    mac->dl_settings &= ~GNRC_LORAWAN_DL_RX2_DR_MASK;
-    mac->dl_settings |= (rx2_dr << GNRC_LORAWAN_DL_RX2_DR_POS) &
-        GNRC_LORAWAN_DL_RX2_DR_MASK;
-}
 
 void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey,
         uint8_t *tx_buf)
@@ -70,12 +64,20 @@ void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey,
     gnrc_lorawan_reset(mac);
 }
 
+void gnrc_lorawan_set_rx2_dr(gnrc_lorawan_t *mac, uint8_t rx2_dr)
+{
+    mac->dl_settings &= ~GNRC_LORAWAN_DL_RX2_DR_MASK;
+    mac->dl_settings |= (rx2_dr << GNRC_LORAWAN_DL_RX2_DR_POS) &
+        GNRC_LORAWAN_DL_RX2_DR_MASK;
+}
+
+
 void gnrc_lorawan_reset(gnrc_lorawan_t *mac)
 {
     gnrc_lorawan_radio_set_cr(mac, LORA_CR_4_5);
     gnrc_lorawan_radio_set_syncword(mac, LORAMAC_DEFAULT_PUBLIC_NETWORK ? LORA_SYNCWORD_PUBLIC
                                                       : LORA_SYNCWORD_PRIVATE);
-    _set_rx2_dr(mac, LORAMAC_DEFAULT_RX2_DR);
+    gnrc_lorawan_set_rx2_dr(mac, LORAMAC_DEFAULT_RX2_DR);
 
     mac->toa = 0;
     mac->tx_len = 0;
@@ -238,10 +240,6 @@ int gnrc_lorawan_netdev_set(netdev_t *dev, netopt_t opt, const void *value, size
     }
 
     switch (opt) {
-        case NETOPT_LORAWAN_RX2_DR:
-            assert(len == sizeof(uint8_t));
-            _set_rx2_dr(mac, *((uint8_t *) value));
-            break;
         default:
             netdev_set_pass(dev, opt, value, len);
     }

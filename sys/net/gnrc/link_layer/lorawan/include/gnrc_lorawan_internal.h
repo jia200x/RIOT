@@ -445,6 +445,8 @@ static inline void gnrc_lorawan_mac_release(gnrc_lorawan_t *mac)
     mac->busy = false;
 }
 
+void gnrc_lorawan_set_rx2_dr(gnrc_lorawan_t *mac, uint8_t rx2_dr);
+
 #ifdef __cplusplus
 }
 #endif
