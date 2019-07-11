@@ -97,12 +97,12 @@ static void _mac_cb(netdev_t *dev, netdev_event_t event)
         case NETDEV_EVENT_MCPS_CONFIRM:
             mcps_confirm = mac->mcps_buf;
             if (mcps_confirm->status == 0) {
-                gnrc_pktbuf_release(mac->mcps.outgoing_pkt);
+                gnrc_pktbuf_release(netif->outgoing_pkt);
             }
             else {
-                gnrc_pktbuf_release_error(mac->mcps.outgoing_pkt, 1);
+                gnrc_pktbuf_release_error(netif->outgoing_pkt, 1);
             }
-            mac->mcps.outgoing_pkt = NULL;
+            netif->outgoing_pkt = NULL;
             break;
         case NETDEV_EVENT_MLME_GET_BUFFER:
             mac->mlme_buf = _mlme_buffer;
@@ -186,6 +186,7 @@ static void _init(gnrc_netif_t *netif)
     xtimer_set_msg(&netif->lorawan.backoff_timer,
                    GNRC_LORAWAN_BACKOFF_WINDOW_TICK,
                    &netif->lorawan.backoff_msg, thread_getpid());
+    netif->lorawan.outgoing_pkt = NULL;
     gnrc_lorawan_init(&netif->lorawan.mac, netif->lorawan.nwkskey, netif->lorawan.appskey);
 }
 
@@ -233,6 +234,8 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
     mlme_request_t mlme_request;
     mlme_confirm_t mlme_confirm;
 
+    netif->lorawan.outgoing_pkt = payload;
+
     if (netif->flags & GNRC_NETIF_FLAGS_LINK_CHECK) {
         mlme_request.type = MLME_LINK_CHECK;
         gnrc_lorawan_mlme_request(&netif->lorawan.mac, &mlme_request, &mlme_confirm);
@@ -241,6 +244,10 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
                            .data.dr = netif->lorawan.datarate };
     mcps_confirm_t conf;
     gnrc_lorawan_mcps_request(&netif->lorawan.mac, &req, &conf);
+    if(conf.status != GNRC_LORAWAN_REQ_STATUS_DEFERRED) {
+        gnrc_pktbuf_release_error(payload, 1);
+        netif->lorawan.outgoing_pkt = NULL;
+    }
     return conf.status;
 }
 

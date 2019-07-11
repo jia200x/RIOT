@@ -140,7 +140,6 @@ typedef struct {
 typedef struct {
     uint32_t fcnt;                  /**< uplink framecounter */
     uint32_t fcnt_down;             /**< downlink frame counter */
-    gnrc_pktsnip_t *outgoing_pkt;   /**< holds the outgoing packet in case of retransmissions */
     int nb_trials;              /**< holds the remaining number of retransmissions */
     int ack_requested;          /**< wether the network server requested an ACK */
     int waiting_for_ack;        /**< true if the MAC layer is waiting for an ACK */
@@ -239,8 +238,8 @@ int gnrc_lorawan_set_dr(gnrc_lorawan_t *mac, uint8_t datarate);
  * @return full LoRaWAN frame including payload
  * @return NULL if packet buffer is full. `payload` is released
  */
-void gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *payload, int confirmed_data, uint8_t port,
-        gnrc_pktsnip_t *mac_hdr, gnrc_pktsnip_t *mic);
+size_t gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, iolist_t *payload, int confirmed_data, uint8_t port,
+        uint8_t *out);
 
 /**
  * @brief pick a random available LoRaWAN channel
