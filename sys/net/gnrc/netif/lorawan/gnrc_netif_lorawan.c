@@ -51,6 +51,20 @@ static const gnrc_netif_ops_t lorawan_ops = {
     .msg_handler = _msg_handler
 };
 
+static inline void _set_be_addr(gnrc_lorawan_t *mac, uint8_t *be_addr)
+{
+    uint32_t tmp = *((uint32_t*) be_addr);
+    tmp = byteorder_swapl(tmp);
+    mlme_request_t mlme_request;
+    mlme_confirm_t mlme_confirm;
+
+    mlme_request.type = MLME_SET;
+    mlme_request.mib.type = MIB_DEV_ADDR;
+    mlme_request.mib.dev_addr = &tmp;
+
+    gnrc_lorawan_mlme_request(mac, &mlme_request, &mlme_confirm);
+}
+
 void gnrc_lorawan_mcps_indication(gnrc_lorawan_t *mac, mcps_indication_t *ind)
 {
     gnrc_netif_lorawan_t *netif = (gnrc_netif_lorawan_t*) mac;
@@ -166,7 +180,7 @@ static void _init(gnrc_netif_t *netif)
     _memcpy_reversed(netif->lorawan.appeui, _appeui, sizeof(_appeui));
 
     gnrc_lorawan_setup(&netif->lorawan.mac, netif->dev);
-    netif->lorawan.mac.netdev.driver->set(&netif->lorawan.mac.netdev, NETOPT_ADDRESS, _devaddr, sizeof(_devaddr));
+    _set_be_addr(&netif->lorawan.mac, _devaddr);
 
     uint32_t rx_timeout = 0;
     netdev_set_pass(&netif->lorawan.mac.netdev, NETOPT_RX_TIMEOUT, &rx_timeout, sizeof(rx_timeout));
@@ -264,6 +278,7 @@ static void _msg_handler(gnrc_netif_t *netif, msg_t *msg)
 static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
 {
     int res = 0;
+    uint32_t tmp;
 
     mlme_confirm_t mlme_confirm;
     mlme_request_t mlme_request;
@@ -290,6 +305,16 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
         case NETOPT_DEMOD_MARGIN:
             assert(opt->data_len == sizeof(uint8_t));
             *((uint8_t *) opt->data) = netif->lorawan.demod_margin;
+            break;
+        case NETOPT_ADDRESS:
+            mlme_request.type = MLME_GET;
+            mlme_request.mib.type = MIB_DEV_ADDR;
+
+            gnrc_lorawan_mlme_request(&netif->lorawan.mac, &mlme_request, &mlme_confirm);
+            tmp = *((uint32_t*) mlme_confirm.mib.dev_addr);
+            tmp = byteorder_swapl(tmp);
+            memcpy(opt->data, &tmp, sizeof(uint32_t));
+            res = sizeof(uint32_t);
             break;
         default:
             res = netif->lorawan.mac.netdev.driver->get(&netif->lorawan.mac.netdev, opt->opt, opt->data, opt->data_len);
@@ -370,6 +395,10 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
             }
             break;
         }
+        case NETOPT_ADDRESS:
+            assert(opt->data_len == sizeof(uint32_t));
+            _set_be_addr(&netif->lorawan.mac, opt->data);
+            break;
         case NETOPT_LINK_CHECK:
             netif->flags |= GNRC_NETIF_FLAGS_LINK_CHECK;
             break;
