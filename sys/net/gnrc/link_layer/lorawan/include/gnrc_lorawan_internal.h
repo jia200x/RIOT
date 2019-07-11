@@ -163,6 +163,8 @@ typedef struct {
     netdev_t netdev;                                /**< netdev for the MAC layer */
     gnrc_lorawan_mcps_t mcps;                       /**< MCPS descriptor */
     gnrc_lorawan_mlme_t mlme;                       /**< MLME descriptor */
+    uint8_t *tx_buf;
+    size_t tx_len;
     uint8_t *nwkskey;                               /**< pointer to Network SKey buffer */
     uint8_t *appskey;                               /**< pointer to Application SKey buffer */
     uint32_t channel[GNRC_LORAWAN_MAX_CHANNELS];    /**< channel array */

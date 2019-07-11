@@ -183,7 +183,8 @@ void gnrc_lorawan_event_tx_complete(gnrc_lorawan_t *mac);
  * @param[in] nwkskey buffer to store the NwkSKey. Should be at least 16 bytes long
  * @param[in] appskey buffer to store the AppsKey. Should be at least 16 bytes long
  */
-void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey);
+void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey,
+        uint8_t *tx_buf);
 
 /**
  * @brief Perform a MLME request

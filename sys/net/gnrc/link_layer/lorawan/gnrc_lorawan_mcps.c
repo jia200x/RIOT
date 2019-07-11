@@ -31,9 +31,6 @@
 #define _16_UPPER_BITMASK 0xFFFF0000
 #define _16_LOWER_BITMASK 0xFFFF
 
-uint8_t tx_buf[250];
-size_t tx_len;
-
 int gnrc_lorawan_mic_is_valid(uint8_t *buf, size_t len, uint8_t *nwkskey)
 {
     le_uint32_t calc_mic;
@@ -314,7 +311,7 @@ void gnrc_lorawan_mcps_request(gnrc_lorawan_t *mac, const mcps_request_t *mcps_r
     int waiting_for_ack = mcps_request->type == MCPS_CONFIRMED;
     /* We try to allocate the whole header with fopts at once */
 
-    size_t pkt_size = gnrc_lorawan_build_uplink(mac, mcps_request->data.pkt, waiting_for_ack, mcps_request->data.port, tx_buf);
+    size_t pkt_size = gnrc_lorawan_build_uplink(mac, mcps_request->data.pkt, waiting_for_ack, mcps_request->data.port, mac->tx_buf);
 
     mac->mcps.waiting_for_ack = waiting_for_ack;
     mac->mcps.ack_requested = false;
@@ -324,9 +321,9 @@ void gnrc_lorawan_mcps_request(gnrc_lorawan_t *mac, const mcps_request_t *mcps_r
     //assert(mac->mcps.outgoing_pkt == NULL);
     //mac->mcps.outgoing_pkt = pkt;
 
-    tx_len = pkt_size;
+    mac->tx_len = pkt_size;
     iolist_t pkt = {
-        .iol_base = tx_buf,
+        .iol_base = mac->tx_buf,
         .iol_len = pkt_size,
         .iol_next = NULL
     };

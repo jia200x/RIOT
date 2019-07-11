@@ -66,10 +66,12 @@ static void _sleep_radio(gnrc_lorawan_t *mac)
     netdev_set_pass((netdev_t *) mac, NETOPT_STATE, &state, sizeof(state));
 }
 
-void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey)
+void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey,
+        uint8_t *tx_buf)
 {
     mac->nwkskey = nwkskey;
     mac->appskey = appskey;
+    mac->tx_buf = tx_buf;
     mac->busy = false;
     gnrc_lorawan_mlme_backoff_init(mac);
     gnrc_lorawan_reset(mac);
@@ -92,6 +94,7 @@ void gnrc_lorawan_reset(gnrc_lorawan_t *mac)
     _set_rx2_dr(mac, LORAMAC_DEFAULT_RX2_DR);
 
     mac->toa = 0;
+    mac->tx_len = 0;
     gnrc_lorawan_mcps_reset(mac);
     gnrc_lorawan_mlme_reset(mac);
     gnrc_lorawan_channels_init(mac);
@@ -307,16 +310,13 @@ void gnrc_lorawan_setup(gnrc_lorawan_t *mac, netdev_t *lower)
     lower->context = mac;
 }
 
-extern uint8_t *tx_buf;
-extern size_t tx_len;
-
 void gnrc_lorawan_timer_fired(gnrc_lorawan_t *mac)
 {
     if(mac->state == LORAWAN_STATE_IDLE)
     {
         iolist_t pkt = {
-            .iol_base = tx_buf,
-            .iol_len = tx_len,
+            .iol_base = mac->tx_buf,
+            .iol_len = mac->tx_len,
             .iol_next = NULL
         };
         gnrc_lorawan_send_pkt(mac, &pkt, mac->last_dr);

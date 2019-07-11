@@ -40,6 +40,8 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt);
 static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt);
 static void _init(gnrc_netif_t *netif);
 
+uint8_t tx_buf[250];
+
 static const gnrc_netif_ops_t lorawan_ops = {
     .init = _init,
     .send = _send,
@@ -172,7 +174,8 @@ static void _init(gnrc_netif_t *netif)
                    GNRC_LORAWAN_BACKOFF_WINDOW_TICK,
                    &netif->lorawan.backoff_msg, thread_getpid());
     netif->lorawan.outgoing_pkt = NULL;
-    gnrc_lorawan_init(&netif->lorawan.mac, netif->lorawan.nwkskey, netif->lorawan.appskey);
+    gnrc_lorawan_init(&netif->lorawan.mac, netif->lorawan.nwkskey, netif->lorawan.appskey,
+            tx_buf);
 }
 
 gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize,
