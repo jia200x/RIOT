@@ -40,11 +40,10 @@ ifneq (,$(filter gnrc_gomach,$(USEMODULE)))
   FEATURES_REQUIRED += periph_rtt
 endif
 
-ifneq (,$(filter gnrc_lorawan,$(USEMODULE)))
+ifneq (,$(filter gnrc_lorawan,$(USEPKG)))
   USEMODULE += xtimer
   USEMODULE += hashes
   USEMODULE += crypto
-  USEMODULE += netdev_layer
   USEMODULE += gnrc_neterr
 endif
 
@@ -162,7 +161,7 @@ ifneq (,$(filter gnrc_netif,$(USEMODULE)))
   ifneq (,$(filter netdev_eth,$(USEMODULE)))
     USEMODULE += gnrc_netif_ethernet
   endif
-  ifneq (,$(filter gnrc_lorawan,$(USEMODULE)))
+  ifneq (,$(filter gnrc_lorawan,$(USEPKG)))
     USEMODULE += gnrc_netif_lorawan
   endif
 endif

@@ -1,3 +1,3 @@
-MODULE = gnrc_lorawan
+MODULE = gnrc_lorawan_contrib
 
 include $(RIOTBASE)/Makefile.base

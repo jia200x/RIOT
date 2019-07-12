@@ -18,7 +18,9 @@
 #ifndef NET_GNRC_NETIF_LORAWAN_H
 #define NET_GNRC_NETIF_LORAWAN_H
 
-#include "net/gnrc/lorawan.h"
+#include "gnrc_lorawan/lorawan.h"
+#include "net/loramac.h"
+#include "xtimer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +49,10 @@ typedef struct {
     int ack_req;                            /**< Request ACK in the next transmission */
     int otaa;                               /**< wether the next transmission is OTAA or not */
 } gnrc_netif_lorawan_t;
+
+#define MSG_TYPE_TIMEOUT             (0x3457)           /**< Timeout message type */
+#define MSG_TYPE_MLME_BACKOFF_EXPIRE (0x3459)           /**< Backoff timer expiration message type */
+
 
 #ifdef __cplusplus
 }

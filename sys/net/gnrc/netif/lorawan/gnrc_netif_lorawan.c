@@ -18,7 +18,7 @@
 #include "net/gnrc/netif/lorawan.h"
 #include "net/gnrc/netif/lorawan_base.h"
 #include "net/gnrc/netif/internal.h"
-#include "net/gnrc/lorawan.h"
+#include "gnrc_lorawan/lorawan.h"
 #include "net/netdev.h"
 #include "net/lora.h"
 #include "net/loramac.h"

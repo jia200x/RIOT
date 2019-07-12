@@ -5,7 +5,8 @@ USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += gnrc_netdev_default
 USEMODULE += auto_init_gnrc_netif
-USEMODULE += gnrc_lorawan
+#USEMODULE += gnrc_lorawan
+USEPKG += gnrc_lorawan
 USEMODULE += gnrc_netapi_callbacks
 
 BOARD ?= b-l072z-lrwan1

@@ -1,0 +1,4 @@
+INCLUDES += -I$(PKGDIRBASE)/gnrc_lorawan/include
+
+GNRC_LORAWAN_CONTRIB := $(RIOTBASE)/pkg/gnrc_lorawan/contrib
+DIRS += $(GNRC_LORAWAN_CONTRIB)

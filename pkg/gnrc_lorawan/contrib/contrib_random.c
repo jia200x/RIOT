@@ -2,8 +2,8 @@
 #include <string.h>
 #include "net/gnrc/netif.h"
 #include "net/lora.h"
-#include "net/gnrc/lorawan.h"
-#include "net/gnrc/lorawan/region.h"
+#include "gnrc_lorawan/lorawan.h"
+#include "gnrc_lorawan/region.h"
 #include "net/gnrc/netif/lorawan_base.h"
 #include "errno.h"
 #include "net/gnrc/pktbuf.h"
