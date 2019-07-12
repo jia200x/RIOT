@@ -41,6 +41,13 @@ extern "C" {
 gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize, char priority,
                                         char *name, netdev_t *dev);
 
+static inline gnrc_netif_t *_netif_from_lw_mac(gnrc_lorawan_t *mac)
+{
+    gnrc_netif_lorawan_t *netif_lorawan = (gnrc_netif_lorawan_t*) mac;
+    return container_of(netif_lorawan, gnrc_netif_t, lorawan);
+}
+
+
 #ifdef __cplusplus
 }
 #endif
