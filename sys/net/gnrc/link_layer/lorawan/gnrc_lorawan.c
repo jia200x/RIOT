@@ -224,34 +224,12 @@ void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, uint8_t *data, size_t size)
     gnrc_lorawan_mac_release(mac);
 }
 
-int gnrc_lorawan_netdev_get(netdev_t *dev, netopt_t opt, void *value, size_t max_len)
-{
-    int res;
-    res = netdev_get_pass(dev, opt, value, max_len);
-    return res;
-}
-
-int gnrc_lorawan_netdev_set(netdev_t *dev, netopt_t opt, const void *value, size_t len)
-{
-    gnrc_lorawan_t *mac = (gnrc_lorawan_t *) dev;
-
-    if (mac->busy) {
-        return -EBUSY;
-    }
-
-    switch (opt) {
-        default:
-            netdev_set_pass(dev, opt, value, len);
-    }
-    return 0;
-}
-
 const netdev_driver_t gnrc_lorawan_driver = {
     .init = netdev_init_pass,
     .send = netdev_send_pass,
     .recv = netdev_recv_pass,
-    .get = gnrc_lorawan_netdev_get,
-    .set = gnrc_lorawan_netdev_set,
+    .get = netdev_get_pass,
+    .set = netdev_set_pass,
     .isr = netdev_isr_pass,
 };
 

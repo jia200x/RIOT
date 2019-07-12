@@ -317,7 +317,7 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
             res = sizeof(uint32_t);
             break;
         default:
-            res = netif->lorawan.mac.netdev.driver->get(&netif->lorawan.mac.netdev, opt->opt, opt->data, opt->data_len);
+            res = netif->dev->driver->get(netif->dev, opt->opt, opt->data, opt->data_len);
     }
     return res;
 }
@@ -410,7 +410,7 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
             gnrc_lorawan_mlme_request(&netif->lorawan.mac, &mlme_request, &mlme_confirm);
             break;
         default:
-            res = netif->lorawan.mac.netdev.driver->set(&netif->lorawan.mac.netdev, opt->opt, opt->data, opt->data_len);
+            res = netif->dev->driver->set(netif->dev, opt->opt, opt->data, opt->data_len);
     }
     gnrc_netif_release(netif);
     return res;
