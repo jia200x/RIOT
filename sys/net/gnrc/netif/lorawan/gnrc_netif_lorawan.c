@@ -16,6 +16,7 @@
 #include "net/gnrc/pktbuf.h"
 #include "net/gnrc/netif.h"
 #include "net/gnrc/netif/lorawan.h"
+#include "net/gnrc/netif/lorawan_base.h"
 #include "net/gnrc/netif/internal.h"
 #include "net/gnrc/lorawan.h"
 #include "net/netdev.h"
@@ -93,7 +94,7 @@ void gnrc_lorawan_mcps_confirm(gnrc_lorawan_t *mac, mcps_confirm_t *confirm)
 
 void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm)
 {
-    gnrc_netif_t *netif = (gnrc_netif_t *) mac->netdev.context;
+    gnrc_netif_t *netif = _netif_from_lw_mac(mac);
 
     if (confirm->type == MLME_JOIN) {
         if (confirm->status == 0) {
@@ -110,16 +111,10 @@ void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm)
     }
 }
 
-static void _mac_cb(netdev_t *dev, netdev_event_t event)
-{
-    assert(false);
-    netdev_event_cb_pass(dev, event);
-}
-
 static void _driver_cb(netdev_t *dev, netdev_event_t event)
 {
-    gnrc_lorawan_t *mac = (gnrc_lorawan_t *) dev->context;
-    gnrc_netif_t *netif = (gnrc_netif_t *) mac->netdev.context;
+    gnrc_netif_t *netif = dev->context;
+    gnrc_lorawan_t *mac = &netif->lorawan.mac;
 
     if (event == NETDEV_EVENT_ISR) {
         msg_t msg = { .type = NETDEV_MSG_TYPE_EVENT,
@@ -168,8 +163,6 @@ static void _memcpy_reversed(uint8_t *dst, uint8_t *src, size_t size)
 static void _init(gnrc_netif_t *netif)
 {
     netif->dev->event_callback = _driver_cb;
-    netif->lorawan.mac.netdev.event_callback = _mac_cb;
-    netif->lorawan.mac.netdev.context = netif;
     _reset(netif);
 
     /* Initialize default keys, address and EUIs */
@@ -179,11 +172,10 @@ static void _init(gnrc_netif_t *netif)
     memcpy(netif->lorawan.appkey, _appkey, sizeof(_appkey));
     _memcpy_reversed(netif->lorawan.appeui, _appeui, sizeof(_appeui));
 
-    gnrc_lorawan_setup(&netif->lorawan.mac, netif->dev);
     _set_be_addr(&netif->lorawan.mac, _devaddr);
 
     uint32_t rx_timeout = 0;
-    netdev_set_pass(&netif->lorawan.mac.netdev, NETOPT_RX_TIMEOUT, &rx_timeout, sizeof(rx_timeout));
+    netif->dev->driver->set(netif->dev, NETOPT_RX_TIMEOUT, &rx_timeout, sizeof(rx_timeout));
 
     netif->lorawan.backoff_msg.type = MSG_TYPE_MLME_BACKOFF_EXPIRE;
     gnrc_lorawan_mlme_backoff_expire(&netif->lorawan.mac);
@@ -206,26 +198,26 @@ gnrc_netif_t *gnrc_netif_lorawan_create(char *stack, int stacksize,
 
 static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
 {
-    netdev_t *mac = &netif->lorawan.mac.netdev;
-    int bytes_expected = netdev_recv_pass(mac, NULL, 0, 0);
+    netdev_t *dev = netif->dev;
+    int bytes_expected = dev->driver->recv(dev, NULL, 0, 0);
     int nread;
     struct netdev_radio_rx_info rx_info;
     gnrc_pktsnip_t *pkt = gnrc_pktbuf_add(NULL, NULL, bytes_expected, GNRC_NETTYPE_UNDEF);
     if (pkt == NULL) {
         DEBUG("_recv_ieee802154: cannot allocate pktsnip.\n");
         /* Discard packet on netdev device */
-        netdev_recv_pass(mac, NULL, bytes_expected, NULL);
+        dev->driver->recv(dev, NULL, bytes_expected, NULL);
         return NULL;
     }
 
-    nread = netdev_recv_pass(mac, pkt->data, bytes_expected, &rx_info);
+    nread = dev->driver->recv(dev, pkt->data, bytes_expected, &rx_info);
     if (nread <= 0) {
         gnrc_pktbuf_release(pkt);
         return NULL;
     }
 
     netif->lorawan.rx_pkt = pkt;
-    gnrc_lorawan_process_pkt((gnrc_lorawan_t*) mac, pkt->data, pkt->size);
+    gnrc_lorawan_process_pkt(&netif->lorawan.mac, pkt->data, pkt->size);
 
     if(netif->lorawan.rx_pkt) {
         gnrc_pktbuf_release(pkt);

@@ -224,22 +224,6 @@ void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, uint8_t *data, size_t size)
     gnrc_lorawan_mac_release(mac);
 }
 
-const netdev_driver_t gnrc_lorawan_driver = {
-    .init = netdev_init_pass,
-    .send = netdev_send_pass,
-    .recv = netdev_recv_pass,
-    .get = netdev_get_pass,
-    .set = netdev_set_pass,
-    .isr = netdev_isr_pass,
-};
-
-void gnrc_lorawan_setup(gnrc_lorawan_t *mac, netdev_t *lower)
-{
-    mac->netdev.driver = &gnrc_lorawan_driver;
-    mac->netdev.lower = lower;
-    lower->context = mac;
-}
-
 void gnrc_lorawan_timer_fired(gnrc_lorawan_t *mac)
 {
     if(mac->state == LORAWAN_STATE_IDLE)
