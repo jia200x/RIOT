@@ -1,0 +1,8 @@
+ifneq (,$(filter gnrc_lorawan,$(USEPKG)))
+  USEMODULE += xtimer
+  USEMODULE += hashes
+  USEMODULE += crypto
+  USEMODULE += gnrc_lorawan_contrib
+  USEMODULE += gnrc_neterr
+endif
+

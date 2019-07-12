@@ -40,13 +40,6 @@ ifneq (,$(filter gnrc_gomach,$(USEMODULE)))
   FEATURES_REQUIRED += periph_rtt
 endif
 
-ifneq (,$(filter gnrc_lorawan,$(USEPKG)))
-  USEMODULE += xtimer
-  USEMODULE += hashes
-  USEMODULE += crypto
-  USEMODULE += gnrc_neterr
-endif
-
 ifneq (,$(filter nhdp,$(USEMODULE)))
   USEMODULE += sock_udp
   USEMODULE += xtimer
