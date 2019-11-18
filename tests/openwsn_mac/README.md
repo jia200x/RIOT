@@ -20,21 +20,23 @@ network, usually low power constrained devices).
 
 ## Start a TSCH network
 
-1. Use the `cell` command to add an advertisement cell in the PAN coordinator:
+1. Set the slotframe length in the PAN coordinator with the `slotframe` command:
 ```
-Usage: cell <add|rem> <slot_offset> <channel_offset> <adv|tx|rx> [neighbour_address]
+slotframe 101
 ```
 
+2. Use the `cell` command to add an advertisement cell in the PAN coordinator:
 E.g to add an advertisement cell in `slot_offset` 0 and `channel_offset` 0:
 ```
 cell add 0 0 adv
 ```
-2. Set the role of the PAN coordinator to `pancoord`:
+
+3. Set the role of the PAN coordinator to `pancoord`:
 ```
 role pancoord
 ```
 
-3. Wait for some seconds. Nodes nearby should print "`Synchronized`" when they
+4. Wait for some seconds. Nodes nearby should print "`Synchronized`" when they
 joined the TSCH network.
 
 ## Send messages between nodes.
@@ -71,7 +73,10 @@ role leaf
 ```
 
 ## Cell management
-Use the `cell` command to manage the cells
+Use the `cell` command to manage the cells:
+```
+Usage: cell <add|rem> <slot_offset> <channel_offset> <adv|tx|rx> [neighbour_address]
+```
 
 E.g to create a link in slot offset 50 and channel offset 20 that receives
 data from address 79:65:18:40:22:11:c7:4e
