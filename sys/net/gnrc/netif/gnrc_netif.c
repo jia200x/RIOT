@@ -1352,6 +1352,7 @@ static void *_gnrc_netif_thread(void *args)
     dev->event_callback = _event_cb;
     dev->context = netif;
     /* initialize low-level driver */
+#if 0
     res = dev->driver->init(dev);
     if (res < 0) {
         LOG_ERROR("gnrc_netif: netdev init failed: %d\n", res);
@@ -1363,6 +1364,7 @@ static void *_gnrc_netif_thread(void *args)
         dev->context = NULL;
         return NULL;
     }
+#endif
     _configure_netdev(dev);
     netif->ops->init(netif);
 #if DEVELHELP
@@ -1384,7 +1386,8 @@ static void *_gnrc_netif_thread(void *args)
         switch (msg.type) {
             case NETDEV_MSG_TYPE_EVENT:
                 DEBUG("gnrc_netif: GNRC_NETDEV_MSG_TYPE_EVENT received\n");
-                dev->driver->isr(dev);
+                gnrc_netif_task_handler_t *th = msg.content.ptr;
+                th->th(dev);
                 break;
             case GNRC_NETAPI_MSG_TYPE_SND:
                 DEBUG("gnrc_netif: GNRC_NETDEV_MSG_TYPE_SND received\n");
@@ -1467,39 +1470,29 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
 {
     gnrc_netif_t *netif = (gnrc_netif_t *) dev->context;
 
-    if (event == NETDEV_EVENT_ISR) {
-        msg_t msg = { .type = NETDEV_MSG_TYPE_EVENT,
-                      .content = { .ptr = netif } };
-
-        if (msg_send(&msg, netif->pid) <= 0) {
-            puts("gnrc_netif: possibly lost interrupt.");
-        }
-    }
-    else {
-        DEBUG("gnrc_netif: event triggered -> %i\n", event);
-        gnrc_pktsnip_t *pkt = NULL;
-        switch (event) {
-            case NETDEV_EVENT_RX_COMPLETE:
-                pkt = netif->ops->recv(netif);
-                if (pkt) {
-                    _pass_on_packet(pkt);
-                }
-                break;
+    DEBUG("gnrc_netif: event triggered -> %i\n", event);
+    gnrc_pktsnip_t *pkt = NULL;
+    switch (event) {
+        case NETDEV_EVENT_RX_COMPLETE:
+            pkt = netif->ops->recv(netif);
+            if (pkt) {
+                _pass_on_packet(pkt);
+            }
+            break;
 #ifdef MODULE_NETSTATS_L2
-            case NETDEV_EVENT_TX_MEDIUM_BUSY:
-                /* we are the only ones supposed to touch this variable,
-                 * so no acquire necessary */
-                netif->stats.tx_failed++;
-                break;
-            case NETDEV_EVENT_TX_COMPLETE:
-                /* we are the only ones supposed to touch this variable,
-                 * so no acquire necessary */
-                netif->stats.tx_success++;
-                break;
+        case NETDEV_EVENT_TX_MEDIUM_BUSY:
+            /* we are the only ones supposed to touch this variable,
+             * so no acquire necessary */
+            netif->stats.tx_failed++;
+            break;
+        case NETDEV_EVENT_TX_COMPLETE:
+            /* we are the only ones supposed to touch this variable,
+             * so no acquire necessary */
+            netif->stats.tx_success++;
+            break;
 #endif
-            default:
-                DEBUG("gnrc_netif: warning: unhandled event %u.\n", event);
-        }
+        default:
+            DEBUG("gnrc_netif: warning: unhandled event %u.\n", event);
     }
 }
 /** @} */

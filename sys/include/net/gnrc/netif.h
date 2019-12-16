@@ -63,6 +63,10 @@
 extern "C" {
 #endif
 
+typedef struct {
+    void (*th)(void *arg);
+} gnrc_netif_task_handler_t;
+
 /**
  * @brief   Operations to an interface
  */

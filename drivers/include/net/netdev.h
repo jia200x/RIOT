@@ -360,36 +360,6 @@ typedef struct netdev_driver {
     int (*recv)(netdev_t *dev, void *buf, size_t len, void *info);
 
     /**
-     * @brief the driver's initialization function
-     *
-     * @pre `(dev != NULL)`
-     *
-     * @param[in]   dev     network device descriptor. Must not be NULL.
-     *
-     * @return `< 0` on error
-     * @return 0 on success
-     */
-    int (*init)(netdev_t *dev);
-
-    /**
-     * @brief a driver's user-space ISR handler
-     *
-     * @pre `(dev != NULL)`
-     *
-     * This function will be called from a network stack's loop when being
-     * notified by netdev_isr.
-     *
-     * It is supposed to call
-     * @ref netdev_t::event_callback "netdev->event_callback()" for each
-     * occurring event.
-     *
-     * See receive packet flow description for details.
-     *
-     * @param[in]   dev     network device descriptor. Must not be NULL.
-     */
-    void (*isr)(netdev_t *dev);
-
-    /**
      * @brief   Get an option value from a given network device
      *
      * @pre `(dev != NULL)`

@@ -38,9 +38,21 @@ int stm32_eth_receive_blocking(char *data, unsigned max_len);
 int stm32_eth_send(const struct iolist *iolist);
 int stm32_eth_get_rx_status_owned(void);
 
+void stm32_eth_rx_complete(void);
+void stm32_eth_isr(void);
+
+#if 0
 static void _isr(netdev_t *netdev) {
     if(stm32_eth_get_rx_status_owned()) {
         netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+    }
+}
+#endif
+
+void stm32_eth_task_handler(void)
+{
+    if(stm32_eth_get_rx_status_owned()) {
+        stm32_eth_rx_complete();
     }
 }
 
@@ -56,9 +68,7 @@ void isr_eth(void)
     if ((tmp & ETH_DMASR_RS)) {
         ETH->DMASR = ETH_DMASR_RS | ETH_DMASR_NIS;
         mutex_unlock(&_rx);
-        if (_netdev) {
-            _netdev->event_callback(_netdev, NETDEV_EVENT_ISR);
-        }
+        stm32_eth_isr();
     }
 
     /* printf("r:%x\n\n", tmp); */
@@ -135,17 +145,17 @@ static int _get(netdev_t *dev, netopt_t opt, void *value, size_t max_len)
     return res;
 }
 
+#if 0
 static int _init(netdev_t *netdev)
 {
     (void)netdev;
     return stm32_eth_init();
 }
+#endif
 
 static const netdev_driver_t netdev_driver_stm32f4eth = {
     .send = _send,
     .recv = _recv,
-    .init = _init,
-    .isr = _isr,
     .get = _get,
     .set = _set,
 };
