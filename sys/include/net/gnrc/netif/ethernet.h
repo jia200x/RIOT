@@ -42,7 +42,7 @@ extern "C" {
  * @return  The network interface on success.
  */
 gnrc_netif_t *gnrc_netif_ethernet_create(char *stack, int stacksize, char priority,
-                                         char *name, netdev_t *dev);
+                                         char *name, void *dev, gnrc_netif_t *netif);
 
 #ifdef __cplusplus
 }

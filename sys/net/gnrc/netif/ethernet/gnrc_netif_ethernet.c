@@ -18,11 +18,19 @@
 #include <string.h>
 
 #include "net/ethernet/hdr.h"
+#include "net/ethernet.h"
+#include "net/ethernet/hal.h"
+#include "net/eui48.h"
 #include "net/gnrc.h"
 #include "net/gnrc/netif/ethernet.h"
 #ifdef MODULE_GNRC_IPV6
 #include "net/ipv6/hdr.h"
 #endif
+#ifdef MODULE_GNRC_IPV6_NIB
+#include "net/gnrc/ipv6/nib.h"
+#include "net/gnrc/ipv6.h"
+#endif /* MODULE_GNRC_IPV6_NIB */
+
 
 #define ENABLE_DEBUG (0)
 #include "debug.h"
@@ -36,20 +44,380 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif);
 
 static char addr_str[ETHERNET_ADDR_LEN * 3];
 
+static void gnrc_netif_ethernet_init(gnrc_netif_t *netif)
+{
+    netif->device_type = NETDEV_TYPE_ETHERNET;
+    gnrc_netif_ipv6_init_mtu(netif);
+    ethernet_addr_get(netif->dev, netif->l2addr);
+    netif->flags |= GNRC_NETIF_FLAGS_HAS_L2ADDR;
+    netif->l2addr_len = sizeof(eui48_t);
+    netif->cur_hl = GNRC_NETIF_DEFAULT_HL;
+#ifdef MODULE_GNRC_IPV6_NIB
+    gnrc_ipv6_nib_init_iface(netif);
+#endif
+}
+
+static void _get_iid(ethernet_hal_t *dev, eui64_t *value)
+{
+    eui48_t mac;
+    ethernet_addr_get(dev, mac.uint8);
+    eui48_to_ipv6_iid(value, &mac);
+}
+
+int gnrc_netif_eth_set(gnrc_netif_t *netif,
+                               const gnrc_netapi_opt_t *opt)
+{
+    int res = -ENOTSUP;
+
+    ethernet_hal_t *dev = netif->dev;
+    gnrc_netif_acquire(netif);
+    switch (opt->opt) {
+        case NETOPT_HOP_LIMIT:
+            assert(opt->data_len == sizeof(uint8_t));
+            netif->cur_hl = *((uint8_t *)opt->data);
+            res = sizeof(uint8_t);
+            break;
+#ifdef MODULE_GNRC_IPV6
+        case NETOPT_IPV6_ADDR: {
+                assert(opt->data_len == sizeof(ipv6_addr_t));
+                /* always assume manually added */
+                uint8_t flags = ((((uint8_t)opt->context & 0xff) &
+                                  ~GNRC_NETIF_IPV6_ADDRS_FLAGS_STATE_MASK) |
+                                 GNRC_NETIF_IPV6_ADDRS_FLAGS_STATE_VALID);
+                uint8_t pfx_len = (uint8_t)(opt->context >> 8U);
+                /* acquire locks a recursive mutex so we are safe calling this
+                 * public function */
+                res = gnrc_netif_ipv6_addr_add_internal(netif, opt->data,
+                                                        pfx_len, flags);
+                if (res >= 0) {
+                    res = sizeof(ipv6_addr_t);
+                }
+            }
+            break;
+        case NETOPT_IPV6_ADDR_REMOVE:
+            assert(opt->data_len == sizeof(ipv6_addr_t));
+            /* acquire locks a recursive mutex so we are safe calling this
+             * public function */
+            gnrc_netif_ipv6_addr_remove_internal(netif, opt->data);
+            res = sizeof(ipv6_addr_t);
+            break;
+        case NETOPT_IPV6_GROUP:
+            assert(opt->data_len == sizeof(ipv6_addr_t));
+            /* acquire locks a recursive mutex so we are safe calling this
+             * public function */
+            res = gnrc_netif_ipv6_group_join_internal(netif, opt->data);
+            if (res >= 0) {
+                res = sizeof(ipv6_addr_t);
+            }
+            break;
+        case NETOPT_IPV6_GROUP_LEAVE:
+            assert(opt->data_len == sizeof(ipv6_addr_t));
+            /* acquire locks a recursive mutex so we are safe calling this
+             * public function */
+            gnrc_netif_ipv6_group_leave_internal(netif, opt->data);
+            res = sizeof(ipv6_addr_t);
+            break;
+        case NETOPT_MAX_PDU_SIZE:
+            if (opt->context == GNRC_NETTYPE_IPV6) {
+                assert(opt->data_len == sizeof(uint16_t));
+                netif->ipv6.mtu = *((uint16_t *)opt->data);
+                res = sizeof(uint16_t);
+            }
+            /* else set device */
+            break;
+#if GNRC_IPV6_NIB_CONF_ROUTER
+        case NETOPT_IPV6_FORWARDING:
+            assert(opt->data_len == sizeof(netopt_enable_t));
+            if (*(((netopt_enable_t *)opt->data)) == NETOPT_ENABLE) {
+                netif->flags |= GNRC_NETIF_FLAGS_IPV6_FORWARDING;
+            }
+            else {
+                if (gnrc_netif_is_rtr_adv(netif)) {
+                    gnrc_ipv6_nib_change_rtr_adv_iface(netif, false);
+                }
+                netif->flags &= ~GNRC_NETIF_FLAGS_IPV6_FORWARDING;
+            }
+            res = sizeof(netopt_enable_t);
+            break;
+        case NETOPT_IPV6_SND_RTR_ADV:
+            assert(opt->data_len == sizeof(netopt_enable_t));
+            gnrc_ipv6_nib_change_rtr_adv_iface(netif,
+                    (*(((netopt_enable_t *)opt->data)) == NETOPT_ENABLE));
+            res = sizeof(netopt_enable_t);
+            break;
+#endif  /* GNRC_IPV6_NIB_CONF_ROUTER */
+#endif  /* MODULE_GNRC_IPV6 */
+#ifdef MODULE_GNRC_SIXLOWPAN_IPHC
+        case NETOPT_6LO_IPHC:
+            assert(opt->data_len == sizeof(netopt_enable_t));
+            if (*(((netopt_enable_t *)opt->data)) == NETOPT_ENABLE) {
+                netif->flags |= GNRC_NETIF_FLAGS_6LO_HC;
+            }
+            else {
+                netif->flags &= ~GNRC_NETIF_FLAGS_6LO_HC;
+            }
+            res = sizeof(netopt_enable_t);
+            break;
+#endif  /* MODULE_GNRC_SIXLOWPAN_IPHC */
+        case NETOPT_RAWMODE:
+            if (*(((netopt_enable_t *)opt->data)) == NETOPT_ENABLE) {
+                netif->flags |= GNRC_NETIF_FLAGS_RAWMODE;
+            }
+            else {
+                netif->flags &= ~GNRC_NETIF_FLAGS_RAWMODE;
+            }
+            /* Also propagate to the netdev device */
+            /* It shouldn't apply to ethernet... */
+            /* netif->dev->driver->set(netif->dev, NETOPT_RAWMODE, opt->data,
+                                      opt->data_len);
+                                      */
+            res = sizeof(netopt_enable_t);
+            break;
+        default:
+            break;
+    }
+    if (res == -ENOTSUP) {
+        switch (opt->opt) {
+            case NETOPT_ADDRESS:
+                ethernet_addr_set(dev, netif->l2addr);
+                break;
+            default:
+                break;
+        }
+    }
+    gnrc_netif_release(netif);
+    return res;
+}
+
+int gnrc_netif_eth_get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
+{
+    int res = -ENOTSUP;
+
+    ethernet_hal_t *dev = netif->dev;
+    gnrc_netif_acquire(netif);
+    switch (opt->opt) {
+        case NETOPT_6LO:
+            assert(opt->data_len == sizeof(netopt_enable_t));
+            *((netopt_enable_t *)opt->data) =
+                    (netopt_enable_t)gnrc_netif_is_6lo(netif);
+            res = sizeof(netopt_enable_t);
+            break;
+        case NETOPT_HOP_LIMIT:
+            assert(opt->data_len == sizeof(uint8_t));
+            *((uint8_t *)opt->data) = netif->cur_hl;
+            res = sizeof(uint8_t);
+            break;
+        case NETOPT_STATS:
+            /* XXX discussed this with Oleg, it's supposed to be a pointer */
+            switch ((int16_t)opt->context) {
+#if defined(MODULE_NETSTATS_IPV6) && defined(MODULE_GNRC_IPV6)
+                case NETSTATS_IPV6:
+                    assert(opt->data_len == sizeof(netstats_t *));
+                    *((netstats_t **)opt->data) = &netif->ipv6.stats;
+                    res = sizeof(&netif->ipv6.stats);
+                    break;
+#endif
+#ifdef MODULE_NETSTATS_L2
+                case NETSTATS_LAYER2:
+                    assert(opt->data_len == sizeof(netstats_t *));
+                    *((netstats_t **)opt->data) = &netif->stats;
+                    res = sizeof(&netif->stats);
+                    break;
+#endif
+                default:
+                    /* take from device */
+                    break;
+            }
+            break;
+#ifdef MODULE_GNRC_IPV6
+        case NETOPT_IPV6_ADDR: {
+                assert(opt->data_len >= sizeof(ipv6_addr_t));
+                ipv6_addr_t *tgt = opt->data;
+
+                res = 0;
+                for (unsigned i = 0;
+                     (res < (int)opt->data_len) && (i < GNRC_NETIF_IPV6_ADDRS_NUMOF);
+                     i++) {
+                    if (netif->ipv6.addrs_flags[i] != 0) {
+                        memcpy(tgt, &netif->ipv6.addrs[i], sizeof(ipv6_addr_t));
+                        res += sizeof(ipv6_addr_t);
+                        tgt++;
+                    }
+                }
+            }
+            break;
+        case NETOPT_IPV6_ADDR_FLAGS: {
+                assert(opt->data_len >= sizeof(uint8_t));
+                uint8_t *tgt = opt->data;
+
+                res = 0;
+                for (unsigned i = 0;
+                     (res < (int)opt->data_len) && (i < GNRC_NETIF_IPV6_ADDRS_NUMOF);
+                     i++) {
+                    if (netif->ipv6.addrs_flags[i] != 0) {
+                        *tgt = netif->ipv6.addrs_flags[i];
+                        res += sizeof(uint8_t);
+                        tgt++;
+                    }
+                }
+            }
+            break;
+        case NETOPT_IPV6_GROUP: {
+                assert(opt->data_len >= sizeof(ipv6_addr_t));
+                ipv6_addr_t *tgt = opt->data;
+
+                res = 0;
+                for (unsigned i = 0;
+                     (res < (int)opt->data_len) && (i < GNRC_NETIF_IPV6_GROUPS_NUMOF);
+                     i++) {
+                    if (!ipv6_addr_is_unspecified(&netif->ipv6.groups[i])) {
+                        memcpy(tgt, &netif->ipv6.groups[i], sizeof(ipv6_addr_t));
+                        res += sizeof(ipv6_addr_t);
+                        tgt++;
+                    }
+                }
+            }
+            break;
+        case NETOPT_IPV6_IID:
+            assert(opt->data_len >= sizeof(eui64_t));
+            res = gnrc_netif_ipv6_get_iid(netif, opt->data);
+            break;
+        case NETOPT_MAX_PDU_SIZE:
+            if (opt->context == GNRC_NETTYPE_IPV6) {
+                assert(opt->data_len == sizeof(uint16_t));
+                *((uint16_t *)opt->data) = netif->ipv6.mtu;
+                res = sizeof(uint16_t);
+            }
+            /* else ask device */
+            break;
+#if GNRC_IPV6_NIB_CONF_ROUTER
+        case NETOPT_IPV6_FORWARDING:
+            assert(opt->data_len == sizeof(netopt_enable_t));
+            *((netopt_enable_t *)opt->data) = (gnrc_netif_is_rtr(netif)) ?
+                                              NETOPT_ENABLE : NETOPT_DISABLE;
+            res = sizeof(netopt_enable_t);
+            break;
+        case NETOPT_IPV6_SND_RTR_ADV:
+            assert(opt->data_len == sizeof(netopt_enable_t));
+            *((netopt_enable_t *)opt->data) = (gnrc_netif_is_rtr_adv(netif)) ?
+                                              NETOPT_ENABLE : NETOPT_DISABLE;
+            res = sizeof(netopt_enable_t);
+            break;
+#endif  /* GNRC_IPV6_NIB_CONF_ROUTER */
+#endif  /* MODULE_GNRC_IPV6 */
+#ifdef MODULE_GNRC_SIXLOWPAN_IPHC
+        case NETOPT_6LO_IPHC:
+            assert(opt->data_len == sizeof(netopt_enable_t));
+            *((netopt_enable_t *)opt->data) = (netif->flags & GNRC_NETIF_FLAGS_6LO_HC) ?
+                                              NETOPT_ENABLE : NETOPT_DISABLE;
+            res = sizeof(netopt_enable_t);
+            break;
+#endif  /* MODULE_GNRC_SIXLOWPAN_IPHC */
+        default:
+            break;
+    }
+    if (res == -ENOTSUP) {
+        switch(opt->opt) {
+            case NETOPT_DEVICE_TYPE:
+                {
+                    uint16_t *tgt = (uint16_t *)opt->data;
+                    *tgt = NETDEV_TYPE_ETHERNET;
+                    res = 2;
+                    break;
+                }
+            case NETOPT_ADDR_LEN:
+            case NETOPT_SRC_LEN:
+                {
+                    assert(opt->data_len == 2);
+                    uint16_t *tgt = (uint16_t*)opt->data;
+                    *tgt=6;
+                    res = sizeof(uint16_t);
+                    break;
+                }
+            case NETOPT_MAX_PDU_SIZE:
+                {
+                    assert(opt->data_len == 2);
+                    uint16_t *val = (uint16_t*) opt->data;
+                    *val = ETHERNET_DATA_LEN;
+                    res = sizeof(uint16_t);
+                    break;
+                }
+            case NETOPT_IS_WIRED:
+                {
+                    res = 1;
+                    break;
+                }
+            case NETOPT_IPV6_IID:
+                {
+                    if(opt->data_len < sizeof(eui64_t)) {
+                        res = -EOVERFLOW;
+                        break;
+                    }
+                    _get_iid(dev, opt->data);
+                    res = sizeof(eui64_t);
+                }
+                break;
+            case NETOPT_LINK_CONNECTED:
+                ethernet_link_get(dev);
+                res = sizeof(bool);
+                break;
+            case NETOPT_ADDRESS:
+                ethernet_addr_get(dev, opt->data);
+                res = sizeof(eui48_t);
+                break;
+#ifdef MODULE_L2FILTER
+            case NETOPT_L2FILTER:
+                {
+                    assert(max_len >= sizeof(l2filter_t **));
+                    *((l2filter_t **)value) = dev->filter;
+                    res = sizeof(l2filter_t **);
+                    break;
+                }
+#endif
+            default:
+                break;
+            }
+    }
+    gnrc_netif_release(netif);
+    return res;
+}
+
 static const gnrc_netif_ops_t ethernet_ops = {
-    .init = gnrc_netif_default_init,
+    .init = gnrc_netif_ethernet_init,
     .send = _send,
     .recv = _recv,
-    .get = gnrc_netif_get_from_netdev,
-    .set = gnrc_netif_set_from_netdev,
+    .get = gnrc_netif_eth_get,
+    .set = gnrc_netif_eth_set,
+};
+
+void gnrc_netif_recv(gnrc_netif_t *netif);
+
+static void _tx_done(ethernet_hal_t *dev)
+{
+    (void) dev;
+}
+
+static void _rx_done(ethernet_hal_t *dev)
+{
+    gnrc_netif_t *netif = dev->ctx;
+    gnrc_netif_recv(netif);
+}
+
+static const ethernet_cb_t _cb = {
+    .rx_done = _rx_done,
+    .tx_done = _tx_done,
 };
 
 gnrc_netif_t *gnrc_netif_ethernet_create(char *stack, int stacksize,
                                          char priority, char *name,
-                                         netdev_t *dev)
+                                         void *dev, gnrc_netif_t *netif)
 {
-    return gnrc_netif_create(stack, stacksize, priority, name, dev,
-                             &ethernet_ops);
+    ethernet_hal_t *eth_dev = dev;
+    eth_dev->cbs = &_cb;
+    gnrc_netif_create(stack, stacksize, priority, name, dev,
+                             &ethernet_ops, netif);
+    eth_dev->ctx = netif;
+    return netif;
 }
 
 static inline void _addr_set_broadcast(uint8_t *dst)
@@ -80,9 +448,8 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     ethernet_hdr_t hdr;
     gnrc_netif_hdr_t *netif_hdr;
     gnrc_pktsnip_t *payload;
+    ethernet_hal_t *dev = netif->dev;
     int res;
-
-    netdev_t *dev = netif->dev;
 
     if (pkt == NULL) {
         DEBUG("gnrc_netif_ethernet: pkt was NULL\n");
@@ -111,7 +478,7 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
                netif_hdr->src_l2addr_len);
     }
     else {
-        dev->driver->get(dev, NETOPT_ADDRESS, hdr.src, ETHERNET_ADDR_LEN);
+        ethernet_addr_get(dev, hdr.src);
     }
 
     if (netif_hdr->flags & GNRC_NETIF_HDR_FLAGS_BROADCAST) {
@@ -163,8 +530,8 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 
 static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
 {
-    netdev_t *dev = netif->dev;
-    int bytes_expected = dev->driver->recv(dev, NULL, 0, NULL);
+    ethernet_hal_t *dev = netif->dev;
+    int bytes_expected = dev->driver->recv(dev, NULL, 0);
     gnrc_pktsnip_t *pkt = NULL;
 
     if (bytes_expected > 0) {
@@ -176,12 +543,12 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
             DEBUG("gnrc_netif_ethernet: cannot allocate pktsnip.\n");
 
             /* drop the packet */
-            dev->driver->recv(dev, NULL, bytes_expected, NULL);
+            dev->driver->recv(dev, NULL, bytes_expected);
 
             goto out;
         }
 
-        int nread = dev->driver->recv(dev, pkt->data, bytes_expected, NULL);
+        int nread = dev->driver->recv(dev, pkt->data, bytes_expected);
         if (nread <= 0) {
             DEBUG("gnrc_netif_ethernet: read error.\n");
             goto safe_out;

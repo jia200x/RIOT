@@ -26,6 +26,7 @@
 #include "kernel_types.h"
 #include "periph/uart.h"
 #include "net/netdev.h"
+#include "net/ethernet/hal.h"
 #include "tsrb.h"
 #include "mutex.h"
 
@@ -70,7 +71,7 @@ typedef enum {
  * @extends netdev_t
  */
 typedef struct {
-    netdev_t netdev;        /**< extended netdev structure */
+    ethernet_hal_t dev;        /**< extended netdev structure */
     uart_t uart;            /**< UART device the to use */
     uint8_t mac_addr[6];    /**< this device's MAC address */
     uint8_t remote_mac_addr[6]; /**< this device's MAC address */

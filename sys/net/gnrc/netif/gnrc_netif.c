@@ -39,29 +39,17 @@
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 
-static gnrc_netif_t _netifs[GNRC_NETIF_NUMOF];
-
 static void _update_l2addr_from_dev(gnrc_netif_t *netif);
-static void _configure_netdev(netdev_t *dev);
+//static void _configure_netdev(netdev_t *dev);
 static void *_gnrc_netif_thread(void *args);
-static void _event_cb(netdev_t *dev, netdev_event_t event);
+//static void _event_cb(netdev_t *dev, netdev_event_t event);
 
 gnrc_netif_t *gnrc_netif_create(char *stack, int stacksize, char priority,
-                                const char *name, netdev_t *netdev,
-                                const gnrc_netif_ops_t *ops)
+                                const char *name, void *netdev,
+                                const gnrc_netif_ops_t *ops, gnrc_netif_t *netif)
 {
-    gnrc_netif_t *netif = NULL;
     int res;
 
-    for (int i = 0; i < GNRC_NETIF_NUMOF; i++) {
-        if (_netifs[i].dev == netdev) {
-            return &_netifs[i];
-        }
-        if ((netif == NULL) && (_netifs[i].ops == NULL)) {
-            netif = &_netifs[i];
-        }
-    }
-    assert(netif != NULL);
     rmutex_init(&netif->mutex);
     netif->ops = ops;
     netif_register((netif_t*) netif);
@@ -89,17 +77,10 @@ unsigned gnrc_netif_numof(void)
 
 gnrc_netif_t *gnrc_netif_iter(const gnrc_netif_t *prev)
 {
-    assert((prev == NULL) || (prev >= _netifs));
-    for (const gnrc_netif_t *netif = (prev == NULL) ? _netifs : (prev + 1);
-         netif < (_netifs + GNRC_NETIF_NUMOF); netif++) {
-        if (netif->ops != NULL) {
-            /* we don't care about external modification */
-            return (gnrc_netif_t *)netif;
-        }
-    }
-    return NULL;
+    return (gnrc_netif_t*) netif_iter((netif_t*) prev);
 }
 
+#if 0
 int gnrc_netif_get_from_netdev(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
 {
     int res = -ENOTSUP;
@@ -366,6 +347,7 @@ int gnrc_netif_set_from_netdev(gnrc_netif_t *netif,
     gnrc_netif_release(netif);
     return res;
 }
+#endif
 
 gnrc_netif_t *gnrc_netif_get_by_pid(kernel_pid_t pid)
 {
@@ -1196,6 +1178,7 @@ static void _init_from_device(gnrc_netif_t *netif)
     _update_l2addr_from_dev(netif);
 }
 
+#if 0
 static void _configure_netdev(netdev_t *dev)
 {
     /* Enable RX- and TX-complete interrupts */
@@ -1211,6 +1194,7 @@ static void _configure_netdev(netdev_t *dev)
     }
 #endif
 }
+#endif
 
 #ifdef DEVELHELP
 static bool options_tested = false;
@@ -1336,7 +1320,6 @@ static void *_gnrc_netif_thread(void *args)
 {
     gnrc_netapi_opt_t *opt;
     gnrc_netif_t *netif;
-    netdev_t *dev;
     int res;
     msg_t reply = { .type = GNRC_NETAPI_MSG_TYPE_ACK };
     msg_t msg, msg_queue[GNRC_NETIF_MSG_QUEUE_SIZE];
@@ -1344,13 +1327,10 @@ static void *_gnrc_netif_thread(void *args)
     DEBUG("gnrc_netif: starting thread %i\n", sched_active_pid);
     netif = args;
     gnrc_netif_acquire(netif);
-    dev = netif->dev;
     netif->pid = sched_active_pid;
     /* setup the link-layer's message queue */
     msg_init_queue(msg_queue, GNRC_NETIF_MSG_QUEUE_SIZE);
     /* register the event callback with the device driver */
-    dev->event_callback = _event_cb;
-    dev->context = netif;
     /* initialize low-level driver */
 #if 0
     res = dev->driver->init(dev);
@@ -1365,10 +1345,9 @@ static void *_gnrc_netif_thread(void *args)
         return NULL;
     }
 #endif
-    _configure_netdev(dev);
     netif->ops->init(netif);
 #if DEVELHELP
-    assert(options_tested);
+    //assert(options_tested);
 #endif
 #ifdef MODULE_NETSTATS_L2
     memset(&netif->stats, 0, sizeof(netstats_t));
@@ -1387,7 +1366,7 @@ static void *_gnrc_netif_thread(void *args)
             case NETDEV_MSG_TYPE_EVENT:
                 DEBUG("gnrc_netif: GNRC_NETDEV_MSG_TYPE_EVENT received\n");
                 gnrc_netif_task_handler_t *th = msg.content.ptr;
-                th->th(dev);
+                th->th(netif->dev);
                 break;
             case GNRC_NETAPI_MSG_TYPE_SND:
                 DEBUG("gnrc_netif: GNRC_NETDEV_MSG_TYPE_SND received\n");
@@ -1466,18 +1445,20 @@ static void _pass_on_packet(gnrc_pktsnip_t *pkt)
     }
 }
 
+void gnrc_netif_recv(gnrc_netif_t *netif)
+{
+    gnrc_pktsnip_t *pkt = netif->ops->recv(netif);
+    if (pkt) {
+        _pass_on_packet(pkt);
+    }
+}
+
+#if 0
 static void _event_cb(netdev_t *dev, netdev_event_t event)
 {
-    gnrc_netif_t *netif = (gnrc_netif_t *) dev->context;
-
     DEBUG("gnrc_netif: event triggered -> %i\n", event);
-    gnrc_pktsnip_t *pkt = NULL;
     switch (event) {
         case NETDEV_EVENT_RX_COMPLETE:
-            pkt = netif->ops->recv(netif);
-            if (pkt) {
-                _pass_on_packet(pkt);
-            }
             break;
 #ifdef MODULE_NETSTATS_L2
         case NETDEV_EVENT_TX_MEDIUM_BUSY:
@@ -1495,4 +1476,5 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
             DEBUG("gnrc_netif: warning: unhandled event %u.\n", event);
     }
 }
+#endif
 /** @} */

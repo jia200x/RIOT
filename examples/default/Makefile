@@ -40,23 +40,21 @@ BOARD_PROVIDES_NETIF := acd52832 airfy-beacon atmega256rfr2-xpro avr-rss2 b-l072
         nucleo-f207zg nucleo-f767zi openmote-b openmote-cc2538 pba-d-01-kw2x remote-pa \
         remote-reva ruuvitag samr21-xpro samr30-xpro spark-core telosb thingy52 yunjia-nrf51822 z1
 
-ifneq (,$(filter $(BOARD),$(BOARD_PROVIDES_NETIF)))
-  # Use modules for networking
-  # gnrc is a meta module including all required, basic gnrc networking modules
-  USEMODULE += gnrc
-  # use the default network interface for the board
-  USEMODULE += gnrc_netdev_default
-  # automatically initialize the network interface
-  USEMODULE += auto_init_gnrc_netif
-  # shell command to send L2 packets with a simple string
-  USEMODULE += gnrc_txtsnd
-  # the application dumps received packets to stdout
-  USEMODULE += gnrc_pktdump
+# Use modules for networking
+# gnrc is a meta module including all required, basic gnrc networking modules
+USEMODULE += gnrc
+# use the default network interface for the board
+USEMODULE += gnrc_netdev_default
+# automatically initialize the network interface
+USEMODULE += auto_init_gnrc_netif
+# shell command to send L2 packets with a simple string
+USEMODULE += gnrc_txtsnd
+# the application dumps received packets to stdout
+USEMODULE += gnrc_pktdump
 
-  # We use only the lower layers of the GNRC network stack, hence, we can
-  # reduce the size of the packet buffer a bit
-  CFLAGS += -DGNRC_PKTBUF_SIZE=512
-endif
+# We use only the lower layers of the GNRC network stack, hence, we can
+# reduce the size of the packet buffer a bit
+CFLAGS += -DGNRC_PKTBUF_SIZE=512
 
 FEATURES_OPTIONAL += periph_rtc
 

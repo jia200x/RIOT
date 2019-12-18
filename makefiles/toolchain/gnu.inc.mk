@@ -1,4 +1,4 @@
-export CC         = $(PREFIX)gcc
+export CC         = strace -c $(PREFIX)gcc
 export CXX        = $(PREFIX)g++
 export CCAS      ?= $(CC)
 ifeq ($(LTO),1)

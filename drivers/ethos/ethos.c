@@ -28,8 +28,7 @@
 #include "tsrb.h"
 #include "irq.h"
 
-#include "net/netdev.h"
-#include "net/netdev/eth.h"
+#include "net/ethernet/hal.h"
 #include "net/eui64.h"
 #include "net/ethernet.h"
 
@@ -46,9 +45,10 @@ extern isrpipe_t stdio_uart_isrpipe;
 #define ENABLE_DEBUG (0)
 #include "debug.h"
 
-static void _get_mac_addr(netdev_t *dev, uint8_t* buf);
+static void _get_mac_addr(ethos_t *dev, uint8_t* buf);
 static void ethos_isr(void *arg, uint8_t c);
-static const netdev_driver_t netdev_driver_ethos;
+void ethos_isr_cb(ethos_t *dev);
+void ethos_rx_complete(ethos_t *dev);
 
 static const uint8_t _esc_esc[] = {ETHOS_ESC_CHAR, (ETHOS_ESC_CHAR ^ 0x20)};
 static const uint8_t _esc_delim[] = {ETHOS_ESC_CHAR, (ETHOS_FRAME_DELIMITER ^ 0x20)};
@@ -56,7 +56,6 @@ static const uint8_t _esc_delim[] = {ETHOS_ESC_CHAR, (ETHOS_FRAME_DELIMITER ^ 0x
 
 void ethos_setup(ethos_t *dev, const ethos_params_t *params)
 {
-    dev->netdev.driver = &netdev_driver_ethos;
     dev->uart = params->uart;
     dev->state = WAIT_FRAMESTART;
     dev->framesize = 0;
@@ -123,7 +122,7 @@ static void _end_of_frame(ethos_t *dev)
             if (dev->framesize) {
                 assert(dev->last_framesize == 0);
                 dev->last_framesize = dev->framesize;
-                dev->netdev.event_callback((netdev_t*) dev, NETDEV_EVENT_ISR);
+                ethos_isr_cb(dev);
             }
             break;
         case ETHOS_FRAME_TYPE_HELLO:
@@ -145,6 +144,7 @@ static void ethos_isr(void *arg, uint8_t c)
 
     switch (dev->state) {
         case WAIT_FRAMESTART:
+            puts("a");
             if (c == ETHOS_FRAME_DELIMITER) {
                 _reset_state(dev);
                 if (dev->last_framesize) {
@@ -154,6 +154,7 @@ static void ethos_isr(void *arg, uint8_t c)
             }
             break;
         case IN_FRAME:
+            puts("b");
             if (c == ETHOS_ESC_CHAR) {
                 dev->state = IN_ESCAPE;
             }
@@ -167,6 +168,7 @@ static void ethos_isr(void *arg, uint8_t c)
             }
             break;
         case IN_ESCAPE:
+            puts("c");
             switch (c) {
                 case (ETHOS_FRAME_DELIMITER ^ 0x20):
                     _handle_char(dev, ETHOS_FRAME_DELIMITER);
@@ -189,17 +191,9 @@ static void ethos_isr(void *arg, uint8_t c)
     }
 }
 
-static void _isr(netdev_t *netdev)
+void ethos_task_handler(ethos_t *dev)
 {
-    ethos_t *dev = (ethos_t *) netdev;
-    dev->netdev.event_callback((netdev_t*) dev, NETDEV_EVENT_RX_COMPLETE);
-}
-
-static int _init(netdev_t *encdev)
-{
-    ethos_t *dev = (ethos_t *) encdev;
-    (void)dev;
-    return 0;
+    ethos_rx_complete(dev);
 }
 
 static size_t iolist_count_total(const iolist_t *iolist)
@@ -268,9 +262,9 @@ void ethos_send_frame(ethos_t *dev, const uint8_t *data, size_t len, unsigned fr
     }
 }
 
-static int _send(netdev_t *netdev, const iolist_t *iolist)
+static int _send(ethernet_hal_t *ethdev, const iolist_t *iolist)
 {
-    ethos_t * dev = (ethos_t *) netdev;
+    ethos_t * dev = (ethos_t *) ethdev;
     (void)dev;
 
     /* count total packet length */
@@ -299,16 +293,14 @@ static int _send(netdev_t *netdev, const iolist_t *iolist)
     return pktlen;
 }
 
-static void _get_mac_addr(netdev_t *encdev, uint8_t* buf)
+static void _get_mac_addr(ethos_t *dev, uint8_t* buf)
 {
-    ethos_t * dev = (ethos_t *) encdev;
     memcpy(buf, dev->mac_addr, 6);
 }
 
-static int _recv(netdev_t *netdev, void *buf, size_t len, void* info)
+static int _recv(ethernet_hal_t *ethdev, void *buf, size_t len)
 {
-    (void) info;
-    ethos_t * dev = (ethos_t *) netdev;
+    ethos_t * dev = (ethos_t *) ethdev;
 
     if (buf) {
         if (len < dev->last_framesize) {
@@ -339,34 +331,32 @@ static int _recv(netdev_t *netdev, void *buf, size_t len, void* info)
     }
 }
 
-static int _get(netdev_t *dev, netopt_t opt, void *value, size_t max_len)
+static int _hw_addr(ethernet_hal_t *dev, uint8_t *addr, int set)
 {
-    int res = 0;
-
-    switch (opt) {
-        case NETOPT_ADDRESS:
-            if (max_len < ETHERNET_ADDR_LEN) {
-                res = -EINVAL;
-            }
-            else {
-                _get_mac_addr(dev, (uint8_t*)value);
-                res = ETHERNET_ADDR_LEN;
-            }
-            break;
-        default:
-            res = netdev_eth_get(dev, opt, value, max_len);
-            break;
+    if(set) {
+        return -EINVAL;
     }
 
-    return res;
+    _get_mac_addr((ethos_t*) dev, (uint8_t*) addr);
+    return 0;
+
 }
 
-/* netdev interface */
-static const netdev_driver_t netdev_driver_ethos = {
-    .send = _send,
+static bool _link(ethernet_hal_t *dev)
+{
+    (void) dev;
+    return true;
+}
+
+static ethernet_driver_t driver = {
     .recv = _recv,
-    .init = _init,
-    .isr = _isr,
-    .get = _get,
-    .set = netdev_eth_set
+    .send = _send,
+    .hw_addr = _hw_addr,
+    .link = _link,
 };
+
+void ethos_hal_setup(ethernet_hal_t *dev)
+{
+    dev->driver = &driver;
+}
+

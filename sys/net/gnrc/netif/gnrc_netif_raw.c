@@ -40,7 +40,7 @@ gnrc_netif_t *gnrc_netif_raw_create(char *stack, int stacksize,
                                     netdev_t *dev)
 {
     return gnrc_netif_create(stack, stacksize, priority, name, dev,
-                             &raw_ops);
+                             &raw_ops, NULL);
 }
 
 static inline uint8_t _get_version(uint8_t *data)

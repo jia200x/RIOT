@@ -20,8 +20,8 @@
 
 #include "periph_conf.h"
 #include "mutex.h"
-#include "net/netdev/eth.h"
 #include "net/ethernet.h"
+#include "net/ethernet/hal.h"
 #include "iolist.h"
 #define ENABLE_DEBUG (0)
 #include "debug.h"
@@ -29,7 +29,6 @@
 #include <string.h>
 static mutex_t _tx = MUTEX_INIT;
 static mutex_t _rx = MUTEX_INIT;
-netdev_t *_netdev;
 
 void stm32_eth_set_mac(const char *mac);
 void stm32_eth_get_mac(char *out);
@@ -40,14 +39,6 @@ int stm32_eth_get_rx_status_owned(void);
 
 void stm32_eth_rx_complete(void);
 void stm32_eth_isr(void);
-
-#if 0
-static void _isr(netdev_t *netdev) {
-    if(stm32_eth_get_rx_status_owned()) {
-        netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
-    }
-}
-#endif
 
 void stm32_eth_task_handler(void)
 {
@@ -76,10 +67,9 @@ void isr_eth(void)
     cortexm_isr_end();
 }
 
-static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)
+static int _recv(ethernet_hal_t *dev, void *buf, size_t len)
 {
-    (void)info;
-    (void)netdev;
+    (void) dev;
     if(!stm32_eth_get_rx_status_owned()){
                 mutex_lock(&_rx);
     }
@@ -89,26 +79,42 @@ static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)
     return ret;
 }
 
-static int _send(netdev_t *netdev, const struct iolist *iolist)
+static int _send(ethernet_hal_t *dev, const struct iolist *iolist)
 {
-    (void)netdev;
     int ret = 0;
     if(stm32_eth_get_rx_status_owned()) {
         mutex_lock(&_tx);
     }
-    netdev->event_callback(netdev, NETDEV_EVENT_TX_STARTED);
     ret = stm32_eth_send(iolist);
     DEBUG("stm32_eth_netdev: _send: %d %d\n", ret, iolist_size(iolist));
     if (ret < 0)
     {
-        netdev->event_callback(netdev, NETDEV_EVENT_TX_MEDIUM_BUSY);
         return ret;
     }
-    netdev->event_callback(netdev, NETDEV_EVENT_TX_COMPLETE);
+
+    dev->cbs->tx_done(dev);
 
     return ret;
 }
 
+bool _link(ethernet_hal_t *dev)
+{
+    (void) dev;
+    return true; 
+}
+
+int _hw_addr(ethernet_hal_t *dev, uint8_t *addr, int set)
+{
+    (void) dev;
+    if(set) {
+        stm32_eth_set_mac((char *)addr);
+    }
+    else {
+        stm32_eth_get_mac((char*) addr);
+    }
+    return 0;
+}
+#if 0
 static int _set(netdev_t *dev, netopt_t opt, const void *value, size_t max_len)
 {
     int res = -1;
@@ -144,7 +150,19 @@ static int _get(netdev_t *dev, netopt_t opt, void *value, size_t max_len)
 
     return res;
 }
+#endif
 
+static ethernet_driver_t driver = {
+    .recv = _recv,
+    .send = _send,
+    .hw_addr = _hw_addr,
+    .link = _link,
+};
+
+void stm32_eth_hal_setup(ethernet_hal_t *dev)
+{
+    dev->driver = &driver;
+}
 #if 0
 static int _init(netdev_t *netdev)
 {
@@ -152,16 +170,3 @@ static int _init(netdev_t *netdev)
     return stm32_eth_init();
 }
 #endif
-
-static const netdev_driver_t netdev_driver_stm32f4eth = {
-    .send = _send,
-    .recv = _recv,
-    .get = _get,
-    .set = _set,
-};
-
-void stm32_eth_netdev_setup(netdev_t *netdev)
-{
-    _netdev = netdev;
-    netdev->driver = &netdev_driver_stm32f4eth;
-}

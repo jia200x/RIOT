@@ -78,7 +78,7 @@ typedef struct gnrc_netif_ops gnrc_netif_ops_t;
 typedef struct {
     netif_t netif;                          /**< network interface descriptor */
     const gnrc_netif_ops_t *ops;            /**< Operations of the network interface */
-    netdev_t *dev;                          /**< Network device of the network interface */
+    void *dev;                          /**< Network device of the network interface */
     rmutex_t mutex;                         /**< Mutex of the interface */
 #ifdef MODULE_NETSTATS_L2
     netstats_t stats;                       /**< transceiver's statistics */
@@ -257,8 +257,8 @@ struct gnrc_netif_ops {
  * @return  The network interface on success.
  */
 gnrc_netif_t *gnrc_netif_create(char *stack, int stacksize, char priority,
-                                const char *name, netdev_t *dev,
-                                const gnrc_netif_ops_t *ops);
+                                const char *name, void *dev,
+                                const gnrc_netif_ops_t *ops, gnrc_netif_t *netif);
 
 /**
  * @brief   Get number of network interfaces actually allocated

@@ -32,6 +32,7 @@
 static int _get_iid(netdev_t *netdev, eui64_t *value, size_t max_len)
 {
     if (max_len < sizeof(eui64_t)) {
+        puts("WUT");
         return -EOVERFLOW;
     }
 

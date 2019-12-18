@@ -11,13 +11,13 @@
 
 #include <stdio.h>
 #include "stm32_eth.h"
+#include "net/ethernet/hal.h"
 #include "net/gnrc/netif/ethernet.h"
 #include "net/gnrc/netif/internal.h"
-#include "net/netdev.h"
 
-static netdev_t stm32eth;
+static ethernet_hal_t stm32eth;
 static char stack[THREAD_STACKSIZE_DEFAULT];
-static gnrc_netif_t *netif;
+static gnrc_netif_t eth_netif;
 int stm32_eth_init(void);
 
 void stm32_eth_task_handler(void);
@@ -37,29 +37,30 @@ void stm32_eth_isr(void)
     msg_t msg = { .type = NETDEV_MSG_TYPE_EVENT,
                   .content = { .ptr = (gnrc_netif_task_handler_t*) &stm32_eth_th } };
 
-    if (msg_send(&msg, netif->pid) <= 0) {
-        puts("gnrc_netif: possibly lost interrupt.");
+    if (msg_send(&msg, eth_netif.pid) <= 0) {
+        //puts("gnrc_netif: possibly lost interrupt.");
     }
+    //printf("netif: %i", netif->pid);
 }
 
 void stm32_eth_rx_complete(void)
 {
-    stm32eth.event_callback(&stm32eth, NETDEV_EVENT_RX_COMPLETE);
+    stm32eth.cbs->rx_done(&stm32eth);
 }
 
+void stm32_eth_hal_setup(ethernet_hal_t *dev);
 void auto_init_stm32_eth(void)
 {
   /* setup netdev device */
-  stm32_eth_netdev_setup(&stm32eth);
+  stm32_eth_hal_setup(&stm32eth);
 
   if(stm32_eth_init() < 0) {
-      /* Don't even start the thread if this doesn't init... */
       return;
   }
 
   /* initialize netdev <-> gnrc adapter state */
-  netif = gnrc_netif_ethernet_create(stack, THREAD_STACKSIZE_DEFAULT, GNRC_NETIF_PRIO, "stm32_eth",
-                             &stm32eth);
+  gnrc_netif_ethernet_create(stack, THREAD_STACKSIZE_DEFAULT, GNRC_NETIF_PRIO, "stm32_eth",
+                             &stm32eth, &eth_netif);
 }
 
 #else
