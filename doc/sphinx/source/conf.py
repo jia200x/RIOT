@@ -38,7 +38,7 @@ sys.path.append(os.path.join(RIOTBASE, "doc", "breathe"))
 
 extensions = ['breathe']
 breathe_projects = { "RIOT": os.path.join(RIOTBASE, "doc", "doxygen", "xml")}
-breathe_default_project = "riot"
+breathe_default_project = "RIOT"
 master_doc = 'index'
 
 # Add any paths that contain templates here, relative to this directory.
