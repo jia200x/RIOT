@@ -36,7 +36,21 @@ if "RIOTBASE" not in os.environ:
 RIOTBASE = os.path.abspath(os.environ["RIOTBASE"])
 sys.path.append(os.path.join(RIOTBASE, "doc", "breathe"))
 
-extensions = ['breathe']
+extensions = ['breathe', 'exhale']
+# Setup the exhale extension
+exhale_args = {
+    # These arguments are required
+    "containmentFolder":     "./api",
+    "rootFileName":          "library_root.rst",
+    "rootFileTitle":         "Library API",
+    "doxygenStripFromPath":  "..",
+    # Suggested optional arguments
+    "createTreeView":        True,
+    # TIP: if using the sphinx-bootstrap-theme, you need
+    # "treeViewIsBootstrap": True,
+    "exhaleExecutesDoxygen": False,
+}
+
 breathe_projects = { "RIOT": os.path.join(RIOTBASE, "doc", "doxygen", "xml")}
 breathe_default_project = "RIOT"
 master_doc = 'index'

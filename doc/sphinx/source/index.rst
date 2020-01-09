@@ -12,3 +12,4 @@ This is the unofficial documentation for RIOT.
    contribute/index
    reference/index
    examples.rst
+   api/library_root
