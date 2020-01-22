@@ -1194,6 +1194,9 @@ static void _init_from_device(gnrc_netif_t *netif)
     netif->device_type = (uint8_t)tmp;
     gnrc_netif_ipv6_init_mtu(netif);
     _update_l2addr_from_dev(netif);
+#if IS_USED(MODULE_IEEE802154_SOFT_CSMA)
+    netif->csma_conf = CSMA_SENDER_CONF_DEFAULT;
+#endif
 }
 
 static void _configure_netdev(netdev_t *dev)

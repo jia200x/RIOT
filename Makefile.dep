@@ -27,6 +27,10 @@ ifneq (,$(filter ndn-riot,$(USEPKG)))
   USEPKG += micro-ecc
 endif
 
+ifneq (,$(filter ieee802154_soft_csma,$(USEMODULE)))
+  USEMODULE += csma_sender
+endif
+
 ifneq (,$(filter csma_sender,$(USEMODULE)))
   USEMODULE += random
   USEMODULE += xtimer

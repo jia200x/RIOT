@@ -34,6 +34,9 @@
 #include "net/gnrc/netapi.h"
 #include "net/gnrc/pkt.h"
 #include "net/gnrc/netif/conf.h"
+#if IS_USED(MODULE_IEEE802154_SOFT_CSMA)
+#include "net/csma_sender.h"
+#endif
 #ifdef MODULE_GNRC_LORAWAN
 #include "net/gnrc/netif/lorawan.h"
 #endif
@@ -78,6 +81,9 @@ typedef struct {
     rmutex_t mutex;                         /**< Mutex of the interface */
 #ifdef MODULE_NETSTATS_L2
     netstats_t stats;                       /**< transceiver's statistics */
+#endif
+#if IS_USED(MODULE_IEEE802154_SOFT_CSMA)
+    csma_sender_conf_t csma_conf;           /**< Software CSMA configuration */
 #endif
 #if defined(MODULE_GNRC_LORAWAN) || DOXYGEN
     gnrc_netif_lorawan_t lorawan;           /**< LoRaWAN component */

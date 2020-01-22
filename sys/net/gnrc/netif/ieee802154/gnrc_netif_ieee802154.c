@@ -293,6 +293,8 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     else {
         res = dev->driver->send(dev, &iolist);
     }
+#elif IS_USED(MODULE_IEEE802154_SOFT_CSMA)
+    res = csma_sender_csma_ca_send(dev, &iolist, &netif->csma_conf);
 #else
     res = dev->driver->send(dev, &iolist);
 #endif

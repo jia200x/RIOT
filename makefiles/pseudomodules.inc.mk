@@ -9,6 +9,7 @@ PSEUDOMODULES += cord_ep_standalone
 PSEUDOMODULES += core_%
 PSEUDOMODULES += cortexm_fpu
 PSEUDOMODULES += cpu_check_address
+PSEUDOMODULES += ieee802154_soft_csma
 PSEUDOMODULES += devfs_%
 PSEUDOMODULES += ecc_%
 PSEUDOMODULES += emb6_router
