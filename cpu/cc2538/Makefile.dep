@@ -1,3 +1,4 @@
 ifneq (,$(filter cc2538_rf,$(USEMODULE)))
   USEMODULE += netdev_ieee802154
+  USEMODULE += ieee802154_soft_csma
 endif

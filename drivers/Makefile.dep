@@ -114,6 +114,7 @@ ifneq (,$(filter cc2420,$(USEMODULE)))
   USEMODULE += netif
   USEMODULE += ieee802154
   USEMODULE += netdev_ieee802154
+  USEMODULE += ieee802154_soft_csma
   FEATURES_REQUIRED += periph_gpio
   FEATURES_REQUIRED += periph_gpio_irq
   FEATURES_REQUIRED += periph_spi
@@ -282,6 +283,7 @@ ifneq (,$(filter kw2xrf,$(USEMODULE)))
   USEMODULE += netif
   USEMODULE += ieee802154
   USEMODULE += netdev_ieee802154
+  USEMODULE += ieee802154_soft_csma
   USEMODULE += core_thread_flags
   FEATURES_REQUIRED += periph_spi
   FEATURES_REQUIRED += periph_gpio
