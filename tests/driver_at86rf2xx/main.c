@@ -25,6 +25,8 @@
 #include "shell_commands.h"
 #include "thread.h"
 #include "xtimer.h"
+#include "net/ieee802154/radio.h"
+#include "luid.h"
 
 #include "common.h"
 
@@ -42,6 +44,7 @@ static const shell_command_t shell_commands[] = {
     { NULL, NULL, NULL }
 };
 
+#if 0
 static void _event_cb(netdev_t *dev, netdev_event_t event)
 {
     if (event == NETDEV_EVENT_ISR) {
@@ -68,6 +71,11 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
         }
     }
 }
+#endif
+
+void at86rf2xx_init_int(at86rf2xx_t *dev, void (*isr)(void *arg));
+int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params, const ieee802154_rf_cb_t cb);
+void at86rf2xx_task_handler(at86rf2xx_t *dev);
 
 void *_recv_thread(void *arg)
 {
@@ -76,12 +84,31 @@ void *_recv_thread(void *arg)
         msg_t msg;
         msg_receive(&msg);
         if (msg.type == MSG_TYPE_ISR) {
-            netdev_t *dev = msg.content.ptr;
-            dev->driver->isr(dev);
+            at86rf2xx_task_handler(msg.content.ptr);
         }
         else {
             puts("unexpected message type");
         }
+    }
+}
+
+static void at86rf2xx_cbs(void *dev, ieee802154_rf_event_t event, void *ctx)
+{
+    printf("CB!");
+    (void) dev;
+    (void) event;
+    (void) ctx;
+}
+
+static void _isr(void *arg)
+{
+    msg_t msg;
+
+    msg.type = MSG_TYPE_ISR;
+    msg.content.ptr = arg;
+
+    if (msg_send(&msg, _recv_pid) <= 0) {
+        puts("gnrc_netdev: possibly lost interrupt.");
     }
 }
 
@@ -91,17 +118,18 @@ int main(void)
 
     unsigned dev_success = 0;
     for (unsigned i = 0; i < AT86RF2XX_NUM; i++) {
-        netopt_enable_t en = NETOPT_ENABLE;
         const at86rf2xx_params_t *p = &at86rf2xx_params[i];
-        netdev_t *dev = (netdev_t *)(&devs[i]);
 
         printf("Initializing AT86RF2xx radio at SPI_%d\n", p->spi);
-        at86rf2xx_setup(&devs[i], p);
-        dev->event_callback = _event_cb;
-        if (dev->driver->init(dev) < 0) {
-            continue;
-        }
-        dev->driver->set(dev, NETOPT_RX_END_IRQ, &en, sizeof(en));
+        at86rf2xx_init(&devs[i], p, at86rf2xx_cbs);
+        at86rf2xx_init_int(&devs[i], _isr);
+        /* generate EUI-64 and short address */
+        eui64_t addr_long;
+        network_uint16_t addr_short;
+        luid_get_eui64(&addr_long);
+        luid_get_short(&addr_short);
+        ieee802154_dev_t *d = (ieee802154_dev_t*) &devs[i];
+        d->driver->set_hw_addr_filter(d, (uint8_t*) &addr_short, (uint8_t*) &addr_long, 0x23);
         dev_success++;
     }
 

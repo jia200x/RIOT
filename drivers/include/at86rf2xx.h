@@ -33,9 +33,12 @@
 #include <stdbool.h>
 
 #include "board.h"
-#include "net/netdev.h"
-#include "net/netdev/ieee802154.h"
 #include "net/gnrc/nettype.h"
+#include "net/ieee802154/radio.h"
+#include "net/ieee802154.h"
+#include "errno.h"
+#include "byteorder.h"
+#include "net/eui64.h"
 
 /* we need no peripherals for memory mapped radios */
 #if !defined(MODULE_AT86RFA1) && !defined(MODULE_AT86RFR2)
@@ -204,7 +207,8 @@ extern "C" {
 #define AT86RF2XX_OPT_AUTOACK        (0x0080)       /**< Auto ACK active */
 #define AT86RF2XX_OPT_ACK_PENDING    (0x0100)       /**< ACK frames with data
                                                      *   pending */
-
+#define AT86RF2XX_FLAG_SLEEP (0x1)
+#define AT86RF2XX_FLAG_RX_CONTINUOUS (0x2)
 /** @} */
 
 #if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
@@ -226,13 +230,19 @@ typedef struct at86rf2xx_params {
 } at86rf2xx_params_t;
 #endif
 
+typedef enum {
+    AT86RF2XX_TRX_STATE_RX_ON,
+    AT86RF2XX_TRX_STATE_TX_ON,
+    AT86RF2XX_TRX_STATE_TRX_OFF,
+} at86rf2xx_trx_state_t;
+
 /**
  * @brief   Device descriptor for AT86RF2XX radio devices
  *
  * @extends netdev_ieee802154_t
  */
 typedef struct {
-    netdev_ieee802154_t netdev;             /**< netdev parent struct */
+    ieee802154_dev_t dev;
 #if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
     /* ATmega256rfr2 signals transceiver events with different interrupts
      * they have to be stored to mimic the same flow as external transceiver
@@ -246,17 +256,12 @@ typedef struct {
     /* device specific fields */
     at86rf2xx_params_t params;              /**< parameters for initialization */
 #endif
-    uint16_t flags;                         /**< Device specific flags */
-    uint8_t state;                          /**< current state of the radio */
+    uint8_t trx_state;                          /**< current state of the radio */
     uint8_t tx_frame_len;                   /**< length of the current TX frame */
 #ifdef MODULE_AT86RF212B
     /* Only AT86RF212B supports multiple pages (PHY modes) */
     uint8_t page;                       /**< currently used channel page */
 #endif
-    uint8_t idle_state;                 /**< state to return to after sending */
-    uint8_t pending_tx;                 /**< keep track of pending TX calls
-                                             this is required to know when to
-                                             return to @ref at86rf2xx_t::idle_state */
 #if AT86RF2XX_HAVE_RETRIES
     /* Only radios with the XAH_CTRL_2 register support frame retry reporting */
     uint8_t tx_retries;                 /**< Number of NOACK retransmissions */
@@ -574,6 +579,11 @@ void at86rf2xx_tx_exec(const at86rf2xx_t *dev);
  * @return                  false if channel is determined busy
  */
 bool at86rf2xx_cca(at86rf2xx_t *dev);
+void at86rf2xx_set_promiscuous(at86rf2xx_t *dev, bool enable);
+void at86rf2xx_set_auto_ack(at86rf2xx_t *dev, bool enable);
+void at86rf2xx_set_frame_pending(at86rf2xx_t *dev, bool pending);
+void at86rf2xx_set_internal_state(const at86rf2xx_t *dev, int state);
+void at86rf2xx_sleep(at86rf2xx_t *dev);
 
 #ifdef __cplusplus
 }

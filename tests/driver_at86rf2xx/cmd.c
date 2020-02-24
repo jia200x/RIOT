@@ -18,7 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "net/netdev/ieee802154.h"
 #include "net/ieee802154.h"
 
 #include "common.h"
@@ -31,106 +30,6 @@
 static size_t _parse_addr(uint8_t *out, size_t out_len, const char *in);
 static int send(int iface, le_uint16_t dst_pan, uint8_t *dst_addr,
                 size_t dst_len, char *data);
-
-int ifconfig_list(int idx)
-{
-    int res;
-    netdev_ieee802154_t *dev = (netdev_ieee802154_t *)(&devs[idx]);
-
-    int (*get)(netdev_t *, netopt_t, void *, size_t) = dev->netdev.driver->get;
-    netopt_enable_t enable_val;
-    uint16_t u16_val;
-
-    printf("Iface %3d  HWaddr: ", idx);
-    print_addr(dev->short_addr, IEEE802154_SHORT_ADDRESS_LEN);
-    printf(", Long HWaddr: ");
-    print_addr(dev->long_addr, IEEE802154_LONG_ADDRESS_LEN);
-    printf(", PAN: 0x%04x", dev->pan);
-
-    res = get((netdev_t *)dev, NETOPT_ADDR_LEN, &u16_val, sizeof(u16_val));
-    if (res < 0) {
-        puts("(err)");
-        return 1;
-    }
-    printf("\n           Address length: %u", (unsigned)u16_val);
-
-    res = get((netdev_t *)dev, NETOPT_SRC_LEN, &u16_val, sizeof(u16_val));
-    if (res < 0) {
-        puts("(err)");
-        return 1;
-    }
-    printf(", Source address length: %u", (unsigned)u16_val);
-
-    res = get((netdev_t *)dev, NETOPT_MAX_PDU_SIZE, &u16_val,
-              sizeof(u16_val));
-    if (res < 0) {
-        puts("(err)");
-        return 1;
-    }
-    printf(", Max.Payload: %u", (unsigned)u16_val);
-    printf("\n           Channel: %u", dev->chan);
-
-    res = get((netdev_t *)dev, NETOPT_CHANNEL_PAGE, &u16_val, sizeof(u16_val));
-    if (res < 0) {
-        puts("(err)");
-        return 1;
-    }
-    printf(", Ch.page: %u", (unsigned)u16_val);
-
-    res = get((netdev_t *)dev, NETOPT_TX_POWER, &u16_val, sizeof(u16_val));
-    if (res < 0) {
-        puts("(err)");
-        return 1;
-    }
-    printf(", TXPower: %d dBm", (int)u16_val);
-    res = get((netdev_t *)dev, NETOPT_IS_WIRED, &u16_val, sizeof(u16_val));
-    if (res < 0) {
-        puts(", wireless");
-    }
-    else {
-        puts(", wired");
-    }
-
-    printf("         ");
-    res = get((netdev_t *)dev, NETOPT_PRELOADING, &enable_val,
-              sizeof(netopt_enable_t));
-    if ((res > 0) && (enable_val == NETOPT_ENABLE)) {
-        printf("  PRELOAD");
-    }
-    res = get((netdev_t *)dev, NETOPT_AUTOACK, &enable_val,
-              sizeof(netopt_enable_t));
-    if ((res > 0) && (enable_val == NETOPT_ENABLE)) {
-        printf("  AUTOACK");
-    }
-    res = get((netdev_t *)dev, NETOPT_RAWMODE, &enable_val,
-              sizeof(netopt_enable_t));
-    if ((res > 0) && (enable_val == NETOPT_ENABLE)) {
-        printf("  RAW");
-    }
-    res = get((netdev_t *)dev, NETOPT_AUTOCCA, &enable_val,
-              sizeof(netopt_enable_t));
-    if ((res > 0) && (enable_val == NETOPT_ENABLE)) {
-        printf("  AUTOCCA");
-    }
-    res = get((netdev_t *)dev, NETOPT_CSMA, &enable_val,
-              sizeof(netopt_enable_t));
-    if ((res > 0) && (enable_val == NETOPT_ENABLE)) {
-        printf("  CSMA");
-    }
-    puts("");
-
-    return 0;
-}
-
-int ifconfig(int argc, char **argv)
-{
-    (void)argc;
-    (void)argv;
-    for (unsigned int i = 0; i < AT86RF2XX_NUM; i++) {
-        ifconfig_list(i);
-    }
-    return 0;
-}
 
 static void txtsnd_usage(char *cmd_name)
 {
@@ -241,7 +140,6 @@ static int send(int iface, le_uint16_t dst_pan, uint8_t *dst, size_t dst_len,
                 char *data)
 {
     int res;
-    netdev_ieee802154_t *dev;
     uint8_t *src;
     size_t src_len;
     uint8_t mhr[IEEE802154_MAX_HDR_LEN];
@@ -258,7 +156,6 @@ static int send(int iface, le_uint16_t dst_pan, uint8_t *dst, size_t dst_len,
         .iol_len = strlen(data)
     };
 
-    dev = (netdev_ieee802154_t *)&devs[iface];
     flags = (uint8_t)(dev->flags & NETDEV_IEEE802154_SEND_MASK);
     flags |= IEEE802154_FCF_TYPE_DATA;
     src_pan = byteorder_btols(byteorder_htons(dev->pan));

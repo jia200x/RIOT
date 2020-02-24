@@ -27,10 +27,10 @@
 #include <stdint.h>
 
 #include "at86rf2xx.h"
+#include "at86rf2xx_registers.h"
 
 #if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
 #include <string.h>
-#include "at86rf2xx_registers.h"
 #endif
 
 
@@ -243,6 +243,20 @@ void at86rf2xx_configure_phy(at86rf2xx_t *dev);
  */
 void at86rf2xx_get_random(const at86rf2xx_t *dev, uint8_t *data, size_t len);
 #endif
+
+static inline uint8_t at86rf2xx_clear_irq_flags(const at86rf2xx_t *dev)
+{
+    return at86rf2xx_reg_read(dev, AT86RF2XX_REG__IRQ_STATUS);
+}
+static inline bool at86rf2xx_irq_has_trx_end(uint8_t irq_mask)
+{
+    return (irq_mask & AT86RF2XX_IRQ_STATUS_MASK__TRX_END);
+}
+
+static inline bool at86rf2xx_irq_has_rx_start(uint8_t irq_mask)
+{
+    return (irq_mask & AT86RF2XX_IRQ_STATUS_MASK__RX_START);
+}
 
 #ifdef __cplusplus
 }
