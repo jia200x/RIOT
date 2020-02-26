@@ -29,7 +29,7 @@
 
 #include "net/csma_sender.h"
 
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG    (1)
 #include "debug.h"
 
 #if ENABLE_DEBUG
@@ -87,26 +87,19 @@ static inline uint32_t choose_backoff_period(int be,
  * @return              -EBUSY if radio medium was not available
  *                      to send the given data
  */
-static int send_if_cca(netdev_t *device, iolist_t *iolist)
+static int send_if_cca(ieee802154_dev_t *device, iolist_t *iolist)
 {
-    netopt_enable_t hwfeat;
-
+    int res;
     /* perform a CCA */
     DEBUG("csma: Checking radio medium availability...\n");
-    int res = device->driver->get(device,
-                                  NETOPT_IS_CHANNEL_CLR,
-                                  (void *) &hwfeat,
-                                  sizeof(netopt_enable_t));
-    if (res < 0) {
-        /* normally impossible: we got a big internal problem! */
-        DEBUG("csma: !!! DEVICE DRIVER FAILURE! TRANSMISSION ABORTED!\n");
-        return -ECANCELED;
-    }
-
     /* if medium is clear, send the packet and return */
-    if (hwfeat == NETOPT_ENABLE) {
+    if (device->driver->cca(device)) {
         DEBUG("csma: Radio medium available: sending packet.\n");
-        return device->driver->send(device, iolist);
+        device->driver->set_trx_state(device, IEEE802154_TRX_STATE_TX_ON);
+        if((res = device->driver->prepare(device, iolist) < 0)) {
+            return res;
+        }
+        return device->driver->transmit(device);
     }
 
     /* if we arrive here, medium was not available for transmission */
@@ -116,51 +109,22 @@ static int send_if_cca(netdev_t *device, iolist_t *iolist)
 
 /*------------------------- "EXPORTED" FUNCTIONS -------------------------*/
 
-int csma_sender_csma_ca_send(netdev_t *dev, iolist_t *iolist,
+int csma_sender_csma_ca_send(ieee802154_dev_t *dev, iolist_t *iolist,
                              const csma_sender_conf_t *conf)
 {
-    netopt_enable_t hwfeat;
-
     assert(dev);
     /* choose default configuration if none is given */
     if (conf == NULL) {
         conf = &CSMA_SENDER_CONF_DEFAULT;
     }
     /* Does the transceiver do automatic CSMA/CA when sending? */
-    int res = dev->driver->get(dev,
-                               NETOPT_CSMA,
-                               (void *) &hwfeat,
-                               sizeof(netopt_enable_t));
-    bool ok = false;
-
-    switch (res) {
-        case -ENODEV:
-            /* invalid device pointer given */
-            return -ENODEV;
-        case -ENOTSUP:
-            /* device doesn't make auto-CSMA/CA */
-            break;
-        case -EOVERFLOW: /* (normally impossible...*/
-        case -ECANCELED:
-            DEBUG("csma: !!! DEVICE DRIVER FAILURE! TRANSMISSION ABORTED!\n");
-            /* internal driver error! */
-            return -ECANCELED;
-        default:
-            ok = (hwfeat == NETOPT_ENABLE);
-    }
-
-    if (ok) {
-        /* device does CSMA/CA all by itself: let it do its job */
-        DEBUG("csma: Network device does hardware CSMA/CA\n");
-        return dev->driver->send(dev, iolist);
-    }
-
     /* if we arrive here, then we must perform the CSMA/CA procedure
        ourselves by software */
     random_init(_xtimer_now());
     DEBUG("csma: Starting software CSMA/CA....\n");
 
     int nb = 0, be = conf->min_be;
+    int res;
 
     while (nb <= conf->max_be) {
         /* delay for an adequate random backoff period */
@@ -230,7 +194,7 @@ int csma_sender_cca_send(netdev_t *dev, iolist_t *iolist)
 
     /* if we arrive here, we must do CCA ourselves to see if radio medium
        is clear before sending */
-    res = send_if_cca(dev, iolist);
+    res = send_if_cca((void*) dev, iolist);
     if (res == -EBUSY) {
         DEBUG("csma: Transmission cancelled!\n");
     }

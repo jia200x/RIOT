@@ -34,6 +34,14 @@
 #define ENABLE_DEBUG (0)
 #include "debug.h"
 
+#if IS_ACTIVE(AT86RF2XX_EXT)
+#define _RX_STATE AT86RF2XX_STATE_RX_AACK_ON
+#define _TX_STATE AT86RF2XX_STATE_TX_ARET_ON
+#else
+#define _RX_STATE AT86RF2XX_STATE_RX_ON
+#define _TX_STATE AT86RF2XX_STATE_PLL_ON
+#endif
+
 #ifdef MODULE_AT86RF212B
 /* See: Table 9-15. Recommended Mapping of TX Power, Frequency Band, and
  * PHY_TX_PWR (register 0x05), AT86RF212B data sheet. */
@@ -412,15 +420,16 @@ uint8_t at86rf2xx_set_state(at86rf2xx_t *dev, at86rf2xx_trx_state_t trx_state)
         return 0;
     }
 
-    if (_requires_trx_off(old_state, trx_state)) {
+    if (IS_ACTIVE(AT86RF2XX_EXT) && _requires_trx_off(old_state, trx_state)) {
         at86rf2xx_set_internal_state(dev, AT86RF2XX_STATE_TRX_OFF);
     }
+
     switch(trx_state) {
         case AT86RF2XX_TRX_STATE_TX_ON:
-            radio_state = AT86RF2XX_STATE_TX_ARET_ON;
+            radio_state = _TX_STATE;
             break;
         case AT86RF2XX_TRX_STATE_RX_ON:
-            radio_state = AT86RF2XX_STATE_RX_AACK_ON;
+            radio_state = _RX_STATE;
             break;
         case AT86RF2XX_TRX_STATE_TRX_OFF:
             radio_state = AT86RF2XX_STATE_TRX_OFF;

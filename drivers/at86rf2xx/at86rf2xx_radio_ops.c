@@ -3,7 +3,7 @@
 #include "at86rf2xx_registers.h"
 #include "net/ieee802154/radio.h"
 
-#define ENABLE_DEBUG (1)
+#define ENABLE_DEBUG (0)
 #include "debug.h"
 
 ieee802154_radio_ops_t at86rf2xx_ops;
@@ -191,15 +191,12 @@ static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)
     int int_state;
     switch(state) {
         case IEEE802154_TRX_STATE_TRX_OFF:
-            puts("TRX_OFF");
             int_state = AT86RF2XX_TRX_STATE_TRX_OFF;
             break;
         case IEEE802154_TRX_STATE_RX_ON:
-            puts("RX_ON");
             int_state = AT86RF2XX_TRX_STATE_RX_ON;
             break;
         case IEEE802154_TRX_STATE_TX_ON:
-            puts("TX_ON");
             int_state = AT86RF2XX_TRX_STATE_TX_ON;
             break;
         default:
@@ -239,7 +236,15 @@ static bool get_flag(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag)
 {
     (void) dev;
     (void) flag;
-    return 0;
+    switch(flag) {
+#if IS_ACTIVE(AT86RF2XX_EXT)
+        case IEEE802154_FLAG_HAS_CSMA_BACKOFF:
+        case IEEE802154_FLAG_HAS_FRAME_RETRIES:
+            return true;
+#endif
+        default:
+            return false;
+    }
 }
 
 static int set_hw_addr_filter(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_t *ext_addr, uint16_t pan_id)
@@ -386,24 +391,30 @@ static void _isr_send_complete(ieee802154_dev_t *dev, uint8_t trac_status)
 
     DEBUG("[at86rf2xx] EVT - TX_END\n");
 
-    switch (trac_status) {
-                case AT86RF2XX_TRX_STATE__TRAC_SUCCESS:
-                case AT86RF2XX_TRX_STATE__TRAC_SUCCESS_DATA_PENDING:
-                    dev->cb(dev, IEEE802154_RF_EV_TX_DONE, NULL);
-                    DEBUG("[at86rf2xx] TX SUCCESS\n");
-                    break;
-                case AT86RF2XX_TRX_STATE__TRAC_NO_ACK:
-                    dev->cb(dev, IEEE802154_RF_EV_TX_NO_ACK, NULL);
-                    DEBUG("[at86rf2xx] TX NO_ACK\n");
-                    break;
-                case AT86RF2XX_TRX_STATE__TRAC_CHANNEL_ACCESS_FAILURE:
-                    dev->cb(dev, IEEE802154_RF_EV_TX_MEDIUM_BUSY, NULL);
-                    DEBUG("[at86rf2xx] TX_CHANNEL_ACCESS_FAILURE\n");
-                    break;
-                default:
-                    DEBUG("[at86rf2xx] Unhandled TRAC_STATUS: %d\n",
-                          trac_status >> 5);
-            }
+    if(IS_ACTIVE(AT86RF2XX_EXT)) {
+        switch (trac_status) {
+                    case AT86RF2XX_TRX_STATE__TRAC_SUCCESS:
+                    case AT86RF2XX_TRX_STATE__TRAC_SUCCESS_DATA_PENDING:
+                        dev->cb(dev, IEEE802154_RF_EV_TX_DONE, NULL);
+                        DEBUG("[at86rf2xx] TX SUCCESS\n");
+                        break;
+                    case AT86RF2XX_TRX_STATE__TRAC_NO_ACK:
+                        dev->cb(dev, IEEE802154_RF_EV_TX_NO_ACK, NULL);
+                        DEBUG("[at86rf2xx] TX NO_ACK\n");
+                        break;
+                    case AT86RF2XX_TRX_STATE__TRAC_CHANNEL_ACCESS_FAILURE:
+                        dev->cb(dev, IEEE802154_RF_EV_TX_MEDIUM_BUSY, NULL);
+                        DEBUG("[at86rf2xx] TX_CHANNEL_ACCESS_FAILURE\n");
+                        break;
+                    default:
+                        DEBUG("[at86rf2xx] Unhandled TRAC_STATUS: %d\n",
+                              trac_status >> 5);
+                }
+    }
+    else {
+        dev->cb(dev, IEEE802154_RF_EV_TX_DONE, NULL);
+        DEBUG("[at86rf2xx] TX SUCCESS\n");
+    }
 }
 
 void at86rf2xx_task_handler(ieee802154_dev_t *dev)
