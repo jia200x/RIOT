@@ -14,6 +14,10 @@ typedef enum {
     IEEE802154_RF_EV_RX_DONE,
 } ieee802154_rf_event_t;
 
+#define IEEE802154_RF_FLAG_RX_DONE (0x1)
+#define IEEE802154_RF_FLAG_RX_START (0x2)
+#define IEEE802154_RF_FLAG_TX_DONE (0x4)
+
 typedef enum {
     IEEE802154_FLAG_SLEEP,
     IEEE802154_FLAG_RX_CONTINUOUS,
@@ -46,7 +50,6 @@ typedef void (*ieee802154_rf_cb_t)(void *dev, ieee802154_rf_event_t event, void 
 struct ieee802154_dev {
     uint8_t flags;
     ieee802154_radio_ops_t *driver;
-    ieee802154_rf_cb_t cb;
 };
 
 struct ieee802154_radio_ops {
@@ -61,11 +64,14 @@ struct ieee802154_radio_ops {
     int (*set_trx_state)(ieee802154_dev_t *dev, ieee802154_trx_state_t state);
     int (*set_flag)(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag, bool value);
     bool (*get_flag)(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag);
+    uint8_t (*poll_events)(ieee802154_dev_t *dev);
+    int (*get_tx_status)(ieee802154_dev_t *dev);
     int (*set_hw_addr_filter)(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_t *ext_addr, uint16_t pan_id);
     int (*set_frame_retries)(ieee802154_dev_t *dev, int retries);
     int (*set_csma_params)(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd, int8_t retries);
     int (*set_promiscuous)(ieee802154_dev_t *dev, bool enable);
-    int (*start)(ieee802154_dev_t *dev);
-    int (*stop)(ieee802154_dev_t *dev);
+
+    //int (*start)(ieee802154_dev_t *dev);
+    //int (*stop)(ieee802154_dev_t *dev);
 };
 #endif /* IEEE802154_RADIO_H */

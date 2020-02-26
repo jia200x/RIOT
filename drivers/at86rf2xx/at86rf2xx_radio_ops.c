@@ -37,7 +37,6 @@ static int prepare(ieee802154_dev_t *dev, iolist_t *pkt)
 static int transmit(ieee802154_dev_t *dev)
 {
     at86rf2xx_tx_exec((at86rf2xx_t*) dev);
-    dev->cb(dev, IEEE802154_RF_EV_TX_START, NULL);
     return 0;
 }
 
@@ -379,6 +378,7 @@ void at86rf2xx_init_int(at86rf2xx_t *dev, void (*isr)(void *arg))
     at86rf2xx_reg_read(dev, AT86RF2XX_REG__IRQ_STATUS);
 }
 
+#if 0
 static void _isr_send_complete(ieee802154_dev_t *dev, uint8_t trac_status)
 {
 /* Only radios with the XAH_CTRL_2 register support frame retry reporting */
@@ -416,7 +416,70 @@ static void _isr_send_complete(ieee802154_dev_t *dev, uint8_t trac_status)
         DEBUG("[at86rf2xx] TX SUCCESS\n");
     }
 }
+#endif
 
+uint8_t _poll_events(ieee802154_dev_t *dev)
+{
+    uint8_t irq_mask;
+    uint8_t state;
+    uint8_t flags = 0;
+
+    at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
+    /* If transceiver is sleeping register access is impossible and frames are
+     * lost anyway, so return immediately.
+     */
+    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+        return flags;
+    }
+
+    state = _dev->trx_state;
+    /* read (consume) device status */
+    irq_mask = at86rf2xx_clear_irq_flags(_dev);
+
+    if (at86rf2xx_irq_has_rx_start(irq_mask)) {
+        flags |= IEEE802154_RF_FLAG_RX_START;
+    }
+
+    if (at86rf2xx_irq_has_trx_end(irq_mask)) {
+        if (state == AT86RF2XX_TRX_STATE_RX_ON) {
+            flags |= IEEE802154_RF_FLAG_RX_DONE;
+        }
+        else if (state == AT86RF2XX_TRX_STATE_TX_ON) {
+            flags |= IEEE802154_RF_FLAG_TX_DONE;
+        }
+    }
+
+    return flags;
+}
+
+int get_tx_status(ieee802154_dev_t *dev)
+{
+    uint8_t trac_status;
+    at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
+    trac_status = at86rf2xx_reg_read(_dev, AT86RF2XX_REG__TRX_STATE)
+                  & AT86RF2XX_TRX_STATE_MASK__TRAC;
+    switch (trac_status) {
+                case AT86RF2XX_TRX_STATE__TRAC_SUCCESS:
+                case AT86RF2XX_TRX_STATE__TRAC_SUCCESS_DATA_PENDING:
+                    DEBUG("[at86rf2xx] TX SUCCESS\n");
+                    return IEEE802154_RF_EV_TX_DONE;
+                    break;
+                case AT86RF2XX_TRX_STATE__TRAC_NO_ACK:
+                    DEBUG("[at86rf2xx] TX NO_ACK\n");
+                    return IEEE802154_RF_EV_TX_NO_ACK;
+                    break;
+                case AT86RF2XX_TRX_STATE__TRAC_CHANNEL_ACCESS_FAILURE:
+                    DEBUG("[at86rf2xx] TX_CHANNEL_ACCESS_FAILURE\n");
+                    return IEEE802154_RF_EV_TX_MEDIUM_BUSY;
+                    break;
+                default:
+                    DEBUG("[at86rf2xx] Unhandled TRAC_STATUS: %d\n",
+                          trac_status >> 5);
+                    return 100;
+            }
+}
+
+#if 0
 void at86rf2xx_task_handler(ieee802154_dev_t *dev)
 {
     uint8_t irq_mask;
@@ -462,6 +525,7 @@ void at86rf2xx_task_handler(ieee802154_dev_t *dev)
 #endif
     }
 }
+#endif
 ieee802154_radio_ops_t at86rf2xx_ops = {
     .prepare = prepare,
     .transmit = transmit,
@@ -477,4 +541,6 @@ ieee802154_radio_ops_t at86rf2xx_ops = {
     .set_frame_retries = set_frame_retries,
     .set_csma_params = set_csma_params,
     .set_promiscuous = set_promiscuous,
+    .poll_events = _poll_events,
+    .get_tx_status = get_tx_status,
 };

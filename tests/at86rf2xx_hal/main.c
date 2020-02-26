@@ -51,6 +51,25 @@ uint8_t at86rf2xx_seq;
 /* SubMAC variables */
 #define IEEE802154_SUBMAC_MAX_RETRIES (2)
 int submac_retries;
+bool wait_for_ack;
+
+void _ack_timeout(void *arg)
+{
+    (void) arg;
+    wait_for_ack = 0;
+    msg_t msg;
+
+    msg.type = MSG_TYPE_ACK_TIMEOUT;
+    msg.content.ptr = arg;
+
+    if (msg_send(&msg, _recv_pid) <= 0) {
+        puts("gnrc_netdev: possibly lost interrupt.");
+    }
+}
+
+xtimer_t ack_timeout = {
+    .callback = _ack_timeout
+};
 
 static void submac_tx_done(ieee802154_dev_t *dev, int status, bool frame_pending)
 {
@@ -61,7 +80,6 @@ static void submac_tx_done(ieee802154_dev_t *dev, int status, bool frame_pending
     }
     dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
 }
-
 
 int ieee802154_send(ieee802154_dev_t *dev, iolist_t *iolist)
 {
@@ -244,69 +262,6 @@ static const shell_command_t shell_commands[] = {
 
 void at86rf2xx_init_int(at86rf2xx_t *dev, void (*isr)(void *arg));
 int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params);
-void at86rf2xx_task_handler(at86rf2xx_t *dev);
-
-void *_recv_thread(void *arg)
-{
-    (void)arg;
-    msg_t msg, queue[8];
-    msg_init_queue(queue, 8);
-    while (1) {
-        msg_receive(&msg);
-        if (msg.type == MSG_TYPE_ISR) {
-            at86rf2xx_task_handler(msg.content.ptr);
-        }
-        else if(msg.type == MSG_TYPE_ACK_TIMEOUT)
-        {
-            if(++submac_retries < IEEE802154_SUBMAC_MAX_RETRIES) {
-                ieee802154_send((void*) &dev, &iol_hdr);
-            }
-            else {
-                submac_retries = 0;
-                submac_tx_done((void*) &dev, 1, 0);
-            }
-        }
-        else {
-            puts("unexpected message type");
-        }
-    }
-}
-bool wait_for_ack;
-
-void recv(void)
-{
-    size_t data_len;
-
-    putchar('\n');
-    data_len = dev.dev.driver->read((void*) &dev, buffer, sizeof(buffer), NULL);
-    for (unsigned i=0;i<data_len;i++) {
-        printf("%02x ", buffer[i]);
-    }
-    puts("");
-}
-
-static bool ieee802154_dev_has_retrans(ieee802154_dev_t *dev)
-{
-    return dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES);
-}
-
-void _ack_timeout(void *arg)
-{
-    (void) arg;
-    wait_for_ack = 0;
-    msg_t msg;
-
-    msg.type = MSG_TYPE_ACK_TIMEOUT;
-    msg.content.ptr = arg;
-
-    if (msg_send(&msg, _recv_pid) <= 0) {
-        puts("gnrc_netdev: possibly lost interrupt.");
-    }
-}
-
-xtimer_t ack_timeout = {
-    .callback = _ack_timeout
-};
 
 static void _handle_ack(ieee802154_dev_t *dev)
 {
@@ -325,38 +280,67 @@ static void _handle_ack(ieee802154_dev_t *dev)
 
 }
 
-static void at86rf2xx_cbs(void *_dev, ieee802154_rf_event_t event, void *ctx)
+void recv(void)
 {
-    (void) _dev;
-    switch(event) {
-        case IEEE802154_RF_EV_TX_DONE:
-            if (!ieee802154_dev_has_retrans((void*) &dev)) {
-                dev.dev.driver->set_trx_state((void*) &dev, IEEE802154_TRX_STATE_RX_ON);
-                wait_for_ack = 1;
-                xtimer_set(&ack_timeout, 7000);
-            }
-            else {
-                submac_tx_done((void*) &dev, 0, 0);
-            }
-            break;
-        case IEEE802154_RF_EV_RX_DONE:
-            if(wait_for_ack) {
-                _handle_ack((void*) &dev);
-            }
-            else {
-                recv();
-            }
-            break;
-        case IEEE802154_RF_EV_TX_NO_ACK:
-            submac_tx_done((void*) &dev, 1, 0);
-            break;
-        default:
-            printf("%i\n", event);
-            break;
+    size_t data_len;
+
+    putchar('\n');
+    data_len = dev.dev.driver->read((void*) &dev, buffer, sizeof(buffer), NULL);
+    for (unsigned i=0;i<data_len;i++) {
+        printf("%02x ", buffer[i]);
     }
-    (void) dev;
-    (void) event;
-    (void) ctx;
+    puts("");
+}
+
+static bool ieee802154_dev_has_retrans(ieee802154_dev_t *dev)
+{
+    return dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES);
+}
+
+void *_recv_thread(void *arg)
+{
+    (void)arg;
+    msg_t msg, queue[8];
+    msg_init_queue(queue, 8);
+    while (1) {
+        msg_receive(&msg);
+        if (msg.type == MSG_TYPE_ISR) {
+            uint8_t ev = dev.dev.driver->poll_events((void*) &dev);
+            if (ev & IEEE802154_RF_FLAG_RX_DONE) {
+                if(wait_for_ack) {
+                    _handle_ack((void*) &dev);
+                }
+                else {
+                    recv();
+                }
+            }
+            else if (ev & IEEE802154_RF_FLAG_TX_DONE) {
+                if (!ieee802154_dev_has_retrans((void*) &dev)) {
+                    dev.dev.driver->set_trx_state((void*) &dev, IEEE802154_TRX_STATE_RX_ON);
+                    wait_for_ack = 1;
+                    xtimer_set(&ack_timeout, 7000);
+                }
+                else {
+                    submac_tx_done((void*) &dev, 0, 0);
+                }
+                //submac_tx_done((void*) &dev, 1, 0);
+            }
+        }
+        else if(msg.type == MSG_TYPE_ACK_TIMEOUT)
+        {
+            if(++submac_retries < IEEE802154_SUBMAC_MAX_RETRIES) {
+                ieee802154_send((void*) &dev, &iol_hdr);
+            }
+            else {
+                submac_retries = 0;
+                submac_tx_done((void*) &dev, 1, 0);
+            }
+        }
+        else {
+            puts("unexpected message type");
+        }
+    }
+    return NULL;
 }
 
 static void _isr(void *arg)
@@ -379,7 +363,6 @@ int main(void)
 
     printf("Initializing AT86RF2xx radio at SPI_%d\n", p->spi);
     ieee802154_dev_t *d = (ieee802154_dev_t*) &dev;
-    d->cb = at86rf2xx_cbs;
     at86rf2xx_init(&dev, p);
     at86rf2xx_init_int(&dev, _isr);
     /* generate EUI-64 and short address */
