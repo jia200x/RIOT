@@ -49,27 +49,7 @@ network_uint16_t at86rf2xx_addr_short;
 uint8_t at86rf2xx_seq;
 
 /* SubMAC variables */
-#define IEEE802154_SUBMAC_MAX_RETRIES (2)
-int submac_retries;
-bool wait_for_ack;
-
-void _ack_timeout(void *arg)
-{
-    (void) arg;
-    wait_for_ack = 0;
-    msg_t msg;
-
-    msg.type = MSG_TYPE_ACK_TIMEOUT;
-    msg.content.ptr = arg;
-
-    if (msg_send(&msg, _recv_pid) <= 0) {
-        puts("gnrc_netdev: possibly lost interrupt.");
-    }
-}
-
-xtimer_t ack_timeout = {
-    .callback = _ack_timeout
-};
+#define IEEE802154_SUBMAC_MAX_RETRANSMISSIONS (2)
 
 static void submac_tx_done(ieee802154_dev_t *dev, int status, bool frame_pending)
 {
@@ -79,6 +59,45 @@ static void submac_tx_done(ieee802154_dev_t *dev, int status, bool frame_pending
         puts("NO ACK!");
     }
     dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
+}
+
+static int _handle_ack(ieee802154_dev_t *dev)
+{
+    uint8_t ack_pkt[5];
+    int data_len = dev->driver->read(dev, ack_pkt, 5, NULL);
+
+    if(data_len > 0 && ack_pkt[0] == 0x2) {
+        return 0;
+    }
+    else {
+        return -ENOMSG;
+    }
+}
+
+void _perform_csma_with_retrans(ieee802154_dev_t *dev, iolist_t *psdu)
+{
+    int res;
+    dev->driver->set_flag(dev, IEEE802154_FLAG_POLL, true);
+    int submac_retransmissions = 0;
+    while (submac_retransmissions++ < IEEE802154_SUBMAC_MAX_RETRANSMISSIONS) {
+        res = csma_sender_csma_ca_send(dev, psdu, NULL);
+        if (res < 0) {
+            submac_tx_done(dev, 2, 0);
+            break;
+        }
+        /* Wait for TX done */
+        while(!(dev->driver->poll_events(dev) & IEEE802154_RF_FLAG_TX_DONE)) {}
+
+        dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
+        xtimer_usleep(7000);
+        uint8_t ev = dev->driver->poll_events(dev);
+        res = -ENOMSG;
+        if (ev & IEEE802154_RF_FLAG_RX_DONE && _handle_ack(dev) == 0) {
+            break;
+        }
+    }
+    submac_tx_done(dev, 0, 0);
+    dev->driver->set_flag(dev, IEEE802154_FLAG_POLL, false);
 }
 
 int ieee802154_send(ieee802154_dev_t *dev, iolist_t *iolist)
@@ -98,7 +117,13 @@ int ieee802154_send(ieee802154_dev_t *dev, iolist_t *iolist)
         res = dev->driver->transmit(dev);
     }
     else {
-        res = csma_sender_csma_ca_send(dev, iolist, NULL);
+        res = _perform_csma_with_retrans(dev, iolist);
+        if(res != 0) {
+            submac_tx_done(dev, 1, 0);
+        }
+        else {
+            submac_tx_done(dev, 0, 0);
+        }
     }
 
     return res;
@@ -263,23 +288,6 @@ static const shell_command_t shell_commands[] = {
 void at86rf2xx_init_int(at86rf2xx_t *dev, void (*isr)(void *arg));
 int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params);
 
-static void _handle_ack(ieee802154_dev_t *dev)
-{
-    uint8_t ack_pkt[5];
-    xtimer_remove(&ack_timeout);
-    wait_for_ack = 0;
-    int data_len = dev->driver->read(dev, ack_pkt, 5, NULL);
-
-    if(data_len > 0 && ack_pkt[0] == 0x2) {
-        puts("Received ACK");
-        submac_tx_done(dev, 0, false);
-    }
-    else {
-        puts(":/");
-    }
-
-}
-
 void recv(void)
 {
     size_t data_len;
@@ -292,11 +300,6 @@ void recv(void)
     puts("");
 }
 
-static bool ieee802154_dev_has_retrans(ieee802154_dev_t *dev)
-{
-    return dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES);
-}
-
 void *_recv_thread(void *arg)
 {
     (void)arg;
@@ -307,33 +310,11 @@ void *_recv_thread(void *arg)
         if (msg.type == MSG_TYPE_ISR) {
             uint8_t ev = dev.dev.driver->poll_events((void*) &dev);
             if (ev & IEEE802154_RF_FLAG_RX_DONE) {
-                if(wait_for_ack) {
-                    _handle_ack((void*) &dev);
-                }
-                else {
-                    recv();
-                }
+                recv();
             }
             else if (ev & IEEE802154_RF_FLAG_TX_DONE) {
-                if (!ieee802154_dev_has_retrans((void*) &dev)) {
-                    dev.dev.driver->set_trx_state((void*) &dev, IEEE802154_TRX_STATE_RX_ON);
-                    wait_for_ack = 1;
-                    xtimer_set(&ack_timeout, 7000);
-                }
-                else {
-                    submac_tx_done((void*) &dev, 0, 0);
-                }
-                //submac_tx_done((void*) &dev, 1, 0);
-            }
-        }
-        else if(msg.type == MSG_TYPE_ACK_TIMEOUT)
-        {
-            if(++submac_retries < IEEE802154_SUBMAC_MAX_RETRIES) {
-                ieee802154_send((void*) &dev, &iol_hdr);
-            }
-            else {
-                submac_retries = 0;
-                submac_tx_done((void*) &dev, 1, 0);
+                /* TODO: Check tx status */
+                submac_tx_done((void*) &dev, 0, 0);
             }
         }
         else {
