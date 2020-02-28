@@ -51,14 +51,46 @@ uint8_t at86rf2xx_seq;
 /* SubMAC variables */
 #define IEEE802154_SUBMAC_MAX_RETRANSMISSIONS (2)
 
-static void submac_tx_done(ieee802154_dev_t *dev, int status, bool frame_pending)
+static void submac_tx_done(ieee802154_dev_t *dev, int status, bool frame_pending,
+        int retrans)
 {
     (void) status;
     (void) frame_pending;
-    if(status == 1) {
-        puts("NO ACK!");
+    (void) retrans;
+    switch(status) {
+        case IEEE802154_RF_EV_TX_DONE:
+        case IEEE802154_RF_EV_TX_DONE_DATA_PENDING:
+            puts("Done!");
+            break;
+        case IEEE802154_RF_EV_TX_MEDIUM_BUSY:
+            puts("Medium busy!");
+            break;
+        case IEEE802154_RF_EV_TX_NO_ACK:
+            puts("No ACK!");
+            break;
+        default:
+            break;
     }
+
     dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
+}
+
+static void submac_rx_done(ieee802154_dev_t *dev, uint8_t *buffer, size_t size)
+{
+    (void) dev;
+    puts("Terrible de recibi el paquete");
+    for (unsigned i=0;i<size;i++) {
+        printf("%02x ", buffer[i]);
+    }
+    puts("");
+}
+
+void ieee802154_dev_transmit_blocking(ieee802154_dev_t *dev)
+{
+    dev->driver->set_flag(dev, IEEE802154_FLAG_POLL, true);
+    dev->driver->transmit(dev);
+    while(!(dev->driver->poll_events(dev) & IEEE802154_RF_FLAG_TX_DONE)) {}
+    dev->driver->set_flag(dev, IEEE802154_FLAG_POLL, false);
 }
 
 static int _handle_ack(ieee802154_dev_t *dev)
@@ -82,7 +114,7 @@ void _perform_csma_with_retrans(ieee802154_dev_t *dev, iolist_t *psdu)
     while (submac_retransmissions++ < IEEE802154_SUBMAC_MAX_RETRANSMISSIONS) {
         res = csma_sender_csma_ca_send(dev, psdu, NULL);
         if (res < 0) {
-            submac_tx_done(dev, 2, 0);
+            submac_tx_done(dev, IEEE802154_RF_EV_TX_MEDIUM_BUSY, 0, 0);
             break;
         }
         /* Wait for TX done */
@@ -93,10 +125,17 @@ void _perform_csma_with_retrans(ieee802154_dev_t *dev, iolist_t *psdu)
         uint8_t ev = dev->driver->poll_events(dev);
         res = -ENOMSG;
         if (ev & IEEE802154_RF_FLAG_RX_DONE && _handle_ack(dev) == 0) {
+            res = 0;
             break;
         }
     }
-    submac_tx_done(dev, 0, 0);
+    if (res < 0) {
+        submac_tx_done(dev, IEEE802154_RF_EV_TX_NO_ACK, 0, 0);
+    }
+    else {
+        submac_tx_done(dev, IEEE802154_RF_EV_TX_DONE, 0, 0);
+    }
+
     dev->driver->set_flag(dev, IEEE802154_FLAG_POLL, false);
 }
 
@@ -117,40 +156,26 @@ int ieee802154_send(ieee802154_dev_t *dev, iolist_t *iolist)
         res = dev->driver->transmit(dev);
     }
     else {
-        res = _perform_csma_with_retrans(dev, iolist);
-        if(res != 0) {
-            submac_tx_done(dev, 1, 0);
-        }
-        else {
-            submac_tx_done(dev, 0, 0);
-        }
+        _perform_csma_with_retrans(dev, iolist);
+        res = 0;
     }
 
     return res;
 }
 
-static uint8_t buffer[AT86RF2XX_MAX_PKT_LENGTH];
-int buf_len;
-uint8_t mhr[IEEE802154_MAX_HDR_LEN];
-int mhr_len;
-iolist_t iol_data = {
-    .iol_base = buffer,
-};
-
-iolist_t iol_hdr = {
-    .iol_next = &iol_data,
-    .iol_base = mhr,
-};
-
 static int send(uint8_t *dst, size_t dst_len,
                 char *data)
 {
     uint8_t flags;
+    uint8_t mhr[IEEE802154_MAX_HDR_LEN];
+    int mhr_len;
+
     le_uint16_t src_pan, dst_pan;
-
-    memcpy(buffer, data, strlen(data));
-
-    iol_data.iol_len = strlen(data);
+    iolist_t iol_data = {
+        .iol_base = data,
+        .iol_len = strlen(data),
+        .iol_next = NULL,
+    };
 
     flags = IEEE802154_FCF_TYPE_DATA | 0x20;
     src_pan = byteorder_btols(byteorder_htons(0x23));
@@ -167,7 +192,11 @@ static int send(uint8_t *dst, size_t dst_len,
         return 1;
     }
 
-    iol_hdr.iol_len = (size_t) mhr_len;
+    iolist_t iol_hdr = {
+        .iol_next = &iol_data,
+        .iol_base = mhr,
+        .iol_len = mhr_len,
+    };
 
     ieee802154_send((void*) &dev, &iol_hdr);
     return 0;
@@ -291,13 +320,32 @@ int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params);
 void recv(void)
 {
     size_t data_len;
+    static uint8_t buffer[AT86RF2XX_MAX_PKT_LENGTH];
 
     putchar('\n');
-    data_len = dev.dev.driver->read((void*) &dev, buffer, sizeof(buffer), NULL);
-    for (unsigned i=0;i<data_len;i++) {
-        printf("%02x ", buffer[i]);
+    ieee802154_dev_t *_dev = &dev.dev;
+    data_len = _dev->driver->read(_dev, buffer, sizeof(buffer), NULL);
+
+    if (!_dev->driver->get_flag(_dev, IEEE802154_FLAG_HAS_AUTO_ACK)) {
+        /* Send ACK packet */
+        uint8_t ack_pkt[3];
+        ack_pkt[0] = 0x2;
+        ack_pkt[1] = 0;
+        ack_pkt[2] = buffer[2];
+
+        iolist_t ack = {
+            .iol_base = ack_pkt,
+            .iol_len = 3,
+            .iol_next = NULL,
+        };
+
+        _dev->driver->set_trx_state(_dev, IEEE802154_TRX_STATE_TX_ON);
+        _dev->driver->prepare(_dev, &ack);
+        ieee802154_dev_transmit_blocking(_dev);
+        _dev->driver->set_trx_state(_dev, IEEE802154_TRX_STATE_RX_ON);
     }
-    puts("");
+
+    submac_rx_done(_dev, buffer, data_len);
 }
 
 void *_recv_thread(void *arg)
@@ -314,7 +362,7 @@ void *_recv_thread(void *arg)
             }
             else if (ev & IEEE802154_RF_FLAG_TX_DONE) {
                 /* TODO: Check tx status */
-                submac_tx_done((void*) &dev, 0, 0);
+                submac_tx_done((void*) &dev, 0, 0, 0);
             }
         }
         else {

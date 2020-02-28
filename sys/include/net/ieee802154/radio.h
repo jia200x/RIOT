@@ -9,10 +9,7 @@ typedef enum {
     IEEE802154_RF_EV_TX_DONE_DATA_PENDING,
     IEEE802154_RF_EV_TX_NO_ACK,
     IEEE802154_RF_EV_TX_MEDIUM_BUSY,
-    IEEE802154_RF_EV_TX_START,
-    IEEE802154_RF_EV_RX_START,
-    IEEE802154_RF_EV_RX_DONE,
-} ieee802154_rf_event_t;
+} ieee802154_tx_status_t;
 
 #define IEEE802154_RF_FLAG_RX_DONE (0x1)
 #define IEEE802154_RF_FLAG_RX_START (0x2)
@@ -26,6 +23,7 @@ typedef enum {
     IEEE802154_FLAG_HAS_FRAME_RETRIES,
     IEEE802154_FLAG_HAS_CSMA_BACKOFF,
     IEEE802154_FLAG_HAS_ACK_TIMEOUT,
+    IEEE802154_FLAG_HAS_AUTO_ACK,
 } ieee802154_rf_flags_t;
 
 typedef enum {
@@ -45,8 +43,6 @@ typedef struct {
 } ieee802154_rx_info_t;
 
 typedef struct ieee802154_dev ieee802154_dev_t;
-
-typedef void (*ieee802154_rf_cb_t)(void *dev, ieee802154_rf_event_t event, void *ctx);
 
 struct ieee802154_dev {
     uint8_t flags;
