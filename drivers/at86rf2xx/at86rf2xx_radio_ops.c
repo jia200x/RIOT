@@ -213,7 +213,6 @@ static int set_flag(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag, bool valu
     (void) dev;
     (void) flag;
     (void) value;
-    uint8_t tmp;
     switch(flag) {
         case IEEE802154_FLAG_SLEEP:
             if(value) {
@@ -225,19 +224,6 @@ static int set_flag(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag, bool valu
                 dev->flags &= ~AT86RF2XX_FLAG_SLEEP;
             }
             break;
-        case IEEE802154_FLAG_POLL:
-            tmp = at86rf2xx_reg_read((void*) dev, AT86RF2XX_REG__TRX_CTRL_1);
-            if (value) {
-                tmp |= (AT86RF2XX_TRX_CTRL_1_MASK__IRQ_MASK_MODE);
-            }
-            else {
-                tmp &= ~(AT86RF2XX_TRX_CTRL_1_MASK__IRQ_MASK_MODE);
-            }
-            at86rf2xx_reg_write((void *) dev, AT86RF2XX_REG__TRX_CTRL_1, tmp);
-            at86rf2xx_reg_write((void*) dev, AT86RF2XX_REG__IRQ_MASK,
-                                value ? 0 : AT86RF2XX_IRQ_STATUS_MASK__TRX_END );
-            break;
-
         default:
             return -ENOTSUP;
     }

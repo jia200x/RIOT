@@ -47,6 +47,7 @@ at86rf2xx_t dev;
 eui64_t at86rf2xx_addr_long;
 network_uint16_t at86rf2xx_addr_short;
 uint8_t at86rf2xx_seq;
+volatile bool blocking;
 
 /* SubMAC variables */
 #define IEEE802154_SUBMAC_MAX_RETRANSMISSIONS (2)
@@ -87,10 +88,10 @@ static void submac_rx_done(ieee802154_dev_t *dev, uint8_t *buffer, size_t size)
 
 void ieee802154_dev_transmit_blocking(ieee802154_dev_t *dev)
 {
-    dev->driver->set_flag(dev, IEEE802154_FLAG_POLL, true);
+    blocking = true;
     dev->driver->transmit(dev);
     while(!(dev->driver->poll_events(dev) & IEEE802154_RF_FLAG_TX_DONE)) {}
-    dev->driver->set_flag(dev, IEEE802154_FLAG_POLL, false);
+    blocking = false;
 }
 
 static int _handle_ack(ieee802154_dev_t *dev)
@@ -109,7 +110,7 @@ static int _handle_ack(ieee802154_dev_t *dev)
 void _perform_csma_with_retrans(ieee802154_dev_t *dev, iolist_t *psdu)
 {
     int res;
-    dev->driver->set_flag(dev, IEEE802154_FLAG_POLL, true);
+    blocking = true;
     int submac_retransmissions = 0;
     while (submac_retransmissions++ < IEEE802154_SUBMAC_MAX_RETRANSMISSIONS) {
         res = csma_sender_csma_ca_send(dev, psdu, NULL);
@@ -121,7 +122,7 @@ void _perform_csma_with_retrans(ieee802154_dev_t *dev, iolist_t *psdu)
         while(!(dev->driver->poll_events(dev) & IEEE802154_RF_FLAG_TX_DONE)) {}
 
         dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
-        xtimer_usleep(7000);
+        xtimer_usleep(1000);
         uint8_t ev = dev->driver->poll_events(dev);
         res = -ENOMSG;
         if (ev & IEEE802154_RF_FLAG_RX_DONE && _handle_ack(dev) == 0) {
@@ -136,7 +137,7 @@ void _perform_csma_with_retrans(ieee802154_dev_t *dev, iolist_t *psdu)
         submac_tx_done(dev, IEEE802154_RF_EV_TX_DONE, 0, 0);
     }
 
-    dev->driver->set_flag(dev, IEEE802154_FLAG_POLL, false);
+    blocking = false;
 }
 
 int ieee802154_send(ieee802154_dev_t *dev, iolist_t *iolist)
@@ -374,6 +375,9 @@ void *_recv_thread(void *arg)
 
 static void _isr(void *arg)
 {
+    if(blocking) {
+        return;
+    }
     msg_t msg;
 
     msg.type = MSG_TYPE_ISR;
