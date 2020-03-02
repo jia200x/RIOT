@@ -62,7 +62,7 @@ extern "C" {
 /**
  * @brief   Export the netdev device descriptor
  */
-extern netdev_ieee802154_t nrf802154_dev;
+//extern netdev_ieee802154_t nrf802154_dev;
 
 /**
  * @brief   IEEE 802.15.4 radio timer configuration

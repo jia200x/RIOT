@@ -28,8 +28,13 @@
 #include "shell_commands.h"
 #include "thread.h"
 #include "xtimer.h"
+#if IS_ACTIVE(MODULE_AT86RF2XX)
 #include "at86rf2xx.h"
 #include "at86rf2xx_params.h"
+#endif
+#if IS_ACTIVE(MODULE_NRF802154)
+#include "nrf802154.h"
+#endif
 #include "net/ieee802154/radio.h"
 #include "luid.h"
 #include "od.h"
@@ -43,10 +48,18 @@
 static char stack[_STACKSIZE];
 static kernel_pid_t _recv_pid;
 
+#if IS_ACTIVE(MODULE_AT86RF2XX)
 at86rf2xx_t dev;
-eui64_t at86rf2xx_addr_long;
-network_uint16_t at86rf2xx_addr_short;
-uint8_t at86rf2xx_seq;
+ieee802154_dev_t *ieee802154_dev = (ieee802154_dev_t*) &dev;
+#endif
+#if IS_ACTIVE(MODULE_NRF802154)
+extern ieee802154_dev_t nrf802154_dev;
+ieee802154_dev_t *ieee802154_dev = (ieee802154_dev_t*) &nrf802154_dev;
+#endif
+
+eui64_t ieee802154_addr_long;
+network_uint16_t ieee802154_addr_short;
+uint8_t ieee802154_seq;
 volatile bool blocking;
 
 /* SubMAC variables */
@@ -182,13 +195,13 @@ static int send(uint8_t *dst, size_t dst_len,
     src_pan = byteorder_btols(byteorder_htons(0x23));
     dst_pan = byteorder_btols(byteorder_htons(0x23));
     uint8_t src_len = 8;
-    void *src = &at86rf2xx_addr_long;
+    void *src = &ieee802154_addr_long;
 
     /* fill MAC header, seq should be set by device */
     if ((mhr_len = ieee802154_set_frame_hdr(mhr, src, src_len,
                                         dst, dst_len,
                                         src_pan, dst_pan,
-                                        flags, at86rf2xx_seq++)) < 0) {
+                                        flags, ieee802154_seq++)) < 0) {
         puts("txtsnd: Error preperaring frame");
         return 1;
     }
@@ -199,7 +212,7 @@ static int send(uint8_t *dst, size_t dst_len,
         .iol_len = mhr_len,
     };
 
-    ieee802154_send((void*) &dev, &iol_hdr);
+    ieee802154_send(ieee802154_dev, &iol_hdr);
     return 0;
 }
 
@@ -273,7 +286,7 @@ int txpow(int argc, char **argv)
 {
     (void) argc;
     (void) argv;
-    dev.dev.driver->set_tx_power((void *)&dev, 0);
+    ieee802154_dev->driver->set_tx_power(ieee802154_dev, 0);
     return 0;
 }
 
@@ -315,19 +328,25 @@ static const shell_command_t shell_commands[] = {
     { NULL, NULL, NULL }
 };
 
+#if IS_ACTIVE(MODULE_AT86RF2XX)
 void at86rf2xx_init_int(at86rf2xx_t *dev, void (*isr)(void *arg));
 int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params);
+#endif
+
+#if IS_ACTIVE(MODULE_NRF802154)
+void nrf802154_init_int(void (*isr)(void *arg));
+int nrf802154_init(void);
+#endif
 
 void recv(void)
 {
     size_t data_len;
-    static uint8_t buffer[AT86RF2XX_MAX_PKT_LENGTH];
+    static uint8_t buffer[127];
 
     putchar('\n');
-    ieee802154_dev_t *_dev = &dev.dev;
-    data_len = _dev->driver->read(_dev, buffer, sizeof(buffer), NULL);
+    data_len = ieee802154_dev->driver->read(ieee802154_dev, buffer, sizeof(buffer), NULL);
 
-    if (!_dev->driver->get_flag(_dev, IEEE802154_FLAG_HAS_AUTO_ACK)) {
+    if (!ieee802154_dev->driver->get_flag(ieee802154_dev, IEEE802154_FLAG_HAS_AUTO_ACK)) {
         /* Send ACK packet */
         uint8_t ack_pkt[3];
         ack_pkt[0] = 0x2;
@@ -340,13 +359,13 @@ void recv(void)
             .iol_next = NULL,
         };
 
-        _dev->driver->set_trx_state(_dev, IEEE802154_TRX_STATE_TX_ON);
-        _dev->driver->prepare(_dev, &ack);
-        ieee802154_dev_transmit_blocking(_dev);
-        _dev->driver->set_trx_state(_dev, IEEE802154_TRX_STATE_RX_ON);
+        ieee802154_dev->driver->set_trx_state(ieee802154_dev, IEEE802154_TRX_STATE_TX_ON);
+        ieee802154_dev->driver->prepare(ieee802154_dev, &ack);
+        ieee802154_dev_transmit_blocking(ieee802154_dev);
+        ieee802154_dev->driver->set_trx_state(ieee802154_dev, IEEE802154_TRX_STATE_RX_ON);
     }
 
-    submac_rx_done(_dev, buffer, data_len);
+    submac_rx_done(ieee802154_dev, buffer, data_len);
 }
 
 void *_recv_thread(void *arg)
@@ -357,13 +376,13 @@ void *_recv_thread(void *arg)
     while (1) {
         msg_receive(&msg);
         if (msg.type == MSG_TYPE_ISR) {
-            uint8_t ev = dev.dev.driver->poll_events((void*) &dev);
+            uint8_t ev = ieee802154_dev->driver->poll_events(ieee802154_dev);
             if (ev & IEEE802154_RF_FLAG_RX_DONE) {
                 recv();
             }
             else if (ev & IEEE802154_RF_FLAG_TX_DONE) {
                 /* TODO: Check tx status */
-                submac_tx_done((void*) &dev, 0, 0, 0);
+                submac_tx_done(ieee802154_dev, 0, 0, 0);
             }
         }
         else {
@@ -390,6 +409,7 @@ static void _isr(void *arg)
 
 int main(void)
 {
+#if IS_ACTIVE(MODULE_AT86RF2XX)
     puts("AT86RF2xx device driver test");
 
     const at86rf2xx_params_t *p = &at86rf2xx_params[0];
@@ -398,21 +418,29 @@ int main(void)
     ieee802154_dev_t *d = (ieee802154_dev_t*) &dev;
     at86rf2xx_init(&dev, p);
     at86rf2xx_init_int(&dev, _isr);
+#endif
+#if IS_ACTIVE(MODULE_NRF802154)
+    ieee802154_dev_t *d = (ieee802154_dev_t*) &nrf802154_dev;
+    nrf802154_init();
+    nrf802154_init_int(_isr);
+#endif
     /* generate EUI-64 and short address */
-    luid_get_eui64(&at86rf2xx_addr_long);
-    luid_get_short(&at86rf2xx_addr_short);
-    uint8_t *_p = (uint8_t*) &at86rf2xx_addr_short;
+    luid_get_eui64(&ieee802154_addr_long);
+    luid_get_short(&ieee802154_addr_short);
+    uint8_t *_p = (uint8_t*) &ieee802154_addr_short;
     for(int i=0;i<2;i++) {
         printf("%02x", *_p++);
     }
     printf("\n");
-    _p = (uint8_t*) &at86rf2xx_addr_long;
+    _p = (uint8_t*) &ieee802154_addr_long;
     for(int i=0;i<8;i++) {
         printf("%02x", *_p++);
     }
     printf("\n");
-    d->driver->set_hw_addr_filter(d, (uint8_t*) &at86rf2xx_addr_short, (uint8_t*) &at86rf2xx_addr_long, 0x23);
-    d->driver->set_channel((void*) &dev, 26, 0);
+#if IS_ACTIVE(MODULE_AT86RF2XX)
+    d->driver->set_hw_addr_filter(d, (uint8_t*) &ieee802154_addr_short, (uint8_t*) &ieee802154_addr_long, 0x23);
+#endif
+    d->driver->set_channel(ieee802154_dev, 26, 0);
 
     _recv_pid = thread_create(stack, sizeof(stack), THREAD_PRIORITY_MAIN - 1,
                               THREAD_CREATE_STACKTEST, _recv_thread, NULL,

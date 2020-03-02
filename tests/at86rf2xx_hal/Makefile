@@ -1,6 +1,6 @@
 include ../Makefile.tests_common
 
-DISABLE_MODULE += auto_init_at86rf2xx
+DISABLE_MODULE += auto_init_at86rf2xx auto_init_nrf802154
 
 USEMODULE += od
 USEMODULE += shell
@@ -17,6 +17,9 @@ ifneq (,$(filter iotlab-m3 fox,$(BOARD)))
 endif
 ifneq (,$(filter mulle,$(BOARD)))
   DRIVER := at86rf212b
+endif
+ifneq (,$(filter nrf52840dk,$(BOARD)))
+  DRIVER := nrf802154
 endif
 
 # use the at86rf231 as fallback device
