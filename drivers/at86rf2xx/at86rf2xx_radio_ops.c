@@ -41,7 +41,7 @@ static int transmit(ieee802154_dev_t *dev)
 }
 
 /* The radio should be woken up */
-static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_rx_info_t *info)
+static int _read(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t *info, ieee802154_rx_done_cb rx_done)
 {
     uint8_t phr;
     size_t pkt_len;
@@ -62,7 +62,7 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_r
     pkt_len = (phr & 0x7f) - 2;
 
     /* not enough space in buf */
-    if (pkt_len > max_size) {
+    if (pkt_len > iov->iov_len) {
         at86rf2xx_fb_stop(_dev);
         /* set device back in operation state which was used before last transmission.
          * This state is saved in at86rf2xx.c/at86rf2xx_tx_prepare() e.g RX_AACK_ON */
@@ -70,7 +70,7 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_r
         return -ENOBUFS;
     }
     /* copy payload */
-    at86rf2xx_fb_read(_dev, (uint8_t *)buf, pkt_len);
+    at86rf2xx_fb_read(_dev, iov->iov_base, pkt_len);
 
     /* Ignore FCS but advance fb read - we must give a temporary buffer here,
      * as we are not allowed to issue SPI transfers without any buffer */
@@ -119,7 +119,8 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_r
     /* set device back in operation state which was used before last transmission.
      * This state is saved in at86rf2xx.c/at86rf2xx_tx_prepare() e.g RX_AACK_ON */
 
-    return pkt_len;
+    iov->iov_len = pkt_len;
+    return rx_done(dev, iov, info);
 }
 
 static bool cca(ieee802154_dev_t *dev)
