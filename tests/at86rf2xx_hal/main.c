@@ -107,17 +107,24 @@ void ieee802154_dev_transmit_blocking(ieee802154_dev_t *dev)
     blocking = false;
 }
 
-static int _handle_ack(ieee802154_dev_t *dev)
+static int _process_ack(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t *info)
 {
-    uint8_t ack_pkt[5];
-    int data_len = dev->driver->read(dev, ack_pkt, 5, NULL);
-
-    if(data_len > 0 && ack_pkt[0] == 0x2) {
+    (void) info;
+    (void) dev;
+    uint8_t *ack_pkt = iov->iov_base;
+    if(iov->iov_len > 0 && ack_pkt[0] == 0x2) {
         return 0;
     }
     else {
         return -ENOMSG;
     }
+}
+
+static int _handle_ack(ieee802154_dev_t *dev)
+{
+    uint8_t ack_pkt[5];
+    struct iovec iov = {.iov_base = ack_pkt, .iov_len = 5};
+    return dev->driver->read(dev, &iov, NULL, _process_ack);
 }
 
 void _perform_csma_with_retrans(ieee802154_dev_t *dev, iolist_t *psdu)
@@ -338,14 +345,11 @@ void nrf802154_init_int(void (*isr)(void *arg));
 int nrf802154_init(void);
 #endif
 
-void recv(void)
+static int _process_rx(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t *info)
 {
-    size_t data_len;
-    static uint8_t buffer[127];
-
-    putchar('\n');
-    data_len = ieee802154_dev->driver->read(ieee802154_dev, buffer, sizeof(buffer), NULL);
-
+    (void) info;
+    (void) dev;
+    uint8_t *buffer = iov->iov_base;
     if (!ieee802154_dev->driver->get_flag(ieee802154_dev, IEEE802154_FLAG_HAS_AUTO_ACK)) {
         /* Send ACK packet */
         uint8_t ack_pkt[3];
@@ -365,7 +369,17 @@ void recv(void)
         ieee802154_dev->driver->set_trx_state(ieee802154_dev, IEEE802154_TRX_STATE_RX_ON);
     }
 
-    submac_rx_done(ieee802154_dev, buffer, data_len);
+    submac_rx_done(ieee802154_dev, buffer, iov->iov_len);
+    return 0;
+}
+void recv(void)
+{
+    static uint8_t buffer[127];
+
+    putchar('\n');
+    struct iovec iov = {.iov_base = buffer, .iov_len = 127};
+    ieee802154_dev->driver->read(ieee802154_dev, &iov, NULL, _process_rx);
+
 }
 
 void *_recv_thread(void *arg)

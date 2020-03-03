@@ -2,6 +2,7 @@
 #define IEEE802154_RADIO_H
 #include <stdbool.h>
 #include "iolist.h"
+#include "sys/uio.h"
 
 typedef struct ieee802154_radio_ops ieee802154_radio_ops_t;
 typedef enum {
@@ -48,10 +49,12 @@ struct ieee802154_dev {
     ieee802154_radio_ops_t *driver;
 };
 
+typedef int (*ieee802154_rx_done_cb)(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t *info);
+
 struct ieee802154_radio_ops {
     int (*prepare)(ieee802154_dev_t *dev, iolist_t *pkt);
     int (*transmit)(ieee802154_dev_t *dev);
-    int (*read)(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_rx_info_t *info);
+    int (*read)(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t *info, ieee802154_rx_done_cb cb);
     bool (*cca)(ieee802154_dev_t *dev);
     int (*set_cca_threshold)(ieee802154_dev_t *dev, int8_t threshold);
     //int set_cca_mode(ieee802154_dev_t *dev, ieee802154_cca_mode_t mode);

@@ -97,18 +97,18 @@ static int transmit(ieee802154_dev_t *dev)
     NRF_RADIO->TASKS_START = 1;
  }
 
-static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_rx_info_t *info)
+static int _read(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t *info, ieee802154_rx_done_cb rx_done)
 {
-    (void) dev;
+    (void) iov;
     size_t pktlen = (size_t)rxbuf[0] - IEEE802154_FCS_LEN;
+    int res = -ENOBUFS;
 
-    if (max_size < pktlen) {
+    if (iov->iov_len < pktlen) {
         DEBUG("[nrf802154] recv: buffer is to small\n");
-        return -ENOBUFS;
+        return res;
     }
     else {
         DEBUG("[nrf802154] recv: reading packet of length %i\n", pktlen);
-        memcpy(buf, &rxbuf[1], pktlen);
         if (info != NULL) {
             ieee802154_rx_info_t *radio_info = info;
             /* Hardware link quality indicator */
@@ -123,11 +123,14 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_r
              * match real world performance better */
             radio_info->rssi = (int16_t)hwlqi + ED_RSSIOFFS;
         }
+        iov->iov_base = &rxbuf[1];
+        iov->iov_len = pktlen;
+        res = rx_done(dev, iov, info);
     }
 
     _reset_rx();
 
-    return (int)pktlen;
+    return res;
 }
 
 static int set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
