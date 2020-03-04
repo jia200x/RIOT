@@ -98,6 +98,7 @@ typedef struct {
     network_uint16_t short_addr;
     uint8_t seq;
     int state;
+    uint16_t panid;
 } ieee802154_submac_t;
 
 #endif /* IEEE802154_RADIO_H */

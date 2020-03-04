@@ -228,6 +228,40 @@ int ieee802154_send(ieee802154_dev_t *dev, iolist_t *iolist)
     return res;
 }
 
+int ieee802154_set_addresses(ieee802154_dev_t *dev, network_uint16_t *short_addr,
+        eui64_t *ext_addr, uint16_t panid)
+{
+    memcpy(&submac.short_addr, short_addr, 2);
+    memcpy(&submac.ext_addr, ext_addr, 8);
+    submac.panid = panid;
+
+    if (dev->driver->set_hw_addr_filter) {
+        dev->driver->set_hw_addr_filter(dev, (void*) short_addr, (void*) ext_addr, panid);
+    }
+    return 0;
+}
+
+
+static inline int ieee802154_set_short_addr(ieee802154_dev_t *dev, network_uint16_t *short_addr)
+{
+    return ieee802154_set_addresses(dev, short_addr, &submac.ext_addr, submac.panid);
+}
+
+static inline int ieee802154_set_ext_addr(ieee802154_dev_t *dev, eui64_t *ext_addr)
+{
+    return ieee802154_set_addresses(dev, &submac.short_addr, ext_addr, submac.panid);
+}
+
+static inline int ieee802154_set_panid(ieee802154_dev_t *dev, uint16_t panid)
+{
+    return ieee802154_set_addresses(dev, &submac.short_addr, &submac.ext_addr, panid);
+}
+
+int ieee802154_set_channel(ieee802154_dev_t *dev, uint8_t channel_num, uint8_t channel_page)
+{
+    return dev->driver->set_channel(dev, channel_num, channel_page);
+}
+
 static int send(uint8_t *dst, size_t dst_len,
                 char *data)
 {
