@@ -32,7 +32,7 @@ static mutex_t _txlock;
 ieee802154_radio_ops_t nrf802154_ops;
 
 ieee802154_dev_t nrf802154_dev = {
-    .driver = &nrf802154_ops
+    .driver = &nrf802154_ops,
 };
 
 static int prepare(ieee802154_dev_t *dev, iolist_t *iolist)
@@ -97,9 +97,9 @@ static int transmit(ieee802154_dev_t *dev)
     NRF_RADIO->TASKS_START = 1;
  }
 
-static int _read(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t *info, ieee802154_rx_done_cb rx_done)
+#if 0
+static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_rx_info_t *info)
 {
-    (void) iov;
     size_t pktlen = (size_t)rxbuf[0] - IEEE802154_FCS_LEN;
     int res = -ENOBUFS;
 
@@ -132,6 +132,7 @@ static int _read(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t 
 
     return res;
 }
+#endif
 
 static int set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
 {
@@ -297,19 +298,41 @@ static bool get_flag(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag)
     return false;
 }
 
-uint8_t _poll_events(ieee802154_dev_t *dev)
+void _irq_handler(ieee802154_dev_t *dev)
 {
     (void) dev;
-    uint8_t flags = 0;
     if (_state & RX_COMPLETE) {
-        flags |= IEEE802154_RF_FLAG_RX_DONE;
+        ieee802154_rx_data_t data;
+        size_t pktlen = (size_t)rxbuf[0] - IEEE802154_FCS_LEN;
+
+        DEBUG("[nrf802154] recv: reading packet of length %i\n", pktlen);
+#if 0
+        if (info != NULL) {
+            ieee802154_rx_info_t *radio_info = info;
+            /* Hardware link quality indicator */
+            uint8_t hwlqi = rxbuf[pktlen + 1];
+            /* Convert to 802.15.4 LQI (page 319 of product spec v1.1) */
+            radio_info->lqi = (uint8_t)(hwlqi > UINT8_MAX/ED_RSSISCALE
+                                       ? UINT8_MAX
+                                       : hwlqi * ED_RSSISCALE);
+            /* Calculate RSSI by subtracting the offset from the datasheet.
+             * Intentionally using a different calculation than the one from
+             * figure 122 of the v1.1 product specification. This appears to
+             * match real world performance better */
+            radio_info->rssi = (int16_t)hwlqi + ED_RSSIOFFS;
+        }
+#endif
+        data.buf = &rxbuf[1];
+        data.len = pktlen;
+
+        dev->cb(dev, IEEE802154_RADIO_RX_DONE, &data);
+        _reset_rx();
     }
 
     if (_state & TX_COMPLETE) {
-        flags |= IEEE802154_RF_FLAG_TX_DONE;
+        dev->cb(dev, IEEE802154_RADIO_TX_DONE, NULL);
         _state &= ~TX_COMPLETE;
     }
-    return flags;
 }
 
 void nrf802154_init_int(void (*isr)(void *arg))
@@ -423,11 +446,10 @@ void isr_radio(void)
     cortexm_isr_end();
 }
 
-
 ieee802154_radio_ops_t nrf802154_ops = {
     .prepare = prepare,
     .transmit = transmit,
-    .read = _read,
+    //.read = _read,
     .cca = cca,
     .set_cca_threshold = set_cca_threshold,
     .set_channel = set_channel,
@@ -435,5 +457,5 @@ ieee802154_radio_ops_t nrf802154_ops = {
     .set_trx_state = set_trx_state,
     .set_flag = set_flag,
     .get_flag = get_flag,
-    .poll_events = _poll_events,
+    .irq_handler = _irq_handler,
 };

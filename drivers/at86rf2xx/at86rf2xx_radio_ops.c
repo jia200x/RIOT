@@ -41,7 +41,7 @@ static int transmit(ieee802154_dev_t *dev)
 }
 
 /* The radio should be woken up */
-static int _read(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t *info, ieee802154_rx_done_cb rx_done)
+static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_data_t *data)
 {
     uint8_t phr;
     size_t pkt_len;
@@ -62,7 +62,7 @@ static int _read(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t 
     pkt_len = (phr & 0x7f) - 2;
 
     /* not enough space in buf */
-    if (pkt_len > iov->iov_len) {
+    if (pkt_len > size) {
         at86rf2xx_fb_stop(_dev);
         /* set device back in operation state which was used before last transmission.
          * This state is saved in at86rf2xx.c/at86rf2xx_tx_prepare() e.g RX_AACK_ON */
@@ -70,7 +70,7 @@ static int _read(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t 
         return -ENOBUFS;
     }
     /* copy payload */
-    at86rf2xx_fb_read(_dev, iov->iov_base, pkt_len);
+    at86rf2xx_fb_read(_dev, buf, size);
 
     /* Ignore FCS but advance fb read - we must give a temporary buffer here,
      * as we are not allowed to issue SPI transfers without any buffer */
@@ -94,6 +94,7 @@ static int _read(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t 
      * value is specified as +/- 5 dB, so it should not matter very much in real
      * life.
      */
+#if 0
     if (info != NULL) {
         uint8_t ed = 0;
         at86rf2xx_fb_read(_dev, &(info->lqi), 1);
@@ -112,15 +113,20 @@ static int _read(ieee802154_dev_t *dev, struct iovec *iov, ieee802154_rx_info_t 
               "too much interference.\n", info->lqi, info->rssi);
     }
     else {
+#endif
         at86rf2xx_fb_stop(_dev);
+#if 0
     }
+#endif
 
     /* TODO: Set RX state if not RX continuous */
     /* set device back in operation state which was used before last transmission.
      * This state is saved in at86rf2xx.c/at86rf2xx_tx_prepare() e.g RX_AACK_ON */
 
-    iov->iov_len = pkt_len;
-    return rx_done(dev, iov, info);
+
+    data->buf = buf;
+    data->len = pkt_len;
+    return 0;
 }
 
 static bool cca(ieee802154_dev_t *dev)
@@ -419,18 +425,17 @@ static void _isr_send_complete(ieee802154_dev_t *dev, uint8_t trac_status)
 }
 #endif
 
-uint8_t _poll_events(ieee802154_dev_t *dev)
+void _irq_handler(ieee802154_dev_t *dev)
 {
     uint8_t irq_mask;
     uint8_t state;
-    uint8_t flags = 0;
 
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
     /* If transceiver is sleeping register access is impossible and frames are
      * lost anyway, so return immediately.
      */
     if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
-        return flags;
+        return;
     }
 
     state = _dev->trx_state;
@@ -438,19 +443,18 @@ uint8_t _poll_events(ieee802154_dev_t *dev)
     irq_mask = at86rf2xx_clear_irq_flags(_dev);
 
     if (at86rf2xx_irq_has_rx_start(irq_mask)) {
-        flags |= IEEE802154_RF_FLAG_RX_START;
+        dev->cb(dev, IEEE802154_RADIO_RX_START, NULL);
     }
 
     if (at86rf2xx_irq_has_trx_end(irq_mask)) {
         if (state == AT86RF2XX_TRX_STATE_RX_ON) {
-            flags |= IEEE802154_RF_FLAG_RX_DONE;
+            ieee802154_rx_data_t data = {.buf = NULL};
+            dev->cb(dev, IEEE802154_RADIO_RX_DONE, &data);
         }
         else if (state == AT86RF2XX_TRX_STATE_TX_ON) {
-            flags |= IEEE802154_RF_FLAG_TX_DONE;
+            dev->cb(dev, IEEE802154_RADIO_TX_DONE, NULL);
         }
     }
-
-    return flags;
 }
 
 int get_tx_status(ieee802154_dev_t *dev)
@@ -542,6 +546,6 @@ ieee802154_radio_ops_t at86rf2xx_ops = {
     .set_frame_retries = set_frame_retries,
     .set_csma_params = set_csma_params,
     .set_promiscuous = set_promiscuous,
-    .poll_events = _poll_events,
+    .irq_handler = _irq_handler,
     .get_tx_status = get_tx_status,
 };
