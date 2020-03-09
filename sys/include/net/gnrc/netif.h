@@ -292,6 +292,8 @@ gnrc_netif_t *gnrc_netif_iter(const gnrc_netif_t *prev);
  * @return  NULL, if no network interface with PID exists.
  */
 gnrc_netif_t *gnrc_netif_get_by_pid(kernel_pid_t pid);
+void gnrc_netif_acquire(gnrc_netif_t *netif);
+void gnrc_netif_release(gnrc_netif_t *netif);
 
 /**
  * @brief   Set an option to a given interface
@@ -305,12 +307,9 @@ gnrc_netif_t *gnrc_netif_get_by_pid(kernel_pid_t pid);
  * @return  0 on success
  * @return  negative errno on error
  */
-static inline int gnrc_netif_set(const gnrc_netif_t *netif, netopt_t opt,
+int gnrc_netif_set(const gnrc_netif_t *netif, netopt_t opt,
                                   uint16_t context, const void *data,
-                                  size_t data_len)
-{
-    return gnrc_netapi_set(netif->pid, opt, context, data, data_len);
-}
+                                  size_t data_len);
 
 /**
  * @brief   Get an option from a given interface
@@ -324,12 +323,9 @@ static inline int gnrc_netif_set(const gnrc_netif_t *netif, netopt_t opt,
  * @return  0 on success
  * @return  negative errno on error
  */
-static inline int gnrc_netif_get(const gnrc_netif_t *netif, netopt_t opt,
+int gnrc_netif_get(const gnrc_netif_t *netif, netopt_t opt,
                                   uint16_t context, void *data,
-                                  size_t data_len)
-{
-    return gnrc_netapi_get(netif->pid, opt, context, data, data_len);
-}
+                                  size_t data_len);
 
 /**
  * @brief   Gets the (unicast on anycast) IPv6 address of an interface (if IPv6
@@ -574,10 +570,7 @@ size_t gnrc_netif_addr_from_str(const char *str, uint8_t *out);
  * @return              1 if packet was successfully delivered
  * @return              -1 on error
  */
-static inline int gnrc_netif_send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
-{
-    return gnrc_netapi_send(netif->pid, pkt);
-}
+int gnrc_netif_send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt);
 
 #ifdef __cplusplus
 }
