@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "sys/uio.h"
 
 #include "net/netdev.h"
 #include "shell.h"
@@ -59,20 +60,74 @@ ieee802154_submac_t submac;
 static char stack[_STACKSIZE];
 static kernel_pid_t _recv_pid;
 
+static inline bool ieee802154_submac_expects_ack(ieee802154_submac_t *submac)
+{
+    return submac->state == SUBMAC_WAIT_TX_DONE;
+}
+
+static int ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov)
+{
+    uint8_t *buf = iov->iov_base;
+    ieee802154_dev_t *dev = submac->dev;
+    int res = -ECANCELED;
+    switch(submac->state) {
+        case SUBMAC_WAIT_FOR_ACK:
+            if(iov->iov_len <= 5 && buf[0] == 0x2) {
+                submac->state = SUBMAC_ACK_RECV;
+            }
+            else {
+                submac->state = SUBMAC_ACK_FAILED;
+            }
+            break;
+        default:
+            if (!dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_AUTO_ACK)) {
+                if (buf[0] & 0x2) {
+                    return res;
+                }
+                /* Send ACK packet */
+                uint8_t ack_pkt[3];
+                ack_pkt[0] = 0x2;
+                ack_pkt[1] = 0;
+                ack_pkt[2] = buf[2];
+
+                iolist_t ack = {
+                    .iol_base = ack_pkt,
+                    .iol_len = 3,
+                    .iol_next = NULL,
+                };
+
+                submac->state = SUBMAC_ACK_SENT;
+                dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
+                dev->driver->prepare(dev, &ack);
+                dev->driver->transmit(dev);
+            }
+            submac->cb->rx_done(dev, buf, iov->iov_len);
+            res = 0;
+            break;
+    }
+    return res;
+}
+
+static void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
+{
+    ieee802154_dev_t *dev = submac->dev;
+    switch(submac->state) {
+        case SUBMAC_ACK_SENT:
+            dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
+            submac->state = SUBMAC_RX;
+            break;
+        case SUBMAC_WAIT_TX_DONE:
+            submac->state = SUBMAC_WAIT_FOR_ACK;
+            dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
+            break;
+    }
+}
+
 static void radio_cb(ieee802154_dev_t *dev, int status, void *ctx)
 {
     switch(status) {
         case IEEE802154_RADIO_TX_DONE:
-            switch(submac.state) {
-                case SUBMAC_ACK_SENT:
-                    dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
-                    submac.state = SUBMAC_RX;
-                    break;
-                case SUBMAC_WAIT_TX_DONE:
-                    submac.state = SUBMAC_WAIT_FOR_ACK;
-                    dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
-                    break;
-            }
+            ieee802154_submac_tx_done_cb(&submac);
             break;
         case IEEE802154_RADIO_RX_DONE: {
             ieee802154_rx_data_t *data = ctx;
@@ -80,40 +135,11 @@ static void radio_cb(ieee802154_dev_t *dev, int status, void *ctx)
             if (!data->buf) {
                 dev->driver->read(dev, buffer, 127, data);
             }
-            switch(submac.state) {
-                case SUBMAC_WAIT_FOR_ACK:
-                    if(data->len <= 5 && data->buf[0] == 0x2) {
-                        submac.state = SUBMAC_ACK_RECV;
-                    }
-                    else {
-                        submac.state = SUBMAC_ACK_FAILED;
-                    }
-                    break;
-                default:
-                    if (!dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_AUTO_ACK)) {
-                        if (((uint8_t*) data->buf)[0] & 0x2) {
-                            return;
-                        }
-                        /* Send ACK packet */
-                        uint8_t ack_pkt[3];
-                        ack_pkt[0] = 0x2;
-                        ack_pkt[1] = 0;
-                        ack_pkt[2] = ((uint8_t*) data->buf)[2];
-
-                        iolist_t ack = {
-                            .iol_base = ack_pkt,
-                            .iol_len = 3,
-                            .iol_next = NULL,
-                        };
-
-                        submac.state = SUBMAC_ACK_SENT;
-                        dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
-                        dev->driver->prepare(dev, &ack);
-                        dev->driver->transmit(dev);
-                    }
-                    submac.cb->rx_done(dev, data->buf, data->len);
-                    break;
-            }
+            struct iovec _iov = {
+                .iov_base = data->buf,
+                .iov_len = data->len,
+            };
+            ieee802154_submac_rx_done_cb(&submac, &_iov);
        }
     }
 }
