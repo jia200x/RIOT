@@ -530,7 +530,14 @@ void at86rf2xx_task_handler(ieee802154_dev_t *dev)
 #endif
     }
 }
+
 #endif
+static int _start(ieee802154_dev_t *dev, void (*isr)(void *arg))
+{
+    at86rf2xx_init_int((at86rf2xx_t*) dev, isr);
+    return 0;
+}
+
 ieee802154_radio_ops_t at86rf2xx_ops = {
     .prepare = prepare,
     .transmit = transmit,
@@ -548,4 +555,5 @@ ieee802154_radio_ops_t at86rf2xx_ops = {
     .set_promiscuous = set_promiscuous,
     .irq_handler = _irq_handler,
     .get_tx_status = get_tx_status,
+    .start = _start,
 };

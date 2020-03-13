@@ -471,13 +471,11 @@ int main(void)
     ieee802154_dev_t *d = (ieee802154_dev_t*) &dev;
     d->cb = radio_cb;
     at86rf2xx_init(&dev, p);
-    at86rf2xx_init_int(&dev, _isr);
 #endif
 #if IS_ACTIVE(MODULE_NRF802154)
     ieee802154_dev_t *d = (ieee802154_dev_t*) &nrf802154_dev;
     d->cb = radio_cb;
     nrf802154_init();
-    nrf802154_init_int(_isr);
 #endif
     /* generate EUI-64 and short address */
     luid_get_eui64(&submac.ext_addr);
@@ -492,6 +490,12 @@ int main(void)
         printf("%02x", *_p++);
     }
     printf("\n");
+
+    if(!d->driver->start) {
+        assert(false);
+    }
+
+    d->driver->start(d, _isr);
 #if IS_ACTIVE(MODULE_AT86RF2XX)
     d->driver->set_hw_addr_filter(d, (uint8_t*) &submac.short_addr, (uint8_t*) &submac.ext_addr, 0x23);
 #endif

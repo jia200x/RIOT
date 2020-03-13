@@ -81,7 +81,7 @@ struct ieee802154_radio_ops {
     int (*set_csma_params)(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd, int8_t retries);
     int (*set_promiscuous)(ieee802154_dev_t *dev, bool enable);
 
-    //int (*start)(ieee802154_dev_t *dev); TODO: This should be here...
+    int (*start)(ieee802154_dev_t *dev, void (*isr)(void *arg));
     //int (*stop)(ieee802154_dev_t *dev);
 };
 
