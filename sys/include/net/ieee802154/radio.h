@@ -92,13 +92,14 @@ typedef struct {
 } ieee802154_submac_cb_t;
 
 typedef struct {
-    ieee802154_dev_t *dev;
-    ieee802154_submac_cb_t *cb;
     eui64_t ext_addr;
     network_uint16_t short_addr;
-    uint8_t seq;
+    ieee802154_dev_t *dev;
+    ieee802154_submac_cb_t *cb;
+    void *ctx;
     int state;
     uint16_t panid;
+    uint8_t seq;
 } ieee802154_submac_t;
 
 #endif /* IEEE802154_RADIO_H */

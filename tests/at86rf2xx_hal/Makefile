@@ -7,6 +7,7 @@ USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += ps
 USEMODULE += csma_sender
+USEMODULE += event_thread_highest
 
 # define the driver to be used for selected boards
 ifneq (,$(filter samr21-xpro,$(BOARD)))

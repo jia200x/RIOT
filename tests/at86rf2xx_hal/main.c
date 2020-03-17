@@ -40,10 +40,10 @@
 #include "luid.h"
 #include "od.h"
 #include "net/csma_sender.h"
+#include "event/thread.h"
 #define MAX_LINE    (80)
 
 #define _STACKSIZE      (THREAD_STACKSIZE_DEFAULT + THREAD_EXTRA_STACKSIZE_PRINTF)
-#define MSG_TYPE_ISR    (0x3456)
 #define MSG_TYPE_ACK_TIMEOUT    (0x3457)
 
 typedef enum {
@@ -57,8 +57,25 @@ typedef enum {
 
 ieee802154_submac_t submac;
 
-static char stack[_STACKSIZE];
-static kernel_pid_t _recv_pid;
+/*
+static inline void ieee802154_submac_task_handler_cb(ieee802154_submac_t *submac)
+{
+}
+
+static inline void ieee802154_submac_radio_irq_done(ieee802154_submac_t *submac)
+{
+}
+
+static inline void ieee802154_submac_timer_irq_done(ieee802154_submac_t *submac)
+{
+}
+
+static inline iolist_t* ieee802154_submac_get_transmit_buffer(ieee802154_submac_t *submac,
+        void *ctx)
+{
+    return NULL;
+}
+*/
 
 static inline bool ieee802154_submac_expects_ack(ieee802154_submac_t *submac)
 {
@@ -229,6 +246,30 @@ void _perform_csma_with_retrans(ieee802154_dev_t *dev, iolist_t *psdu)
     /* TODO: */
     submac.state = SUBMAC_RX;
 }
+
+/*
+static inline void ieee802154_submac_task_handler(ieee802154_submac_t *submac)
+{
+    if (submac->ctx) {
+        if (dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES) || 
+            dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_CSMA_BACKOFF))
+        {
+            dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
+            res = dev->driver->prepare(dev, iolist);
+
+            if (res < 0) {
+                return 1;
+            }
+            else {
+            }
+            res = dev->driver->transmit(dev);
+        }
+        else {
+            _perform_csma_with_retrans(dev, iolist);
+            res = 0;
+        }
+}
+*/
 
 int ieee802154_send(ieee802154_dev_t *dev, iolist_t *iolist)
 {
@@ -449,26 +490,20 @@ void nrf802154_init_int(void (*isr)(void *arg));
 int nrf802154_init(void);
 #endif
 
-void *_recv_thread(void *arg)
+void _irq_event_handler(event_t *event)
 {
-    (void)arg;
-    msg_t msg, queue[8];
-    msg_init_queue(queue, 8);
-    while (1) {
-        msg_receive(&msg);
-        if (msg.type == MSG_TYPE_ISR) {
-            submac.dev->driver->irq_handler(submac.dev);
-            //submac.cb->tx_done(submac.dev, 0, 0, 0);
-        }
-        else {
-            puts("unexpected message type");
-        }
-    }
-    return NULL;
+    (void) event;
+    submac.dev->driver->irq_handler(submac.dev);
 }
 
+event_t _irq_event = {
+    .handler = _irq_event_handler,
+};
+
+/* TODO: Add IRQ callbacks and timer functions */
 static void _isr(void *arg)
 {
+    (void) arg;
     switch(submac.state) {
         case SUBMAC_WAIT_FOR_ACK:
         case SUBMAC_WAIT_TX_DONE:
@@ -476,14 +511,8 @@ static void _isr(void *arg)
         default:
             break;
     }
-    msg_t msg;
 
-    msg.type = MSG_TYPE_ISR;
-    msg.content.ptr = arg;
-
-    if (msg_send(&msg, _recv_pid) <= 0) {
-        puts("gnrc_netdev: possibly lost interrupt.");
-    }
+    event_post(EVENT_PRIO_HIGHEST, &_irq_event);
 }
 
 int main(void)
@@ -526,15 +555,6 @@ int main(void)
     d->driver->set_hw_addr_filter(d, (uint8_t*) &submac.short_addr, (uint8_t*) &submac.ext_addr, 0x23);
 #endif
     d->driver->set_channel(submac.dev, 26, 0);
-
-    _recv_pid = thread_create(stack, sizeof(stack), THREAD_PRIORITY_MAIN - 1,
-                              THREAD_CREATE_STACKTEST, _recv_thread, NULL,
-                              "recv_thread");
-
-    if (_recv_pid <= KERNEL_PID_UNDEF) {
-        puts("Creation of receiver thread failed");
-        return 1;
-    }
 
     /* start the shell */
     puts("Initialization successful - starting the shell now");
