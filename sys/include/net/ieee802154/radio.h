@@ -100,6 +100,7 @@ typedef struct {
     int state;
     uint16_t panid;
     uint8_t seq;
+    uint8_t retrans;
 } ieee802154_submac_t;
 
 #endif /* IEEE802154_RADIO_H */
