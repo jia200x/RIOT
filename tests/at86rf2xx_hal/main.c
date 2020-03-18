@@ -203,26 +203,24 @@ static void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
         case SUBMAC_WAIT_TX_DONE:
             submac->state = SUBMAC_WAIT_FOR_ACK;
             dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
-            xtimer_set(&ack_timer, 1000);
+            xtimer_set(&ack_timer, 2000);
             break;
     }
 }
 
+uint8_t buffer[127];
+            
 static void radio_cb(ieee802154_dev_t *dev, int status, void *ctx)
 {
+    (void) ctx;
     switch(status) {
         case IEEE802154_RADIO_TX_DONE:
             ieee802154_submac_tx_done_cb(&submac);
             break;
         case IEEE802154_RADIO_RX_DONE: {
-            ieee802154_rx_data_t *data = ctx;
-            uint8_t buffer[127];
-            if (!data->buf) {
-                dev->driver->read(dev, buffer, 127, data);
-            }
             struct iovec _iov = {
-                .iov_base = data->buf,
-                .iov_len = data->len,
+                .iov_base = buffer,
+                .iov_len = dev->driver->read(dev, buffer, 127, NULL),
             };
             ieee802154_submac_rx_done_cb(&submac, &_iov);
        }

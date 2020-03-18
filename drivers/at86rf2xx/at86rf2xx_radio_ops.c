@@ -77,6 +77,7 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_da
     uint8_t tmp[2];
     at86rf2xx_fb_read(_dev, tmp, 2);
     (void)tmp;
+    (void) data;
 
     /* AT86RF212B RSSI_BASE_VAL + 1.03 * ED, base varies for diff. modulation and datarates
      * AT86RF232  RSSI_BASE_VAL + ED, base -91dBm
@@ -123,10 +124,7 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_da
     /* set device back in operation state which was used before last transmission.
      * This state is saved in at86rf2xx.c/at86rf2xx_tx_prepare() e.g RX_AACK_ON */
 
-
-    data->buf = buf;
-    data->len = pkt_len;
-    return 0;
+    return pkt_len;
 }
 
 static bool cca(ieee802154_dev_t *dev)
@@ -448,8 +446,7 @@ void _irq_handler(ieee802154_dev_t *dev)
 
     if (at86rf2xx_irq_has_trx_end(irq_mask)) {
         if (state == AT86RF2XX_TRX_STATE_RX_ON) {
-            ieee802154_rx_data_t data = {.buf = NULL};
-            dev->cb(dev, IEEE802154_RADIO_RX_DONE, &data);
+            dev->cb(dev, IEEE802154_RADIO_RX_DONE, NULL);
         }
         else if (state == AT86RF2XX_TRX_STATE_TX_ON) {
             dev->cb(dev, IEEE802154_RADIO_TX_DONE, NULL);
