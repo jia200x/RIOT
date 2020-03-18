@@ -441,15 +441,15 @@ void _irq_handler(ieee802154_dev_t *dev)
     irq_mask = at86rf2xx_clear_irq_flags(_dev);
 
     if (at86rf2xx_irq_has_rx_start(irq_mask)) {
-        dev->cb(dev, IEEE802154_RADIO_RX_START, NULL);
+        dev->cb(dev, IEEE802154_RADIO_RX_START);
     }
 
     if (at86rf2xx_irq_has_trx_end(irq_mask)) {
         if (state == AT86RF2XX_TRX_STATE_RX_ON) {
-            dev->cb(dev, IEEE802154_RADIO_RX_DONE, NULL);
+            dev->cb(dev, IEEE802154_RADIO_RX_DONE);
         }
         else if (state == AT86RF2XX_TRX_STATE_TX_ON) {
-            dev->cb(dev, IEEE802154_RADIO_TX_DONE, NULL);
+            dev->cb(dev, IEEE802154_RADIO_TX_DONE);
         }
     }
 }

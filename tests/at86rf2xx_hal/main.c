@@ -210,9 +210,8 @@ static void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
 
 uint8_t buffer[127];
             
-static void radio_cb(ieee802154_dev_t *dev, int status, void *ctx)
+static void radio_cb(ieee802154_dev_t *dev, int status)
 {
-    (void) ctx;
     switch(status) {
         case IEEE802154_RADIO_TX_DONE:
             ieee802154_submac_tx_done_cb(&submac);
