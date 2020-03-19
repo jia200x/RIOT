@@ -96,23 +96,8 @@ void at86rf2xx_reset(at86rf2xx_t *dev)
     DEBUG("at86rf2xx_reset(): reset complete.\n");
 }
 
-void at86rf2xx_tx_prepare(at86rf2xx_t *dev)
-{
-    dev->tx_frame_len = IEEE802154_FCS_LEN;
-}
-
-size_t at86rf2xx_tx_load(at86rf2xx_t *dev, const uint8_t *data,
-                         size_t len, size_t offset)
-{
-    dev->tx_frame_len += (uint8_t)len;
-    at86rf2xx_sram_write(dev, offset + 1, data, len);
-    return offset + len;
-}
-
 void at86rf2xx_tx_exec(const at86rf2xx_t *dev)
 {
-    /* write frame length field in FIFO */
-    at86rf2xx_sram_write(dev, 0, &(dev->tx_frame_len), 1);
     /* trigger sending of pre-loaded frame */
     at86rf2xx_reg_write(dev, AT86RF2XX_REG__TRX_STATE,
                         AT86RF2XX_TRX_STATE__TX_START);

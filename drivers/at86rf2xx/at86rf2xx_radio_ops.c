@@ -18,14 +18,13 @@ static inline bool _is_sleep(ieee802154_dev_t *dev)
 /* This wakes up the radio! */
 static int prepare(ieee802154_dev_t *dev, iolist_t *pkt)
 {
-    size_t len = 0;
-
+    at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
+    uint8_t len = 0;
     bool sleep = _is_sleep(dev);
+
     if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
-
-    at86rf2xx_tx_prepare((at86rf2xx_t*) dev);
 
     /* load packet data into FIFO */
     for (const iolist_t *iol = pkt; iol; iol = iol->iol_next) {
@@ -36,9 +35,14 @@ static int prepare(ieee802154_dev_t *dev, iolist_t *pkt)
             return -EOVERFLOW;
         }
         if (iol->iol_len) {
-            len = at86rf2xx_tx_load((at86rf2xx_t*) dev, iol->iol_base, iol->iol_len, len);
+            at86rf2xx_sram_write(_dev, len + 1, iol->iol_base, iol->iol_len);
+            len += iol->iol_len;
         }
     }
+    len += IEEE802154_FCS_LEN;
+
+    /* write frame length field in FIFO */
+    at86rf2xx_sram_write(_dev, 0, &len, 1);
     return 0;
 }
 

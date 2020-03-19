@@ -257,7 +257,6 @@ typedef struct {
     at86rf2xx_params_t params;              /**< parameters for initialization */
 #endif
     uint8_t trx_state;                          /**< current state of the radio */
-    uint8_t tx_frame_len;                   /**< length of the current TX frame */
 #ifdef MODULE_AT86RF212B
     /* Only AT86RF212B supports multiple pages (PHY modes) */
     uint8_t page;                       /**< currently used channel page */
