@@ -16,6 +16,7 @@ static inline bool _is_sleep(ieee802154_dev_t *dev)
 }
 
 /* This wakes up the radio! */
+/* This doesn't check sizes!! */
 static int prepare(ieee802154_dev_t *dev, iolist_t *pkt)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
@@ -28,12 +29,6 @@ static int prepare(ieee802154_dev_t *dev, iolist_t *pkt)
 
     /* load packet data into FIFO */
     for (const iolist_t *iol = pkt; iol; iol = iol->iol_next) {
-        /* current packet data + FCS too long */
-        if ((len + iol->iol_len + 2) > AT86RF2XX_MAX_PKT_LENGTH) {
-            DEBUG("[at86rf2xx] error: packet too large (%u byte) to be send\n",
-                  (unsigned)len + 2);
-            return -EOVERFLOW;
-        }
         if (iol->iol_len) {
             at86rf2xx_sram_write(_dev, len + 1, iol->iol_base, iol->iol_len);
             len += iol->iol_len;
