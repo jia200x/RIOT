@@ -41,10 +41,26 @@
 #include "od.h"
 #include "event/thread.h"
 #include "event/callback.h"
+#include "xtimer.h"
 #define MAX_LINE    (80)
 
 ieee802154_submac_t submac;
 mutex_t lock;
+void _ack_timeout(void *arg);
+xtimer_t ack_timer = {.callback = _ack_timeout, .arg = &submac};
+
+void ieee802154_submac_ack_timer_set(ieee802154_submac_t *submac, uint16_t us)
+{
+    (void) submac;
+    xtimer_set(&ack_timer, us);
+}
+
+void ieee802154_submac_ack_timer_cancel(ieee802154_submac_t *submac)
+{
+    (void) submac;
+    xtimer_remove(&ack_timer);
+}
+
 void _task_send(event_t *event)
 {
     event_callback_t *ev = (event_callback_t*) event;
@@ -52,12 +68,12 @@ void _task_send(event_t *event)
 }
 
 event_callback_t _send = {.super.handler=_task_send, .arg=&submac};
-
-void ieee802154_submac_ack_timeout_irq_done(ieee802154_submac_t *submac)
+void _ack_timeout(void *arg)
 {
-    (void) submac;
+    (void) arg;
     event_post(EVENT_PRIO_HIGHEST, &_send.super);
 }
+
 
 uint8_t buffer[127];
             

@@ -60,3 +60,5 @@ static inline int ieee802154_set_panid(ieee802154_submac_t *submac, uint16_t pan
 int ieee802154_set_channel(ieee802154_submac_t *submac, uint8_t channel_num, uint8_t channel_page);
 
 int ieee802154_submac_init(ieee802154_submac_t *submac);
+void ieee802154_submac_ack_timer_cancel(ieee802154_submac_t *submac);
+void ieee802154_submac_ack_timer_set(ieee802154_submac_t *submac, uint16_t us);

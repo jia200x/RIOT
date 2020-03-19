@@ -2,14 +2,6 @@
 #include <string.h>
 #include "net/ieee802154/submac.h"
 #include "net/csma_sender.h"
-#include "xtimer.h"
-
-void _ack_timeout(void *arg)
-{
-    ieee802154_submac_ack_timeout_irq_done(arg);
-}
-
-xtimer_t ack_timer = {.callback = _ack_timeout, .arg = &submac};
 
 static void _perform_retrans(ieee802154_submac_t *submac)
 {
@@ -59,7 +51,7 @@ void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov
     uint8_t *buf = iov->iov_base;
     ieee802154_dev_t *dev = submac->dev;
     if (submac->wait_for_ack) {
-        xtimer_remove(&ack_timer);
+        ieee802154_submac_ack_timer_cancel(submac);
         if(iov->iov_len <= 5 && buf[0] == 0x2) {
             submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_DONE, 0, 0);
             submac->wait_for_ack = false;
@@ -86,7 +78,7 @@ void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
         submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_DONE, 0, 0);
     }
     else if (submac->wait_for_ack) {
-        xtimer_set(&ack_timer, 2000);
+        ieee802154_submac_ack_timer_set(submac, 2000);
     }
     dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
 }
