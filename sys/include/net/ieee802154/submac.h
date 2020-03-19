@@ -33,32 +33,29 @@ static inline bool ieee802154_submac_expects_ack(ieee802154_submac_t *submac)
     return submac->wait_for_ack;
 }
 
-void ieee802154_submac_ack_timeout_fired(ieee802154_submac_t *submac);
-/* TODO: Change this with an explicit call... e.g ieee802154_submac_set_ack_timer() */
-void ieee802154_submac_ack_timeout_irq_done(ieee802154_submac_t *submac);
-void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov);
-void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac);
 int ieee802154_send(ieee802154_submac_t *submac, iolist_t *iolist);
 int ieee802154_set_addresses(ieee802154_submac_t *submac, network_uint16_t *short_addr,
         eui64_t *ext_addr, uint16_t panid);
-
 static inline int ieee802154_set_short_addr(ieee802154_submac_t *submac, network_uint16_t *short_addr)
 {
     return ieee802154_set_addresses(submac, short_addr, &submac->ext_addr, submac->panid);
 }
-
 static inline int ieee802154_set_ext_addr(ieee802154_submac_t *submac, eui64_t *ext_addr)
 {
     return ieee802154_set_addresses(submac, &submac->short_addr, ext_addr, submac->panid);
 }
-
 static inline int ieee802154_set_panid(ieee802154_submac_t *submac, uint16_t panid)
 {
     return ieee802154_set_addresses(submac, &submac->short_addr, &submac->ext_addr, panid);
 }
-
 int ieee802154_set_channel(ieee802154_submac_t *submac, uint8_t channel_num, uint8_t channel_page);
-
 int ieee802154_submac_init(ieee802154_submac_t *submac);
+
+/* To be implemented by the user */
 void ieee802154_submac_ack_timer_cancel(ieee802154_submac_t *submac);
 void ieee802154_submac_ack_timer_set(ieee802154_submac_t *submac, uint16_t us);
+
+/* To be called by the user */
+void ieee802154_submac_ack_timeout_fired(ieee802154_submac_t *submac);
+void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov);
+void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac);

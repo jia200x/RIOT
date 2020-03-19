@@ -37,7 +37,6 @@
 #include "nrf802154.h"
 #endif
 #include "net/ieee802154/submac.h"
-#include "luid.h"
 #include "od.h"
 #include "event/thread.h"
 #include "event/callback.h"
@@ -347,9 +346,14 @@ int main(void)
     d->cb = radio_cb;
     nrf802154_init();
 #endif
-    /* generate EUI-64 and short address */
-    luid_get_eui64(&submac.ext_addr);
-    luid_get_short(&submac.short_addr);
+
+    if(!d->driver->start) {
+        assert(false);
+    }
+
+    ieee802154_submac_init(&submac);
+    /* TODO: This could be done differently. Maybe remove _isr from arg? */
+    d->driver->start(submac.dev, _isr);
     uint8_t *_p = (uint8_t*) &submac.short_addr;
     for(int i=0;i<2;i++) {
         printf("%02x", *_p++);
@@ -360,16 +364,6 @@ int main(void)
         printf("%02x", *_p++);
     }
     printf("\n");
-
-    if(!d->driver->start) {
-        assert(false);
-    }
-
-    d->driver->start(d, _isr);
-#if IS_ACTIVE(MODULE_AT86RF2XX)
-    d->driver->set_hw_addr_filter(d, (uint8_t*) &submac.short_addr, (uint8_t*) &submac.ext_addr, 0x23);
-#endif
-    d->driver->set_channel(submac.dev, 21, 0);
 
     /* start the shell */
     puts("Initialization successful - starting the shell now");

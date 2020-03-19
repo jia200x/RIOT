@@ -2,6 +2,8 @@
 #include <string.h>
 #include "net/ieee802154/submac.h"
 #include "net/csma_sender.h"
+#include "luid.h"
+#include "kernel_defines.h"
 
 static void _perform_retrans(ieee802154_submac_t *submac)
 {
@@ -113,7 +115,16 @@ int ieee802154_send(ieee802154_submac_t *submac, iolist_t *iolist)
 
 int ieee802154_submac_init(ieee802154_submac_t *submac)
 {
-    (void) submac;
+    ieee802154_dev_t *dev = submac->dev;
+    /* generate EUI-64 and short address */
+    luid_get_eui64(&submac->ext_addr);
+    luid_get_short(&submac->short_addr);
+
+    /* TODO */
+#if IS_ACTIVE(MODULE_AT86RF2XX)
+    dev->driver->set_hw_addr_filter(dev, (uint8_t*) &submac->short_addr, (uint8_t*) &submac->ext_addr, 0x23);
+#endif
+    dev->driver->set_channel(dev, 21, 0);
     return 0;
 }
 
