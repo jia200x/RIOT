@@ -302,8 +302,8 @@ static const shell_command_t shell_commands[] = {
 };
 
 #if IS_ACTIVE(MODULE_AT86RF2XX)
-void at86rf2xx_init_int(at86rf2xx_t *dev, void (*isr)(void *arg));
-int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params);
+void at86rf2xx_init_int(at86rf2xx_t *dev);
+int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params, void (*isr)(void *arg));
 #endif
 
 #if IS_ACTIVE(MODULE_NRF802154)
@@ -339,21 +339,15 @@ int main(void)
     printf("Initializing AT86RF2xx radio at SPI_%d\n", p->spi);
     ieee802154_dev_t *d = (ieee802154_dev_t*) &dev;
     d->cb = radio_cb;
-    at86rf2xx_init(&dev, p);
+    at86rf2xx_init(&dev, p, _isr);
 #endif
 #if IS_ACTIVE(MODULE_NRF802154)
     ieee802154_dev_t *d = (ieee802154_dev_t*) &nrf802154_dev;
     d->cb = radio_cb;
-    nrf802154_init();
+    nrf802154_init(_isr);
 #endif
 
-    if(!d->driver->start) {
-        assert(false);
-    }
-
     ieee802154_submac_init(&submac);
-    /* TODO: This could be done differently. Maybe remove _isr from arg? */
-    d->driver->start(submac.dev, _isr);
     uint8_t *_p = (uint8_t*) &submac.short_addr;
     for(int i=0;i<2;i++) {
         printf("%02x", *_p++);

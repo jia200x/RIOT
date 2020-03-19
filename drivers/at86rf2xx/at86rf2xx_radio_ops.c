@@ -334,7 +334,7 @@ static int set_promiscuous(ieee802154_dev_t *dev, bool enable)
     return 0;
 }
 
-int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params)
+int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params, void (*isr)(void *arg))
 {
     /* State to return after receiving or transmitting */
     dev->trx_state = AT86RF2XX_STATE_TRX_OFF;
@@ -355,6 +355,7 @@ int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params)
     gpio_clear(dev->params.sleep_pin);
     gpio_init(dev->params.reset_pin, GPIO_OUT);
     gpio_set(dev->params.reset_pin);
+    gpio_init_int(dev->params.int_pin, GPIO_IN, GPIO_RISING, isr, dev);
 
     /* Intentionally check if bus can be acquired,
        since getbus() drops the return value */
@@ -378,9 +379,12 @@ int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params)
     return 0;
 }
 
-void at86rf2xx_init_int(at86rf2xx_t *dev, void (*isr)(void *arg))
+void at86rf2xx_init_int(at86rf2xx_t *dev)
 {
-    gpio_init_int(dev->params.int_pin, GPIO_IN, GPIO_RISING, isr, dev);
+    /* enable interrupts */
+    at86rf2xx_reg_write(dev, AT86RF2XX_REG__IRQ_MASK,
+                        AT86RF2XX_IRQ_STATUS_MASK__TRX_END);
+    /* clear interrupt flags */
     at86rf2xx_reg_read(dev, AT86RF2XX_REG__IRQ_STATUS);
 }
 
@@ -530,9 +534,9 @@ void at86rf2xx_task_handler(ieee802154_dev_t *dev)
 }
 
 #endif
-static int _start(ieee802154_dev_t *dev, void (*isr)(void *arg))
+static int _start(ieee802154_dev_t *dev)
 {
-    at86rf2xx_init_int((at86rf2xx_t*) dev, isr);
+    at86rf2xx_init_int((at86rf2xx_t*) dev);
     return 0;
 }
 

@@ -4,6 +4,7 @@
 #include "net/csma_sender.h"
 #include "luid.h"
 #include "kernel_defines.h"
+#include <assert.h>
 
 static void _perform_retrans(ieee802154_submac_t *submac)
 {
@@ -125,6 +126,11 @@ int ieee802154_submac_init(ieee802154_submac_t *submac)
     dev->driver->set_hw_addr_filter(dev, (uint8_t*) &submac->short_addr, (uint8_t*) &submac->ext_addr, 0x23);
 #endif
     dev->driver->set_channel(dev, 21, 0);
+    if(!dev->driver->start) {
+        assert(false);
+    }
+
+    dev->driver->start(submac->dev);
     return 0;
 }
 
