@@ -14,10 +14,6 @@ typedef enum {
     IEEE802154_RF_EV_TX_MEDIUM_BUSY,
 } ieee802154_tx_status_t;
 
-#define IEEE802154_RF_FLAG_RX_DONE (0x1)
-#define IEEE802154_RF_FLAG_RX_START (0x2)
-#define IEEE802154_RF_FLAG_TX_DONE (0x4)
-
 typedef enum {
     IEEE802154_FLAG_SLEEP,
     IEEE802154_FLAG_RX_CONTINUOUS,
@@ -46,8 +42,6 @@ typedef struct {
 } ieee802154_csma_be_t;
 
 typedef struct {
-    uint8_t *buf;
-    size_t len;
     int16_t rssi;
     uint8_t lqi;
 } ieee802154_rx_data_t;
@@ -82,25 +76,6 @@ struct ieee802154_radio_ops {
     int (*set_promiscuous)(ieee802154_dev_t *dev, bool enable);
 
     int (*start)(ieee802154_dev_t *dev, void (*isr)(void *arg));
-    //int (*stop)(ieee802154_dev_t *dev);
 };
-
-typedef struct {
-    void (*rx_done)(ieee802154_dev_t *dev, uint8_t *buffer, size_t size);
-    void (*tx_done)(ieee802154_dev_t *dev, int status, bool frame_pending, int retrans);
-
-} ieee802154_submac_cb_t;
-
-typedef struct {
-    eui64_t ext_addr;
-    network_uint16_t short_addr;
-    ieee802154_dev_t *dev;
-    ieee802154_submac_cb_t *cb;
-    void *ctx;
-    bool wait_for_ack;
-    uint16_t panid;
-    uint8_t seq;
-    uint8_t retrans;
-} ieee802154_submac_t;
 
 #endif /* IEEE802154_RADIO_H */

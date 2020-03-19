@@ -36,7 +36,7 @@
 #if IS_ACTIVE(MODULE_NRF802154)
 #include "nrf802154.h"
 #endif
-#include "net/ieee802154/radio.h"
+#include "net/ieee802154/submac.h"
 #include "luid.h"
 #include "od.h"
 #include "net/csma_sender.h"
@@ -44,54 +44,42 @@
 #include "event/callback.h"
 #define MAX_LINE    (80)
 
-#define _STACKSIZE      (THREAD_STACKSIZE_DEFAULT + THREAD_EXTRA_STACKSIZE_PRINTF)
-#define MSG_TYPE_ACK_TIMEOUT    (0x3457)
-
-/* SubMAC variables */
-#define IEEE802154_SUBMAC_MAX_RETRANSMISSIONS (2)
-
 ieee802154_submac_t submac;
 mutex_t lock;
 void _ack_timeout(void *arg);
 xtimer_t ack_timer = {.callback = _ack_timeout, .arg = &submac};
 
-/* TODO: THIS is a callback */
-static inline iolist_t* ieee802154_submac_get_transmit_buffer(ieee802154_submac_t *submac)
+static void _perform_retrans(ieee802154_submac_t *submac)
 {
-    return submac->ctx;
-}
-
-static void ieee802154_submac_perform_retrans(ieee802154_submac_t *submac)
-{
-    iolist_t *psdu = ieee802154_submac_get_transmit_buffer(submac);
+    iolist_t *psdu = submac->ctx;
     ieee802154_dev_t *dev = submac->dev;
     int res;
 
     if (submac->retrans++ < IEEE802154_SUBMAC_MAX_RETRANSMISSIONS) {
         res = csma_sender_csma_ca_send(dev, psdu, NULL);
         if (res < 0) {
-            submac->cb->tx_done(dev, IEEE802154_RF_EV_TX_MEDIUM_BUSY, 0, 0);
+            submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_MEDIUM_BUSY, 0, 0);
         }
     }
     else {
-        submac->cb->tx_done(dev, IEEE802154_RF_EV_TX_NO_ACK, 0, 0);
+        submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_NO_ACK, 0, 0);
     }
 }
 
-static void ieee802154_submac_ack_timeout_cb(ieee802154_submac_t *submac)
+void ieee802154_submac_ack_timeout_fired(ieee802154_submac_t *submac)
 {
-    ieee802154_submac_perform_retrans(submac);
+    _perform_retrans(submac);
 }
 
 void _task_send(event_t *event)
 {
     event_callback_t *ev = (event_callback_t*) event;
-    ieee802154_submac_ack_timeout_cb(ev->arg);
+    ieee802154_submac_ack_timeout_fired(ev->arg);
 }
 
 event_callback_t _send = {.super.handler=_task_send, .arg=&submac};
 
-static inline void ieee802154_submac_ack_timeout_irq_done(ieee802154_submac_t *submac)
+void ieee802154_submac_ack_timeout_irq_done(ieee802154_submac_t *submac)
 {
     (void) submac;
     event_post(EVENT_PRIO_HIGHEST, &_send.super);
@@ -102,32 +90,7 @@ void _ack_timeout(void *arg)
     ieee802154_submac_ack_timeout_irq_done(arg);
 }
 
-/*
-static inline void ieee802154_submac_task_handler_cb(ieee802154_submac_t *submac)
-{
-}
-
-static inline void ieee802154_submac_radio_irq_done(ieee802154_submac_t *submac)
-{
-}
-
-static inline void ieee802154_submac_timer_irq_done(ieee802154_submac_t *submac)
-{
-}
-
-static inline iolist_t* ieee802154_submac_get_transmit_buffer(ieee802154_submac_t *submac,
-        void *ctx)
-{
-    return NULL;
-}
-*/
-
-static inline bool ieee802154_submac_expects_ack(ieee802154_submac_t *submac)
-{
-    return submac->wait_for_ack;
-}
-
-static void ieee802154_submac_send_ack(ieee802154_submac_t *submac, uint8_t *mhr)
+static void _send_ack(ieee802154_submac_t *submac, uint8_t *mhr)
 {
     ieee802154_dev_t *dev = submac->dev;
     /* Send ACK packet */
@@ -148,40 +111,36 @@ static void ieee802154_submac_send_ack(ieee802154_submac_t *submac, uint8_t *mhr
 }
 
 /* All callbacks run in the same context */
-static int ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov)
+void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov)
 {
     uint8_t *buf = iov->iov_base;
     ieee802154_dev_t *dev = submac->dev;
-    int res = -ECANCELED;
     if (submac->wait_for_ack) {
         xtimer_remove(&ack_timer);
         if(iov->iov_len <= 5 && buf[0] == 0x2) {
-            submac->cb->tx_done(dev, IEEE802154_RF_EV_TX_DONE, 0, 0);
+            submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_DONE, 0, 0);
             submac->wait_for_ack = false;
         }
         else {
-            ieee802154_submac_perform_retrans(submac);
+            _perform_retrans(submac);
         }
     }
     else {
         if (!dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_AUTO_ACK)) {
             if (buf[0] & 0x2) {
-                return res;
+                return;
             }
-            ieee802154_submac_send_ack(submac, buf);
+            _send_ack(submac, buf);
         }
-        submac->cb->rx_done(dev, buf, iov->iov_len);
-        res = 0;
+        submac->cb->rx_done(submac, buf, iov->iov_len);
     }
-
-    return res;
 }
 
-static void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
+void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
 {
     ieee802154_dev_t *dev = submac->dev;
     if (dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES)) {
-        submac->cb->tx_done(dev, IEEE802154_RF_EV_TX_DONE, 0, 0);
+        submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_DONE, 0, 0);
     }
     else if (submac->wait_for_ack) {
         xtimer_set(&ack_timer, 2000);
@@ -207,12 +166,13 @@ static void radio_cb(ieee802154_dev_t *dev, int status)
     }
 }
 
-static void submac_tx_done(ieee802154_dev_t *dev, int status, bool frame_pending,
+static void submac_tx_done(ieee802154_submac_t *submac, int status, bool frame_pending,
         int retrans)
 {
     (void) status;
     (void) frame_pending;
     (void) retrans;
+    ieee802154_dev_t *dev = submac->dev;
     switch(status) {
         case IEEE802154_RF_EV_TX_DONE:
         case IEEE802154_RF_EV_TX_DONE_DATA_PENDING:
@@ -232,9 +192,9 @@ static void submac_tx_done(ieee802154_dev_t *dev, int status, bool frame_pending
     mutex_unlock(&lock);
 }
 
-static void submac_rx_done(ieee802154_dev_t *dev, uint8_t *buffer, size_t size)
+static void submac_rx_done(ieee802154_submac_t *submac, uint8_t *buffer, size_t size)
 {
-    (void) dev;
+    (void) submac;
     puts("Terrible de recibi el paquete");
     for (unsigned i=0;i<size;i++) {
         printf("%02x ", buffer[i]);
@@ -257,37 +217,9 @@ extern ieee802154_dev_t nrf802154_dev;
 ieee802154_submac_t submac = {.dev = (ieee802154_dev_t*) &nrf802154_dev, .cb = &_cb};
 #endif
 
-#if 0
-void _task_send(void *arg)
+int ieee802154_send(ieee802154_submac_t *submac, iolist_t *iolist)
 {
-    ieee802154_submac_t *submac = arg;
-    iolist_t *iolist = submac->ctx;
     ieee802154_dev_t *dev = submac->dev;
-    int res;
-
-    if (dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES) || 
-        dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_CSMA_BACKOFF))
-    {
-        dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
-        res = dev->driver->prepare(dev, iolist);
-
-        if (res < 0) {
-            return;
-        }
-        else {
-        }
-        res = dev->driver->transmit(dev);
-    }
-    else {
-        _perform_csma_with_retrans(dev, iolist);
-        res = 0;
-    }
-}
-#endif
-
-int ieee802154_send(ieee802154_dev_t *dev, iolist_t *iolist)
-{
-    (void) dev;
     int res;
     /* TODO */
     if (dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES) || 
@@ -304,52 +236,46 @@ int ieee802154_send(ieee802154_dev_t *dev, iolist_t *iolist)
         dev->driver->transmit(dev);
     }
     else {
-        submac.wait_for_ack = true;
-        submac.retrans = 0;
-        submac.ctx = iolist;
+        submac->wait_for_ack = true;
+        submac->retrans = 0;
+        submac->ctx = iolist;
         /* This function could be called from the same context of the callbacks! */
-        ieee802154_submac_perform_retrans(&submac);
+        _perform_retrans(submac);
     }
     return 0;
 }
 
-int ieee802154_set_addresses(ieee802154_dev_t *dev, network_uint16_t *short_addr,
+int ieee802154_submac_init(ieee802154_submac_t *submac)
+{
+    (void) submac;
+    return 0;
+}
+
+int ieee802154_set_addresses(ieee802154_submac_t *submac, network_uint16_t *short_addr,
         eui64_t *ext_addr, uint16_t panid)
 {
-    memcpy(&submac.short_addr, short_addr, 2);
-    memcpy(&submac.ext_addr, ext_addr, 8);
-    submac.panid = panid;
+    ieee802154_dev_t *dev = submac->dev;
+    memcpy(&submac->short_addr, short_addr, 2);
+    memcpy(&submac->ext_addr, ext_addr, 8);
+    submac->panid = panid;
 
     if (dev->driver->set_hw_addr_filter) {
+        /*TODO: Change signature */
         dev->driver->set_hw_addr_filter(dev, (void*) short_addr, (void*) ext_addr, panid);
     }
     return 0;
 }
 
 
-static inline int ieee802154_set_short_addr(ieee802154_dev_t *dev, network_uint16_t *short_addr)
+int ieee802154_set_channel(ieee802154_submac_t *submac, uint8_t channel_num, uint8_t channel_page)
 {
-    return ieee802154_set_addresses(dev, short_addr, &submac.ext_addr, submac.panid);
-}
-
-static inline int ieee802154_set_ext_addr(ieee802154_dev_t *dev, eui64_t *ext_addr)
-{
-    return ieee802154_set_addresses(dev, &submac.short_addr, ext_addr, submac.panid);
-}
-
-static inline int ieee802154_set_panid(ieee802154_dev_t *dev, uint16_t panid)
-{
-    return ieee802154_set_addresses(dev, &submac.short_addr, &submac.ext_addr, panid);
-}
-
-int ieee802154_set_channel(ieee802154_dev_t *dev, uint8_t channel_num, uint8_t channel_page)
-{
+    ieee802154_dev_t *dev = submac->dev;
     return dev->driver->set_channel(dev, channel_num, channel_page);
 }
 
 void _ev_send(void *arg)
 {
-    ieee802154_send(submac.dev, arg);
+    ieee802154_send(&submac, arg);
 }
 
 static int send(uint8_t *dst, size_t dst_len,
@@ -572,7 +498,7 @@ int main(void)
 #if IS_ACTIVE(MODULE_AT86RF2XX)
     d->driver->set_hw_addr_filter(d, (uint8_t*) &submac.short_addr, (uint8_t*) &submac.ext_addr, 0x23);
 #endif
-    d->driver->set_channel(submac.dev, 26, 0);
+    d->driver->set_channel(submac.dev, 21, 0);
 
     /* start the shell */
     puts("Initialization successful - starting the shell now");
