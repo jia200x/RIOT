@@ -8,12 +8,20 @@
 
 ieee802154_radio_ops_t at86rf2xx_ops;
 static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state);
+
+static inline bool _is_sleep(ieee802154_dev_t *dev)
+{
+    at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
+    return _dev->is_sleep;
+}
+
 /* This wakes up the radio! */
 static int prepare(ieee802154_dev_t *dev, iolist_t *pkt)
 {
     size_t len = 0;
 
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    bool sleep = _is_sleep(dev);
+    if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
 
@@ -139,11 +147,12 @@ static bool cca(ieee802154_dev_t *dev)
 
 static int set_cca_threshold(ieee802154_dev_t *dev, int8_t threshold)
 {
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    bool sleep = _is_sleep(dev);
+    if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
     at86rf2xx_set_cca_threshold((at86rf2xx_t*) dev, threshold);
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    if (sleep) {
         at86rf2xx_sleep((at86rf2xx_t*) dev);
     }
     return 0;
@@ -151,7 +160,8 @@ static int set_cca_threshold(ieee802154_dev_t *dev, int8_t threshold)
 
 static int set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
 {
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    bool sleep = _is_sleep(dev);
+    if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
@@ -171,7 +181,7 @@ static int set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
 
     /* Return to the state we had before reconfiguring */
     at86rf2xx_set_state(_dev, prev_state);
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    if (sleep) {
         at86rf2xx_sleep((at86rf2xx_t*) dev);
     }
     return 0;
@@ -179,11 +189,12 @@ static int set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
 
 static int set_tx_power(ieee802154_dev_t *dev, int16_t pow)
 {
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    bool sleep = _is_sleep(dev);
+    if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
     at86rf2xx_set_txpower((at86rf2xx_t*) dev, pow);
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    if (sleep) {
         at86rf2xx_sleep((at86rf2xx_t*) dev);
     }
     return 0;
@@ -192,6 +203,7 @@ static int set_tx_power(ieee802154_dev_t *dev, int16_t pow)
 static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
+    bool sleep = _is_sleep(dev);
     int int_state;
     switch(state) {
         case IEEE802154_TRX_STATE_TRX_OFF:
@@ -206,7 +218,7 @@ static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)
         default:
             return -EINVAL;
     }
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
     at86rf2xx_set_state(_dev, int_state);
@@ -215,14 +227,15 @@ static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)
 
 static int _set_sleep(ieee802154_dev_t *dev, bool sleep)
 {
+    at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
+
     if(sleep) {
         at86rf2xx_sleep((at86rf2xx_t*) dev);
-        dev->flags |= AT86RF2XX_FLAG_SLEEP;
     }
     else {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-        dev->flags &= ~AT86RF2XX_FLAG_SLEEP;
     }
+    _dev->is_sleep = sleep;
     return 0;
 }
 
@@ -245,7 +258,8 @@ static bool get_flag(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag)
 static int set_hw_addr_filter(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_t *ext_addr, uint16_t pan_id)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    bool sleep = _is_sleep(dev);
+    if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
     le_uint16_t le_pan = byteorder_btols(byteorder_htons(pan_id));
@@ -260,7 +274,7 @@ static int set_hw_addr_filter(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_
 
     at86rf2xx_reg_write(_dev, AT86RF2XX_REG__PAN_ID_0, le_pan.u8[0]);
     at86rf2xx_reg_write(_dev, AT86RF2XX_REG__PAN_ID_1, le_pan.u8[1]);
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    if (sleep) {
         at86rf2xx_sleep((at86rf2xx_t*) dev);
     }
     return 0;
@@ -269,7 +283,8 @@ static int set_hw_addr_filter(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_
 static int set_frame_retries(ieee802154_dev_t *dev, int retries)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    bool sleep = _is_sleep(dev);
+    if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
     uint8_t tmp = at86rf2xx_reg_read(_dev, AT86RF2XX_REG__XAH_CTRL_0);
@@ -277,7 +292,7 @@ static int set_frame_retries(ieee802154_dev_t *dev, int retries)
     tmp &= ~(AT86RF2XX_XAH_CTRL_0__MAX_FRAME_RETRIES);
     tmp |= ((retries > 7) ? 7 : retries) << 4;
     at86rf2xx_reg_write(_dev, AT86RF2XX_REG__XAH_CTRL_0, tmp);
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    if (sleep) {
         at86rf2xx_sleep((at86rf2xx_t*) dev);
     }
     return 0;
@@ -286,7 +301,8 @@ static int set_frame_retries(ieee802154_dev_t *dev, int retries)
 static int set_csma_params(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd, int8_t retries)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    bool sleep = _is_sleep(dev);
+    if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
     retries = (retries > 5) ? 5 : retries;  /* valid values: 0-5 */
@@ -303,7 +319,7 @@ static int set_csma_params(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd, int8
         min = (min > max) ? max : min;
         at86rf2xx_reg_write(_dev, AT86RF2XX_REG__CSMA_BE, (max << 4) | (min));
     }
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    if (sleep) {
         at86rf2xx_sleep((at86rf2xx_t*) dev);
     }
 
@@ -312,13 +328,14 @@ static int set_csma_params(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd, int8
 
 static int set_promiscuous(ieee802154_dev_t *dev, bool enable)
 {
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    bool sleep = _is_sleep(dev);
+    if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
 
     at86rf2xx_set_promiscuous((at86rf2xx_t*) dev, enable);
 
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    if (sleep) {
         at86rf2xx_sleep((at86rf2xx_t*) dev);
     }
     return 0;
@@ -427,7 +444,7 @@ void _irq_handler(ieee802154_dev_t *dev)
     /* If transceiver is sleeping register access is impossible and frames are
      * lost anyway, so return immediately.
      */
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
+    if (_is_sleep(dev)) {
         return;
     }
 

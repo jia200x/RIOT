@@ -68,6 +68,7 @@ static void at86rf2xx_enable_smart_idle(at86rf2xx_t *dev)
 void at86rf2xx_reset(at86rf2xx_t *dev)
 {
     /* Reset state machine to ensure a known state */
+    dev->is_sleep = false;
     at86rf2xx_set_internal_state(dev, AT86RF2XX_STATE_FORCE_TRX_OFF);
 
     /* set default TX power */

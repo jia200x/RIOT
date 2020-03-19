@@ -52,7 +52,6 @@ typedef void (*ieee802154_cb_t)(ieee802154_dev_t *dev, int status);
 
 struct ieee802154_dev {
     ieee802154_radio_ops_t *driver;
-    uint8_t flags;
     ieee802154_cb_t cb;
 };
 
