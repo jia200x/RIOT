@@ -97,7 +97,7 @@ typedef struct {
     ieee802154_dev_t *dev;
     ieee802154_submac_cb_t *cb;
     void *ctx;
-    int state;
+    bool wait_for_ack;
     uint16_t panid;
     uint8_t seq;
     uint8_t retrans;

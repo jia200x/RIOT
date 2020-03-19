@@ -244,6 +244,7 @@ static bool get_flag(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag)
 #if IS_ACTIVE(AT86RF2XX_EXT)
         case IEEE802154_FLAG_HAS_CSMA_BACKOFF:
         case IEEE802154_FLAG_HAS_FRAME_RETRIES:
+        case IEEE802154_FLAG_HAS_AUTO_ACK:
             return true;
 #endif
         default:

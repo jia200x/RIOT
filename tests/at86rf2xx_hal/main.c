@@ -50,16 +50,6 @@
 /* SubMAC variables */
 #define IEEE802154_SUBMAC_MAX_RETRANSMISSIONS (2)
 
-typedef enum {
-    SUBMAC_TX,
-    SUBMAC_RX,
-    SUBMAC_WAIT_FOR_ACK,
-    SUBMAC_WAIT_TX_DONE,
-    SUBMAC_ACK_SENT,
-    SUBMAC_ACK_RECV,
-    SUBMAC_ACK_FAILED,
-} ieee802154_submac_state_t;
-
 ieee802154_submac_t submac;
 mutex_t lock;
 void _ack_timeout(void *arg);
@@ -78,7 +68,6 @@ static void ieee802154_submac_perform_retrans(ieee802154_submac_t *submac)
     int res;
 
     if (submac->retrans++ < IEEE802154_SUBMAC_MAX_RETRANSMISSIONS) {
-        submac->state = SUBMAC_WAIT_TX_DONE;
         res = csma_sender_csma_ca_send(dev, psdu, NULL);
         if (res < 0) {
             submac->cb->tx_done(dev, IEEE802154_RF_EV_TX_MEDIUM_BUSY, 0, 0);
@@ -91,15 +80,7 @@ static void ieee802154_submac_perform_retrans(ieee802154_submac_t *submac)
 
 static void ieee802154_submac_ack_timeout_cb(ieee802154_submac_t *submac)
 {
-    switch(submac->state) {
-        case SUBMAC_TX:
-        case SUBMAC_WAIT_FOR_ACK:
-            ieee802154_submac_perform_retrans(submac);
-            break;
-        default:
-            assert(false);
-            break;
-    }
+    ieee802154_submac_perform_retrans(submac);
 }
 
 void _task_send(event_t *event)
@@ -143,7 +124,27 @@ static inline iolist_t* ieee802154_submac_get_transmit_buffer(ieee802154_submac_
 
 static inline bool ieee802154_submac_expects_ack(ieee802154_submac_t *submac)
 {
-    return submac->state == SUBMAC_WAIT_TX_DONE;
+    return submac->wait_for_ack;
+}
+
+static void ieee802154_submac_send_ack(ieee802154_submac_t *submac, uint8_t *mhr)
+{
+    ieee802154_dev_t *dev = submac->dev;
+    /* Send ACK packet */
+    uint8_t ack_pkt[3];
+    ack_pkt[0] = 0x2;
+    ack_pkt[1] = 0;
+    ack_pkt[2] = mhr[2];
+
+    iolist_t ack = {
+        .iol_base = ack_pkt,
+        .iol_len = 3,
+        .iol_next = NULL,
+    };
+
+    dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
+    dev->driver->prepare(dev, &ack);
+    dev->driver->transmit(dev);
 }
 
 /* All callbacks run in the same context */
@@ -152,60 +153,40 @@ static int ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iove
     uint8_t *buf = iov->iov_base;
     ieee802154_dev_t *dev = submac->dev;
     int res = -ECANCELED;
-    switch(submac->state) {
-        case SUBMAC_WAIT_FOR_ACK:
-            xtimer_remove(&ack_timer);
-            if(iov->iov_len <= 5 && buf[0] == 0x2) {
-                submac->cb->tx_done(dev, IEEE802154_RF_EV_TX_DONE, 0, 0);
-            }
-            else {
-                ieee802154_submac_perform_retrans(submac);
-            }
-            break;
-        default:
-            /* TODO: There are HIGH chances that this should be checked by the driver */
-            if (!dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_AUTO_ACK)) {
-                if (buf[0] & 0x2) {
-                    return res;
-                }
-                /* Send ACK packet */
-                uint8_t ack_pkt[3];
-                ack_pkt[0] = 0x2;
-                ack_pkt[1] = 0;
-                ack_pkt[2] = buf[2];
-
-                iolist_t ack = {
-                    .iol_base = ack_pkt,
-                    .iol_len = 3,
-                    .iol_next = NULL,
-                };
-
-                submac->state = SUBMAC_ACK_SENT;
-                dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
-                dev->driver->prepare(dev, &ack);
-                dev->driver->transmit(dev);
-            }
-            submac->cb->rx_done(dev, buf, iov->iov_len);
-            res = 0;
-            break;
+    if (submac->wait_for_ack) {
+        xtimer_remove(&ack_timer);
+        if(iov->iov_len <= 5 && buf[0] == 0x2) {
+            submac->cb->tx_done(dev, IEEE802154_RF_EV_TX_DONE, 0, 0);
+            submac->wait_for_ack = false;
+        }
+        else {
+            ieee802154_submac_perform_retrans(submac);
+        }
     }
+    else {
+        if (!dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_AUTO_ACK)) {
+            if (buf[0] & 0x2) {
+                return res;
+            }
+            ieee802154_submac_send_ack(submac, buf);
+        }
+        submac->cb->rx_done(dev, buf, iov->iov_len);
+        res = 0;
+    }
+
     return res;
 }
 
 static void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
 {
     ieee802154_dev_t *dev = submac->dev;
-    switch(submac->state) {
-        case SUBMAC_ACK_SENT:
-            dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
-            submac->state = SUBMAC_RX;
-            break;
-        case SUBMAC_WAIT_TX_DONE:
-            submac->state = SUBMAC_WAIT_FOR_ACK;
-            dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
-            xtimer_set(&ack_timer, 2000);
-            break;
+    if (dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES)) {
+        submac->cb->tx_done(dev, IEEE802154_RF_EV_TX_DONE, 0, 0);
     }
+    else if (submac->wait_for_ack) {
+        xtimer_set(&ack_timer, 2000);
+    }
+    dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
 }
 
 uint8_t buffer[127];
@@ -276,40 +257,6 @@ extern ieee802154_dev_t nrf802154_dev;
 ieee802154_submac_t submac = {.dev = (ieee802154_dev_t*) &nrf802154_dev, .cb = &_cb};
 #endif
 
-void _perform_csma_with_retrans(ieee802154_dev_t *dev, iolist_t *psdu)
-{
-    int res;
-    int submac_retransmissions = 0;
-    while (submac_retransmissions++ < IEEE802154_SUBMAC_MAX_RETRANSMISSIONS) {
-        submac.state = SUBMAC_WAIT_TX_DONE;
-        res = csma_sender_csma_ca_send(dev, psdu, NULL);
-        if (res < 0) {
-            submac.cb->tx_done(dev, IEEE802154_RF_EV_TX_MEDIUM_BUSY, 0, 0);
-            break;
-        }
-
-        /* Wait for TX done */
-        while(submac.state == SUBMAC_WAIT_TX_DONE ) {
-            dev->driver->irq_handler(dev);
-        }
-        xtimer_usleep(1000);
-        dev->driver->irq_handler(dev);
-        res = -ENOMSG;
-        if (submac.state == SUBMAC_ACK_RECV) {
-            res = 0;
-            break;
-        }
-    }
-    if (res < 0) {
-        submac.cb->tx_done(dev, IEEE802154_RF_EV_TX_NO_ACK, 0, 0);
-    }
-    else {
-        submac.cb->tx_done(dev, IEEE802154_RF_EV_TX_DONE, 0, 0);
-    }
-    /* TODO: */
-    submac.state = SUBMAC_RX;
-}
-
 #if 0
 void _task_send(void *arg)
 {
@@ -341,11 +288,28 @@ void _task_send(void *arg)
 int ieee802154_send(ieee802154_dev_t *dev, iolist_t *iolist)
 {
     (void) dev;
-    submac.ctx = iolist;
-    submac.retrans = 0;
-    submac.state = SUBMAC_TX;
-    /* This function could be called from the same context of the callbacks! */
-    ieee802154_submac_perform_retrans(&submac);
+    int res;
+    /* TODO */
+    if (dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES) || 
+        dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_CSMA_BACKOFF))
+    {
+        dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
+        res = dev->driver->prepare(dev, iolist);
+
+        if (res < 0) {
+            return res;
+        }
+        else {
+        }
+        dev->driver->transmit(dev);
+    }
+    else {
+        submac.wait_for_ack = true;
+        submac.retrans = 0;
+        submac.ctx = iolist;
+        /* This function could be called from the same context of the callbacks! */
+        ieee802154_submac_perform_retrans(&submac);
+    }
     return 0;
 }
 
