@@ -64,7 +64,7 @@ void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov
         }
     }
     else {
-        if (!dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_AUTO_ACK)) {
+        if (!dev->driver->get_cap(dev, IEEE802154_CAP_AUTO_ACK)) {
             if (buf[0] & 0x2) {
                 return;
             }
@@ -77,7 +77,7 @@ void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov
 void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
 {
     ieee802154_dev_t *dev = submac->dev;
-    if (dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES)) {
+    if (dev->driver->get_cap(dev, IEEE802154_CAP_FRAME_RETRIES)) {
         submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_DONE, 0, 0);
     }
     else if (submac->wait_for_ack) {
@@ -91,8 +91,8 @@ int ieee802154_send(ieee802154_submac_t *submac, iolist_t *iolist)
     ieee802154_dev_t *dev = submac->dev;
     int res;
     /* TODO */
-    if (dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_FRAME_RETRIES) || 
-        dev->driver->get_flag(dev, IEEE802154_FLAG_HAS_CSMA_BACKOFF))
+    if (dev->driver->get_cap(dev, IEEE802154_CAP_FRAME_RETRIES) || 
+        dev->driver->get_cap(dev, IEEE802154_CAP_CSMA_BACKOFF))
     {
         dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
         res = dev->driver->prepare(dev, iolist);

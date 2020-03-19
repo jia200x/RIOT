@@ -238,15 +238,14 @@ static int _set_sleep(ieee802154_dev_t *dev, bool sleep)
     return 0;
 }
 
-static bool get_flag(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag)
+static bool _get_cap(ieee802154_dev_t *dev, ieee802154_rf_caps_t cap)
 {
     (void) dev;
-    (void) flag;
-    switch(flag) {
+    switch(cap) {
 #if IS_ACTIVE(AT86RF2XX_EXT)
-        case IEEE802154_FLAG_HAS_CSMA_BACKOFF:
-        case IEEE802154_FLAG_HAS_FRAME_RETRIES:
-        case IEEE802154_FLAG_HAS_AUTO_ACK:
+        case IEEE802154_CAP_CSMA_BACKOFF:
+        case IEEE802154_CAP_FRAME_RETRIES:
+        case IEEE802154_CAP_AUTO_ACK:
             return true;
 #endif
         default:
@@ -556,7 +555,7 @@ ieee802154_radio_ops_t at86rf2xx_ops = {
     .set_tx_power = set_tx_power,
     .set_trx_state = set_trx_state,
     .set_sleep = _set_sleep,
-    .get_flag = get_flag,
+    .get_cap = _get_cap,
     .set_hw_addr_filter = set_hw_addr_filter,
     .set_frame_retries = set_frame_retries,
     .set_csma_params = set_csma_params,

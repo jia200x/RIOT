@@ -15,14 +15,12 @@ typedef enum {
 } ieee802154_tx_status_t;
 
 typedef enum {
-    IEEE802154_FLAG_SLEEP,
-    IEEE802154_FLAG_RX_CONTINUOUS,
-    IEEE802154_FLAG_HAS_HW_ADDR_FILTER,
-    IEEE802154_FLAG_HAS_FRAME_RETRIES,
-    IEEE802154_FLAG_HAS_CSMA_BACKOFF,
-    IEEE802154_FLAG_HAS_ACK_TIMEOUT,
-    IEEE802154_FLAG_HAS_AUTO_ACK,
-} ieee802154_rf_flags_t;
+    IEEE802154_CAP_HW_ADDR_FILTER,
+    IEEE802154_CAP_FRAME_RETRIES,
+    IEEE802154_CAP_CSMA_BACKOFF,
+    IEEE802154_CAP_ACK_TIMEOUT,
+    IEEE802154_CAP_AUTO_ACK,
+} ieee802154_rf_caps_t;
 
 typedef enum {
     IEEE802154_TRX_STATE_TRX_OFF,
@@ -66,7 +64,7 @@ struct ieee802154_radio_ops {
     int (*set_tx_power)(ieee802154_dev_t *dev, int16_t pow);
     int (*set_trx_state)(ieee802154_dev_t *dev, ieee802154_trx_state_t state);
     int (*set_sleep)(ieee802154_dev_t *dev, bool sleep);
-    bool (*get_flag)(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag);
+    bool (*get_cap)(ieee802154_dev_t *dev, ieee802154_rf_caps_t cap);
     void (*irq_handler)(ieee802154_dev_t *dev);
     int (*get_tx_status)(ieee802154_dev_t *dev);
     int (*set_hw_addr_filter)(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_t *ext_addr, uint16_t pan_id);
