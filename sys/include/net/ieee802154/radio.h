@@ -66,7 +66,7 @@ struct ieee802154_radio_ops {
     int (*set_channel)(ieee802154_dev_t *dev, uint8_t channel, uint8_t page);
     int (*set_tx_power)(ieee802154_dev_t *dev, int16_t pow);
     int (*set_trx_state)(ieee802154_dev_t *dev, ieee802154_trx_state_t state);
-    int (*set_flag)(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag, bool value);
+    int (*set_sleep)(ieee802154_dev_t *dev, bool sleep);
     bool (*get_flag)(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag);
     void (*irq_handler)(ieee802154_dev_t *dev);
     int (*get_tx_status)(ieee802154_dev_t *dev);

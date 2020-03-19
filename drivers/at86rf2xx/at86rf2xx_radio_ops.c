@@ -213,26 +213,16 @@ static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)
     return 0;
 }
 
-static int set_flag(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag, bool value)
+static int _set_sleep(ieee802154_dev_t *dev, bool sleep)
 {
-    (void) dev;
-    (void) flag;
-    (void) value;
-    switch(flag) {
-        case IEEE802154_FLAG_SLEEP:
-            if(value) {
-                at86rf2xx_sleep((at86rf2xx_t*) dev);
-                dev->flags |= AT86RF2XX_FLAG_SLEEP;
-            }
-            else {
-                at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-                dev->flags &= ~AT86RF2XX_FLAG_SLEEP;
-            }
-            break;
-        default:
-            return -ENOTSUP;
+    if(sleep) {
+        at86rf2xx_sleep((at86rf2xx_t*) dev);
+        dev->flags |= AT86RF2XX_FLAG_SLEEP;
     }
-
+    else {
+        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
+        dev->flags &= ~AT86RF2XX_FLAG_SLEEP;
+    }
     return 0;
 }
 
@@ -549,7 +539,7 @@ ieee802154_radio_ops_t at86rf2xx_ops = {
     .set_channel = set_channel,
     .set_tx_power = set_tx_power,
     .set_trx_state = set_trx_state,
-    .set_flag = set_flag,
+    .set_sleep = _set_sleep,
     .get_flag = get_flag,
     .set_hw_addr_filter = set_hw_addr_filter,
     .set_frame_retries = set_frame_retries,
