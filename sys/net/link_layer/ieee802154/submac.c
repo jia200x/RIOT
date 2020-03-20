@@ -47,12 +47,13 @@ static void _send_ack(ieee802154_submac_t *submac, uint8_t *mhr)
     };
 
     dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
+
     dev->driver->prepare(dev, &ack);
     dev->driver->transmit(dev);
 }
 
 /* All callbacks run in the same context */
-void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov)
+void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov, ieee802154_rx_info_t *info)
 {
     uint8_t *buf = iov->iov_base;
     ieee802154_dev_t *dev = submac->dev;
@@ -73,7 +74,7 @@ void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov
             }
             _send_ack(submac, buf);
         }
-        submac->cb->rx_done(submac, buf, iov->iov_len);
+        submac->cb->rx_done(submac, buf, iov->iov_len, info);
     }
 }
 

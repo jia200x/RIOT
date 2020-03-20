@@ -83,11 +83,12 @@ static void radio_cb(ieee802154_dev_t *dev, int status)
             ieee802154_submac_tx_done_cb(&submac);
             break;
         case IEEE802154_RADIO_RX_DONE: {
+            ieee802154_rx_info_t info;
             struct iovec _iov = {
                 .iov_base = buffer,
-                .iov_len = dev->driver->read(dev, buffer, 127, NULL),
+                .iov_len = dev->driver->read(dev, buffer, 127, &info),
             };
-            ieee802154_submac_rx_done_cb(&submac, &_iov);
+            ieee802154_submac_rx_done_cb(&submac, &_iov, &info);
        }
     }
 }
@@ -118,13 +119,14 @@ static void submac_tx_done(ieee802154_submac_t *submac, int status, bool frame_p
     mutex_unlock(&lock);
 }
 
-static void submac_rx_done(ieee802154_submac_t *submac, uint8_t *buffer, size_t size)
+static void submac_rx_done(ieee802154_submac_t *submac, uint8_t *buffer, size_t size, ieee802154_rx_info_t *info)
 {
     (void) submac;
     puts("Terrible de recibi el paquete");
     for (unsigned i=0;i<size;i++) {
         printf("%02x ", buffer[i]);
     }
+    printf("LQI: %i, RSSI: %i\n", (int) info->lqi, (int) info->rssi);
     puts("");
 }
 

@@ -48,7 +48,7 @@ static int transmit(ieee802154_dev_t *dev)
 }
 
 /* The radio should be woken up */
-static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_data_t *data)
+static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_info_t *info)
 {
     uint8_t phr;
     size_t pkt_len;
@@ -84,7 +84,6 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_da
     uint8_t tmp[2];
     at86rf2xx_fb_read(_dev, tmp, 2);
     (void)tmp;
-    (void) data;
 
     /* AT86RF212B RSSI_BASE_VAL + 1.03 * ED, base varies for diff. modulation and datarates
      * AT86RF232  RSSI_BASE_VAL + ED, base -91dBm
@@ -102,7 +101,6 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_da
      * value is specified as +/- 5 dB, so it should not matter very much in real
      * life.
      */
-#if 0
     if (info != NULL) {
         uint8_t ed = 0;
         at86rf2xx_fb_read(_dev, &(info->lqi), 1);
@@ -121,11 +119,8 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_da
               "too much interference.\n", info->lqi, info->rssi);
     }
     else {
-#endif
         at86rf2xx_fb_stop(_dev);
-#if 0
     }
-#endif
 
     /* TODO: Set RX state if not RX continuous */
     /* set device back in operation state which was used before last transmission.

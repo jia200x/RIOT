@@ -42,7 +42,7 @@ typedef struct {
 typedef struct {
     int16_t rssi;
     uint8_t lqi;
-} ieee802154_rx_data_t;
+} ieee802154_rx_info_t;
 
 typedef struct ieee802154_dev ieee802154_dev_t;
 
@@ -56,7 +56,7 @@ struct ieee802154_dev {
 struct ieee802154_radio_ops {
     int (*prepare)(ieee802154_dev_t *dev, iolist_t *pkt);
     int (*transmit)(ieee802154_dev_t *dev);
-    int (*read)(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_data_t *data);
+    int (*read)(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_info_t *info);
     bool (*cca)(ieee802154_dev_t *dev);
     int (*set_cca_threshold)(ieee802154_dev_t *dev, int8_t threshold);
     //int set_cca_mode(ieee802154_dev_t *dev, ieee802154_cca_mode_t mode);
