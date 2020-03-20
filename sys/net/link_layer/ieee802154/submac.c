@@ -25,7 +25,10 @@ static void _perform_retrans(ieee802154_submac_t *submac)
 
 void ieee802154_submac_ack_timeout_fired(ieee802154_submac_t *submac)
 {
-    _perform_retrans(submac);
+    /* This is required to avoid race conditions */
+    if(submac->wait_for_ack) {
+        _perform_retrans(submac);
+    }
 }
 
 static void _send_ack(ieee802154_submac_t *submac, uint8_t *mhr)
