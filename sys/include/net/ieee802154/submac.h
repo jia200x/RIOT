@@ -5,7 +5,7 @@
 
 #include "net/ieee802154/radio.h"
 
-#define IEEE802154_SUBMAC_MAX_RETRANSMISSIONS (2)
+#define IEEE802154_SUBMAC_MAX_RETRANSMISSIONS (4)
 
 typedef struct ieee802154_submac ieee802154_submac_t;
 
