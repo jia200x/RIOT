@@ -119,9 +119,11 @@ static void submac_tx_done(ieee802154_submac_t *submac, int status, bool frame_p
     mutex_unlock(&lock);
 }
 
-static void submac_rx_done(ieee802154_submac_t *submac, uint8_t *buffer, size_t size, ieee802154_rx_info_t *info)
+static void submac_rx_done(ieee802154_submac_t *submac, struct iovec *iov, ieee802154_rx_info_t *info)
 {
     (void) submac;
+    uint8_t *buffer = iov->iov_base;
+    size_t size = iov->iov_len;
     puts("Terrible de recibi el paquete");
     for (unsigned i=0;i<size;i++) {
         printf("%02x ", buffer[i]);

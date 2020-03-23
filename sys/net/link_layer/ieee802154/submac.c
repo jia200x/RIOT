@@ -74,7 +74,7 @@ void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov
             }
             _send_ack(submac, buf);
         }
-        submac->cb->rx_done(submac, buf, iov->iov_len, info);
+        submac->cb->rx_done(submac, iov, info);
     }
 }
 

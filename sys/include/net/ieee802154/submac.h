@@ -10,7 +10,7 @@
 typedef struct ieee802154_submac ieee802154_submac_t;
 
 typedef struct {
-    void (*rx_done)(ieee802154_submac_t *submac, uint8_t *buffer, size_t size, ieee802154_rx_info_t *info);
+    void (*rx_done)(ieee802154_submac_t *submac, struct iovec *iov, ieee802154_rx_info_t *info);
     void (*tx_done)(ieee802154_submac_t *submac, int status, bool frame_pending, int retrans);
 } ieee802154_submac_cb_t;
 
