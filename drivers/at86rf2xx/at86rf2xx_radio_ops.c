@@ -77,7 +77,7 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_in
         return -ENOBUFS;
     }
     /* copy payload */
-    at86rf2xx_fb_read(_dev, buf, size);
+    at86rf2xx_fb_read(_dev, buf, pkt_len);
 
     /* Ignore FCS but advance fb read - we must give a temporary buffer here,
      * as we are not allowed to issue SPI transfers without any buffer */

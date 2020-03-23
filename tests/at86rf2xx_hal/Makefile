@@ -9,7 +9,7 @@ USEMODULE += ps
 USEMODULE += csma_sender
 USEMODULE += event_thread_highest
 USEMODULE += event_callback
-CFLAGS=-DEVENT_THREAD_HIGHEST_STACKSIZE=1024
+CFLAGS+=-DEVENT_THREAD_HIGHEST_STACKSIZE=1024
 
 # define the driver to be used for selected boards
 ifneq (,$(filter samr21-xpro,$(BOARD)))
