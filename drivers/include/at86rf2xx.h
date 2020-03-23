@@ -261,10 +261,6 @@ typedef struct {
     /* Only AT86RF212B supports multiple pages (PHY modes) */
     uint8_t page;                       /**< currently used channel page */
 #endif
-#if AT86RF2XX_HAVE_RETRIES
-    /* Only radios with the XAH_CTRL_2 register support frame retry reporting */
-    uint8_t tx_retries;                 /**< Number of NOACK retransmissions */
-#endif
     bool is_sleep;
     /** @} */
 } at86rf2xx_t;

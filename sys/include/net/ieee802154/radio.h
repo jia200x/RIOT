@@ -44,6 +44,11 @@ typedef struct {
     uint8_t lqi;
 } ieee802154_rx_info_t;
 
+typedef struct {
+    int8_t retries;
+    bool frame_pending;
+} ieee802154_tx_info_t;
+
 typedef struct ieee802154_dev ieee802154_dev_t;
 
 typedef void (*ieee802154_cb_t)(ieee802154_dev_t *dev, int status);
@@ -66,7 +71,7 @@ struct ieee802154_radio_ops {
     int (*set_sleep)(ieee802154_dev_t *dev, bool sleep);
     bool (*get_cap)(ieee802154_dev_t *dev, ieee802154_rf_caps_t cap);
     void (*irq_handler)(ieee802154_dev_t *dev);
-    int (*get_tx_status)(ieee802154_dev_t *dev);
+    int (*get_tx_status)(ieee802154_dev_t *dev, ieee802154_tx_info_t *info);
     int (*set_hw_addr_filter)(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_t *ext_addr, uint16_t pan_id);
     int (*set_frame_retries)(ieee802154_dev_t *dev, int retries);
     int (*set_csma_params)(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd, int8_t retries);

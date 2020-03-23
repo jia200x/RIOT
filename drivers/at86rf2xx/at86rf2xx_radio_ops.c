@@ -462,31 +462,38 @@ void _irq_handler(ieee802154_dev_t *dev)
     }
 }
 
-int get_tx_status(ieee802154_dev_t *dev)
+int get_tx_status(ieee802154_dev_t *dev, ieee802154_tx_info_t *info)
 {
     uint8_t trac_status;
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
     trac_status = at86rf2xx_reg_read(_dev, AT86RF2XX_REG__TRX_STATE)
                   & AT86RF2XX_TRX_STATE_MASK__TRAC;
+    info->frame_pending = false;
     switch (trac_status) {
-                case AT86RF2XX_TRX_STATE__TRAC_SUCCESS:
                 case AT86RF2XX_TRX_STATE__TRAC_SUCCESS_DATA_PENDING:
+                    info->frame_pending = true;
+                    /* FALL-THRU */
+                case AT86RF2XX_TRX_STATE__TRAC_SUCCESS:
                     DEBUG("[at86rf2xx] TX SUCCESS\n");
+#if AT86RF2XX_HAVE_RETRIES
+    info->retries = (at86rf2xx_reg_read(_dev, AT86RF2XX_REG__XAH_CTRL_2)
+                       & AT86RF2XX_XAH_CTRL_2__ARET_FRAME_RETRIES_MASK) >>
+                      AT86RF2XX_XAH_CTRL_2__ARET_FRAME_RETRIES_OFFSET;
+#else
+    info->retries = -1;
+#endif
                     return IEEE802154_RF_EV_TX_DONE;
-                    break;
                 case AT86RF2XX_TRX_STATE__TRAC_NO_ACK:
                     DEBUG("[at86rf2xx] TX NO_ACK\n");
                     return IEEE802154_RF_EV_TX_NO_ACK;
-                    break;
                 case AT86RF2XX_TRX_STATE__TRAC_CHANNEL_ACCESS_FAILURE:
                     DEBUG("[at86rf2xx] TX_CHANNEL_ACCESS_FAILURE\n");
                     return IEEE802154_RF_EV_TX_MEDIUM_BUSY;
-                    break;
                 default:
                     DEBUG("[at86rf2xx] Unhandled TRAC_STATUS: %d\n",
                           trac_status >> 5);
-                    return 100;
             }
+    return -EINVAL;
 }
 
 #if 0

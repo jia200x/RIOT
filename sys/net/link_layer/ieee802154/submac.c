@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "net/ieee802154/submac.h"
+#include "net/ieee802154.h"
 #include "net/csma_sender.h"
 #include "luid.h"
 #include "kernel_defines.h"
@@ -15,11 +16,11 @@ static void _perform_retrans(ieee802154_submac_t *submac)
     if (submac->retrans++ < IEEE802154_SUBMAC_MAX_RETRANSMISSIONS) {
         res = csma_sender_csma_ca_send(dev, psdu, NULL);
         if (res < 0) {
-            submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_MEDIUM_BUSY, 0, 0);
+            submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_MEDIUM_BUSY, NULL);
         }
     }
     else {
-        submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_NO_ACK, 0, 0);
+        submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_NO_ACK, NULL);
     }
 }
 
@@ -60,8 +61,11 @@ void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov
     if (submac->wait_for_ack) {
         ieee802154_submac_ack_timer_cancel(submac);
         if(iov->iov_len <= 5 && buf[0] == 0x2) {
-            submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_DONE, 0, 0);
+            ieee802154_tx_info_t tx_info;
+            tx_info.retries = submac->retrans-1;
+            tx_info.frame_pending = buf[0] & IEEE802154_FCF_FRAME_PEND;
             submac->wait_for_ack = false;
+            submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_DONE, &tx_info);
         }
         else {
             _perform_retrans(submac);
@@ -81,8 +85,10 @@ void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov
 void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
 {
     ieee802154_dev_t *dev = submac->dev;
+    ieee802154_tx_info_t info;
     if (dev->driver->get_cap(dev, IEEE802154_CAP_FRAME_RETRIES)) {
-        submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_DONE, 0, 0);
+        int status = dev->driver->get_tx_status(dev, &info);
+        submac->cb->tx_done(submac, status, &info);
     }
     else if (submac->wait_for_ack) {
         ieee802154_submac_ack_timer_set(submac, 2000);

@@ -93,17 +93,16 @@ static void radio_cb(ieee802154_dev_t *dev, int status)
     }
 }
 
-static void submac_tx_done(ieee802154_submac_t *submac, int status, bool frame_pending,
-        int retrans)
+static void submac_tx_done(ieee802154_submac_t *submac, int status, ieee802154_tx_info_t *info)
 {
     (void) status;
-    (void) frame_pending;
-    (void) retrans;
+    (void) info;
     ieee802154_dev_t *dev = submac->dev;
     switch(status) {
         case IEEE802154_RF_EV_TX_DONE:
         case IEEE802154_RF_EV_TX_DONE_DATA_PENDING:
             puts("Done!");
+            printf("Retrans: %i\n", info->retries);
             break;
         case IEEE802154_RF_EV_TX_MEDIUM_BUSY:
             puts("Medium busy!");
