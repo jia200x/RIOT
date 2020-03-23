@@ -451,7 +451,10 @@ void _irq_handler(ieee802154_dev_t *dev)
 
     if (at86rf2xx_irq_has_trx_end(irq_mask)) {
         if (state == AT86RF2XX_TRX_STATE_RX_ON) {
-            dev->cb(dev, IEEE802154_RADIO_RX_DONE);
+            uint8_t crc = at86rf2xx_reg_read(_dev, AT86RF2XX_REG__PHY_RSSI) & 0x80;
+            if(crc) {
+                dev->cb(dev, IEEE802154_RADIO_RX_DONE);
+            }
         }
         else if (state == AT86RF2XX_TRX_STATE_TX_ON) {
             dev->cb(dev, IEEE802154_RADIO_TX_DONE);
