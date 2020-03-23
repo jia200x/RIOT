@@ -54,7 +54,7 @@ static void _send_ack(ieee802154_submac_t *submac, uint8_t *mhr)
 }
 
 /* All callbacks run in the same context */
-void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov, ieee802154_rx_info_t *info)
+int ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov, ieee802154_rx_info_t *info)
 {
     uint8_t *buf = iov->iov_base;
     ieee802154_dev_t *dev = submac->dev;
@@ -74,12 +74,13 @@ void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov
     else {
         if (!dev->driver->get_cap(dev, IEEE802154_CAP_AUTO_ACK)) {
             if (buf[0] & 0x2) {
-                return;
+                return -EINVAL;
             }
             _send_ack(submac, buf);
         }
         submac->cb->rx_done(submac, iov, info);
     }
+    return 0;
 }
 
 void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)

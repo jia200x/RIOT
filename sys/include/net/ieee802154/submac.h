@@ -57,5 +57,5 @@ void ieee802154_submac_ack_timer_set(ieee802154_submac_t *submac, uint16_t us);
 
 /* To be called by the user */
 void ieee802154_submac_ack_timeout_fired(ieee802154_submac_t *submac);
-void ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov, ieee802154_rx_info_t *info);
+int ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov, ieee802154_rx_info_t *info);
 void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac);
