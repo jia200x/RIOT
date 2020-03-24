@@ -21,6 +21,7 @@ struct ieee802154_submac {
     ieee802154_submac_cb_t *cb;
     void *ctx;
     bool wait_for_ack;
+    bool tx;
     uint16_t panid;
     uint8_t seq;
     uint8_t retrans;

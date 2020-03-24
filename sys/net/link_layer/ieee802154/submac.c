@@ -76,7 +76,10 @@ int ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov,
             if (buf[0] & 0x2) {
                 return -EINVAL;
             }
-            _send_ack(submac, buf);
+            if (buf[0] & IEEE802154_FCF_ACK_REQ) {
+                submac->tx = false;
+                _send_ack(submac, buf);
+            }
         }
         submac->cb->rx_done(submac, iov, info);
     }
@@ -91,19 +94,28 @@ void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
         int status = dev->driver->get_tx_status(dev, &info);
         submac->cb->tx_done(submac, status, &info);
     }
-    else if (submac->wait_for_ack) {
-        ieee802154_submac_ack_timer_set(submac, 2000);
+    else if (submac->tx) {
+        if (submac->wait_for_ack) {
+            ieee802154_submac_ack_timer_set(submac, 2000);
+        }
+        else {
+            submac->cb->tx_done(submac, IEEE802154_RF_EV_TX_DONE, &info);
+        }
     }
+    /* TODO: Check state changes */
     dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
 }
 
 int ieee802154_send(ieee802154_submac_t *submac, iolist_t *iolist)
 {
     ieee802154_dev_t *dev = submac->dev;
+    uint8_t *buf = iolist->iol_base;
+    bool cnf = buf[0] & IEEE802154_FCF_ACK_REQ;
     int res;
     /* TODO */
     if (dev->driver->get_cap(dev, IEEE802154_CAP_FRAME_RETRIES) || 
-        dev->driver->get_cap(dev, IEEE802154_CAP_CSMA_BACKOFF))
+        dev->driver->get_cap(dev, IEEE802154_CAP_CSMA_BACKOFF) ||
+        !cnf)
     {
         dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
         res = dev->driver->prepare(dev, iolist);
@@ -122,12 +134,14 @@ int ieee802154_send(ieee802154_submac_t *submac, iolist_t *iolist)
         /* This function could be called from the same context of the callbacks! */
         _perform_retrans(submac);
     }
+    submac->tx = true;
     return 0;
 }
 
 int ieee802154_submac_init(ieee802154_submac_t *submac)
 {
     ieee802154_dev_t *dev = submac->dev;
+    submac->tx = false;
     /* generate EUI-64 and short address */
     luid_get_eui64(&submac->ext_addr);
     luid_get_short(&submac->short_addr);
