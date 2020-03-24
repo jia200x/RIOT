@@ -80,4 +80,104 @@ struct ieee802154_radio_ops {
     int (*start)(ieee802154_dev_t *dev);
 };
 
+static inline int ieee802154_radio_prepare(ieee802154_dev_t *dev, iolist_t *pkt)
+{
+    return dev->driver->prepare(dev, pkt);
+}
+
+static inline int ieee802154_radio_transmit(ieee802154_dev_t *dev)
+{
+    return dev->driver->transmit(dev);
+}
+
+static inline int ieee802154_radio_read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_info_t *info)
+{
+    return dev->driver->read(dev, buf, size, info);
+}
+
+static inline bool ieee802154_radio_cca(ieee802154_dev_t *dev)
+{
+    return dev->driver->cca(dev);
+}
+
+static inline int ieee802154_radio_set_cca_threshold(ieee802154_dev_t *dev, int8_t threshold)
+{
+    return dev->driver->set_cca_threshold(dev, threshold);
+}
+
+static inline int ieee802154_radio_set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
+{
+    return dev->driver->set_channel(dev, channel, page);
+}
+
+static inline int ieee802154_radio_set_tx_power(ieee802154_dev_t *dev, int16_t pow)
+{
+    return dev->driver->set_tx_power(dev, pow);
+}
+
+static inline int ieee802154_radio_set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)
+{
+    return dev->driver->set_trx_state(dev, state);
+}
+
+static inline int ieee802154_radio_set_sleep(ieee802154_dev_t *dev, bool sleep)
+{
+    return dev->driver->set_sleep(dev, sleep);
+}
+
+static inline bool ieee802154_radio_get_cap(ieee802154_dev_t *dev, ieee802154_rf_caps_t cap)
+{
+    return dev->driver->get_cap(dev, cap);
+}
+
+static inline void ieee802154_radio_irq_handler(ieee802154_dev_t *dev)
+{
+    dev->driver->irq_handler(dev);
+}
+
+static inline int ieee802154_radio_get_tx_status(ieee802154_dev_t *dev, ieee802154_tx_info_t *info)
+{
+    return dev->driver->get_tx_status(dev, info);
+}
+
+static inline int ieee802154_radio_set_hw_addr_filter(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_t *ext_addr, uint16_t pan_id)
+{
+    return dev->driver->set_hw_addr_filter(dev, short_addr, ext_addr, pan_id);
+}
+
+static inline int ieee802154_radio_set_frame_retries(ieee802154_dev_t *dev, int retries)
+{
+    return dev->driver->set_frame_retries(dev, retries);
+}
+
+static inline int ieee802154_radio_set_csma_params(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd, int8_t retries)
+{
+    return dev->driver->set_csma_params(dev, bd, retries);
+}
+
+static inline int ieee802154_radio_set_promiscuous(ieee802154_dev_t *dev, bool enable)
+{
+    return dev->driver->set_promiscuous(dev, enable);
+}
+
+static inline int ieee802154_radio_start(ieee802154_dev_t *dev)
+{
+    return dev->driver->start(dev);
+}
+
+static inline bool ieee802154_radio_has_ack_timeout(ieee802154_dev_t *dev)
+{
+    return dev->driver->get_cap(dev, IEEE802154_CAP_AUTO_ACK);
+}
+
+static inline bool ieee802154_radio_has_frame_retries(ieee802154_dev_t *dev)
+{
+    return dev->driver->get_cap(dev, IEEE802154_CAP_FRAME_RETRIES);
+}
+
+static inline bool ieee802154_radio_has_addr_filter(ieee802154_dev_t *dev)
+{
+    return dev->driver->set_hw_addr_filter != NULL;
+}
+
 #endif /* IEEE802154_RADIO_H */

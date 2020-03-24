@@ -47,10 +47,10 @@ static void _send_ack(ieee802154_submac_t *submac, uint8_t *mhr)
         .iol_next = NULL,
     };
 
-    dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
+    ieee802154_radio_set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
 
-    dev->driver->prepare(dev, &ack);
-    dev->driver->transmit(dev);
+    ieee802154_radio_prepare(dev, &ack);
+    ieee802154_radio_transmit(dev);
 }
 
 /* All callbacks run in the same context */
@@ -72,7 +72,7 @@ int ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov,
         }
     }
     else {
-        if (!dev->driver->get_cap(dev, IEEE802154_CAP_AUTO_ACK)) {
+        if (!ieee802154_radio_has_ack_timeout(dev)) {
             if (buf[0] & 0x2) {
                 return -EINVAL;
             }
@@ -90,8 +90,8 @@ void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
 {
     ieee802154_dev_t *dev = submac->dev;
     ieee802154_tx_info_t info;
-    if (dev->driver->get_cap(dev, IEEE802154_CAP_FRAME_RETRIES)) {
-        int status = dev->driver->get_tx_status(dev, &info);
+    if (ieee802154_radio_has_frame_retries(dev)) {
+        int status = ieee802154_radio_get_tx_status(dev, &info);
         submac->cb->tx_done(submac, status, &info);
     }
     else if (submac->tx) {
@@ -103,7 +103,7 @@ void ieee802154_submac_tx_done_cb(ieee802154_submac_t *submac)
         }
     }
     /* TODO: Check state changes */
-    dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
+    ieee802154_radio_set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
 }
 
 int ieee802154_send(ieee802154_submac_t *submac, iolist_t *iolist)
@@ -113,19 +113,17 @@ int ieee802154_send(ieee802154_submac_t *submac, iolist_t *iolist)
     bool cnf = buf[0] & IEEE802154_FCF_ACK_REQ;
     int res;
     /* TODO */
-    if (dev->driver->get_cap(dev, IEEE802154_CAP_FRAME_RETRIES) || 
-        dev->driver->get_cap(dev, IEEE802154_CAP_CSMA_BACKOFF) ||
-        !cnf)
+    if (ieee802154_radio_has_frame_retries(dev) || !cnf)
     {
-        dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
-        res = dev->driver->prepare(dev, iolist);
+        ieee802154_radio_set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
+        res = ieee802154_radio_prepare(dev, iolist);
 
         if (res < 0) {
             return res;
         }
         else {
         }
-        dev->driver->transmit(dev);
+        ieee802154_radio_transmit(dev);
     }
     else {
         submac->wait_for_ack = true;
@@ -148,14 +146,15 @@ int ieee802154_submac_init(ieee802154_submac_t *submac)
 
     /* TODO */
 #if IS_ACTIVE(MODULE_AT86RF2XX)
-    dev->driver->set_hw_addr_filter(dev, (uint8_t*) &submac->short_addr, (uint8_t*) &submac->ext_addr, 0x23);
+    ieee802154_radio_set_hw_addr_filter(dev, (uint8_t*) &submac->short_addr, (uint8_t*) &submac->ext_addr, 0x23);
 #endif
-    dev->driver->set_channel(dev, 21, 0);
+    ieee802154_radio_set_channel(dev, 21, 0);
+    /* TODO: remove */
     if(!dev->driver->start) {
         assert(false);
     }
 
-    dev->driver->start(submac->dev);
+    ieee802154_radio_start(submac->dev);
     return 0;
 }
 
@@ -167,9 +166,9 @@ int ieee802154_set_addresses(ieee802154_submac_t *submac, network_uint16_t *shor
     memcpy(&submac->ext_addr, ext_addr, 8);
     submac->panid = panid;
 
-    if (dev->driver->set_hw_addr_filter) {
+    if (ieee802154_radio_has_addr_filter(dev)) {
         /*TODO: Change signature */
-        dev->driver->set_hw_addr_filter(dev, (void*) short_addr, (void*) ext_addr, panid);
+        ieee802154_radio_set_hw_addr_filter(dev, (void*) short_addr, (void*) ext_addr, panid);
     }
     return 0;
 }
@@ -178,6 +177,6 @@ int ieee802154_set_addresses(ieee802154_submac_t *submac, network_uint16_t *shor
 int ieee802154_set_channel(ieee802154_submac_t *submac, uint8_t channel_num, uint8_t channel_page)
 {
     ieee802154_dev_t *dev = submac->dev;
-    return dev->driver->set_channel(dev, channel_num, channel_page);
+    return ieee802154_radio_set_channel(dev, channel_num, channel_page);
 }
 
