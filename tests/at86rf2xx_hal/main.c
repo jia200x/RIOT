@@ -86,7 +86,7 @@ static void radio_cb(ieee802154_dev_t *dev, int status)
             ieee802154_rx_info_t info;
             struct iovec _iov = {
                 .iov_base = buffer,
-                .iov_len = dev->driver->read(dev, buffer, 127, &info),
+                .iov_len = ieee802154_radio_read(dev, buffer, 127, &info),
             };
             ieee802154_submac_rx_done_cb(&submac, &_iov, &info);
        }
@@ -114,7 +114,7 @@ static void submac_tx_done(ieee802154_submac_t *submac, int status, ieee802154_t
             break;
     }
 
-    dev->driver->set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
+    ieee802154_radio_set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
     mutex_unlock(&lock);
 }
 
@@ -262,7 +262,7 @@ int txpow(int argc, char **argv)
 {
     (void) argc;
     (void) argv;
-    submac.dev->driver->set_tx_power(submac.dev, 0);
+    ieee802154_radio_set_tx_power(submac.dev, 0);
     return 0;
 }
 
@@ -317,7 +317,7 @@ int nrf802154_init(void);
 void _irq_event_handler(event_t *event)
 {
     (void) event;
-    submac.dev->driver->irq_handler(submac.dev);
+    ieee802154_radio_irq_handler(submac.dev);
 }
 
 event_t _irq_event = {

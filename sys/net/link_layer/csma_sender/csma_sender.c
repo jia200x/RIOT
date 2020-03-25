@@ -93,13 +93,13 @@ static int send_if_cca(ieee802154_dev_t *device, iolist_t *iolist)
     /* perform a CCA */
     DEBUG("csma: Checking radio medium availability...\n");
     /* if medium is clear, send the packet and return */
-    if (device->driver->cca(device)) {
+    if (ieee802154_radio_cca(device)) {
         DEBUG("csma: Radio medium available: sending packet.\n");
-        device->driver->set_trx_state(device, IEEE802154_TRX_STATE_TX_ON);
-        if((res = device->driver->prepare(device, iolist) < 0)) {
+        ieee802154_radio_set_trx_state(device, IEEE802154_TRX_STATE_TX_ON);
+        if((res = ieee802154_radio_prepare(device, iolist) < 0)) {
             return res;
         }
-        return device->driver->transmit(device);
+        return ieee802154_radio_transmit(device);
     }
 
     /* if we arrive here, medium was not available for transmission */
