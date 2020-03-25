@@ -150,9 +150,10 @@ int ieee802154_submac_init(ieee802154_submac_t *submac)
 #endif
     ieee802154_radio_set_channel(dev, 21, 0);
     /* TODO: remove */
+    /*
     if(!dev->driver->start) {
         assert(false);
-    }
+    }*/
 
     ieee802154_radio_start(submac->dev);
     return 0;
