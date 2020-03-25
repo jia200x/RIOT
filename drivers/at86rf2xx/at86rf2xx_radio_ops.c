@@ -6,8 +6,8 @@
 #define ENABLE_DEBUG (0)
 #include "debug.h"
 
-ieee802154_radio_ops_t at86rf2xx_ops;
 static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state);
+static const ieee802154_radio_ops_t at86rf2xx_ops;
 
 static inline bool _is_sleep(ieee802154_dev_t *dev)
 {
@@ -550,7 +550,7 @@ static int _start(ieee802154_dev_t *dev)
     return 0;
 }
 
-ieee802154_radio_ops_t at86rf2xx_ops = {
+static const ieee802154_radio_ops_t at86rf2xx_ops = {
     .prepare = prepare,
     .transmit = transmit,
     .read = _read,
