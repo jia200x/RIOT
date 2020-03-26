@@ -47,6 +47,21 @@ static int transmit(ieee802154_dev_t *dev)
     return 0;
 }
 
+static int _len(ieee802154_dev_t *dev)
+{
+    /* get the size of the received packet */
+    uint8_t phr;
+
+#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
+    phr = TST_RX_LENGTH;
+#else
+    at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
+    at86rf2xx_sram_read(_dev, 0, &phr, 1);
+#endif
+
+    return phr;
+}
+
 /* The radio should be woken up */
 static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_info_t *info)
 {
@@ -553,6 +568,7 @@ static int _start(ieee802154_dev_t *dev)
 static const ieee802154_radio_ops_t at86rf2xx_ops = {
     .prepare = prepare,
     .transmit = transmit,
+    .len = _len,
     .read = _read,
     .cca = cca,
     .set_cca_threshold = set_cca_threshold,
