@@ -42,6 +42,7 @@ typedef struct {
 typedef struct {
     int16_t rssi;
     uint8_t lqi;
+    bool crc_ok;
 } ieee802154_rx_info_t;
 
 typedef struct {

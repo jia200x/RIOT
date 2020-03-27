@@ -130,6 +130,7 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_in
         at86rf2xx_fb_stop(_dev);
 #endif
         info->rssi = RSSI_BASE_VAL + ed;
+        info->crc_ok = at86rf2xx_reg_read(_dev, AT86RF2XX_REG__PHY_RSSI) & 0x80;
         DEBUG("[at86rf2xx] LQI:%d high is good, RSSI:%d high is either good or"
               "too much interference.\n", info->lqi, info->rssi);
     }
@@ -466,10 +467,7 @@ void _irq_handler(ieee802154_dev_t *dev)
 
     if (at86rf2xx_irq_has_trx_end(irq_mask)) {
         if (state == AT86RF2XX_TRX_STATE_RX_ON) {
-            uint8_t crc = at86rf2xx_reg_read(_dev, AT86RF2XX_REG__PHY_RSSI) & 0x80;
-            if(crc) {
-                dev->cb(dev, IEEE802154_RADIO_RX_DONE);
-            }
+            dev->cb(dev, IEEE802154_RADIO_RX_DONE);
         }
         else if (state == AT86RF2XX_TRX_STATE_TX_ON) {
             dev->cb(dev, IEEE802154_RADIO_TX_DONE);

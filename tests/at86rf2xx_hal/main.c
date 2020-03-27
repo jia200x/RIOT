@@ -88,7 +88,9 @@ static void radio_cb(ieee802154_dev_t *dev, int status)
                 .iov_base = buffer,
                 .iov_len = ieee802154_radio_read(dev, buffer, 127, &info),
             };
-            ieee802154_submac_rx_done_cb(&submac, &_iov, &info);
+            if (info.crc_ok) {
+                ieee802154_submac_rx_done_cb(&submac, &_iov, &info);
+            }
        }
     }
 }
