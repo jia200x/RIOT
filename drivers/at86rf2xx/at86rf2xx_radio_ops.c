@@ -168,9 +168,11 @@ static int set_cca_threshold(ieee802154_dev_t *dev, int8_t threshold)
     return 0;
 }
 
-static int set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
+static int _config_phy(ieee802154_dev_t *dev, ieee802154_phy_conf_t *conf)
 {
     bool sleep = _is_sleep(dev);
+    uint8_t channel = conf->channel;
+    int16_t pow = conf->pow;
     if (sleep) {
         at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
@@ -178,8 +180,6 @@ static int set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
     /* we must be in TRX_OFF before changing the PHY configuration */
     int prev_state = _dev->trx_state;
     at86rf2xx_set_state(_dev, AT86RF2XX_TRX_STATE_TRX_OFF);
-
-    (void) page;
 
     uint8_t phy_cc_cca = at86rf2xx_reg_read(_dev, AT86RF2XX_REG__PHY_CC_CCA);
     /* Clear previous configuration for channel number */
@@ -191,18 +191,6 @@ static int set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
 
     /* Return to the state we had before reconfiguring */
     at86rf2xx_set_state(_dev, prev_state);
-    if (sleep) {
-        at86rf2xx_sleep((at86rf2xx_t*) dev);
-    }
-    return 0;
-}
-
-static int set_tx_power(ieee802154_dev_t *dev, int16_t pow)
-{
-    bool sleep = _is_sleep(dev);
-    if (sleep) {
-        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-    }
     at86rf2xx_set_txpower((at86rf2xx_t*) dev, pow);
     if (sleep) {
         at86rf2xx_sleep((at86rf2xx_t*) dev);
@@ -570,8 +558,7 @@ static const ieee802154_radio_ops_t at86rf2xx_ops = {
     .read = _read,
     .cca = cca,
     .set_cca_threshold = set_cca_threshold,
-    .set_channel = set_channel,
-    .set_tx_power = set_tx_power,
+    .config_phy = _config_phy,
     .set_trx_state = set_trx_state,
     .set_sleep = _set_sleep,
     .get_cap = _get_cap,

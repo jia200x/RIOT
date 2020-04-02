@@ -260,14 +260,6 @@ static size_t _parse_addr(uint8_t *out, size_t out_len, const char *in)
     return count;
 }
 
-int txpow(int argc, char **argv)
-{
-    (void) argc;
-    (void) argv;
-    ieee802154_radio_set_tx_power(submac.dev, 0);
-    return 0;
-}
-
 int txtsnd(int argc, char **argv)
 {
     char *text;
@@ -302,7 +294,6 @@ int txtsnd(int argc, char **argv)
 }
 static const shell_command_t shell_commands[] = {
     { "txtsnd", "Send IEEE 802.15.4 packet", txtsnd },
-    { "txpow", "Send IEEE 802.15.4 packet", txpow },
     { NULL, NULL, NULL }
 };
 

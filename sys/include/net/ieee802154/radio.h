@@ -59,27 +59,308 @@ struct ieee802154_dev {
     ieee802154_cb_t cb;
 };
 
+typedef enum {
+    IEEE802154_CCA_MODE_ED_THRESHOLD,
+    IEEE802154_CCA_MODE_CARRER_SENSING,
+    IEEE802154_CCA_MODE_ED_THRESH_AND_CS,
+    IEEE802154_CCA_MODE_ED_THRESH_OR_CS,
+} ieee802154_cca_mode_t;
+
+typedef struct {
+    uint8_t channel;
+    uint8_t page;
+    int16_t pow;
+} ieee802154_phy_conf_t;
+
 struct ieee802154_radio_ops {
+    /**
+     * @brief Load packet in the framebuffer of a radio.
+     *
+     * This function shouldn't do any checks, so the packet MUST be valid.
+     * If the radio is still transmitting, it should block until is safe to
+     * write again in the frame buffer
+     *
+     * @pre the PHY state is @ref IEEE802154_TRX_STATE_TX_ON.
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] pkt the packet to be sent with valid length
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
     int (*prepare)(ieee802154_dev_t *dev, iolist_t *pkt);
+
+    /**
+     * @brief Transmit a preloaded packet
+     *
+     * @pre the PHY state is @ref IEEE802154_TRX_STATE_TX_ON and the packet
+     *      is already in the framebuffer.
+     *
+     * @post the PHY state is @ref IEEE802154_TRX_STATE_TX_ON.
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
     int (*transmit)(ieee802154_dev_t *dev);
+
+    /**
+     * @brief Get the lenght of the received packet.
+     *
+     * This function can use SRAM, a reg value or similar to read the packet
+     * length.
+     *
+     * @pre the radio already received a packet (e.g
+     *      @ref ieee802154_dev_t::cb with @ref IEEE802154_RADIO_RX_DONE).
+     * @pre the device is not sleeping
+     *
+     * @post the frame buffer is still protected against new packet arrivals.
+     *      
+     * @param[in] dev IEEE802.15.4 device descriptor
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
     int (*len)(ieee802154_dev_t *dev);
-    int (*read)(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_info_t *info);
+
+    /**
+     * @brief Read a packet from the internal framebuffer of the radio.
+     *
+     * This function should try to write the received packet into @p buf and
+     * put the radio in a state where it can receive more packets.
+     *
+     * @pre the radio already received a packet (e.g
+     *      @ref ieee802154_dev_t::cb with @ref IEEE802154_RADIO_RX_DONE).
+     * @pre the device is not sleeping
+     *
+     * @post the PHY state is @ref IEEE802154_TRX_STATE_RX_ON and the radio is
+     *       in a state where it can receive more packets, regardless of the
+     *       return value.
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[out] buf buffer to write the received packet into. If NULL, the
+     *             packet is not copied.
+     * @param[in] size size of @p buf
+     * @param[in] info information of the received packet (LQI, RSSI). Can be
+     *            NULL if this information is not needed.
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
+    int (*read)(ieee802154_dev_t *dev, void *buf, size_t size,
+                ieee802154_rx_info_t *info);
+
+    /**
+     * @brief Perform Stand-Alone Clear Channel Assessment
+     *
+     * This function performs blocking CCA to check if the channel is clear.
+     * @pre the PHY state is @ref IEEE802154_TRX_STATE_RX_ON.
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     *
+     * @return true if channel is clear.
+     * @return false if channel is busy.
+     */
     bool (*cca)(ieee802154_dev_t *dev);
+
+    /**
+     * @brief Set the threshold for the Energy Detection (first mode of CCA)
+     *
+     * @pre the device is not sleeping
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] threshold the threshold in dBm.
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
     int (*set_cca_threshold)(ieee802154_dev_t *dev, int8_t threshold);
-    //int set_cca_mode(ieee802154_dev_t *dev, ieee802154_cca_mode_t mode);
-    int (*set_channel)(ieee802154_dev_t *dev, uint8_t channel, uint8_t page);
-    int (*set_tx_power)(ieee802154_dev_t *dev, int16_t pow);
+
+    /**
+     * @brief Set CCA mode
+     *
+     * All radios MUST at least implement the first CCA mode (ED Threshold).
+     *
+     * @pre the device is not sleeping
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] mode the CCA mode
+     *
+     * @return 0 on success
+     * @return -ENOTSUP if the mode is not supported
+     * @return negative errno on error
+     */
+    int (*set_cca_mode)(ieee802154_dev_t *dev, ieee802154_cca_mode_t mode);
+
+    /**
+     * @brief Set IEEE802.15.4 PHY configuration (channel, TX power)
+     *
+     * This function SHOULD NOT validate the PHY configurations unless
+     * it's specific to the device. The upper layer is responsible of all kind
+     * of validations.
+     *
+     * @pre the device is not sleeping
+     * @pre the PHY state is @ref IEEE802154_TRX_STATE_TRX_OFF.
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] conf the PHY configuration
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
+    int (*config_phy)(ieee802154_dev_t *dev, ieee802154_phy_conf_t *conf);
+
+    /**
+     * @brief Set the transceiver PHY state
+     *
+     * @pre the device is not sleeping
+     *
+     * @note the implementation MUST block until the state change occurs.
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] state the new state
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
     int (*set_trx_state)(ieee802154_dev_t *dev, ieee802154_trx_state_t state);
+
+    /**
+     * @brief Set the sleep state of the device (sleep or awake)
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] sleep whether the device should sleep or not.
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
     int (*set_sleep)(ieee802154_dev_t *dev, bool sleep);
+
+    /**
+     * @brief Get a cap from the radio
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param cap cap to be checked
+     *
+     * @return true if the radio supports the cap
+     * @return false otherwise
+     */
     bool (*get_cap)(ieee802154_dev_t *dev, ieee802154_rf_caps_t cap);
+
+    /**
+     * @brief Process radio IRQ.
+     *
+     * This function calls the @ref ieee802154_cb_t::cb function with all
+     * the corresponding events.
+     *
+     * @note if the device is sleeping, this function should do nothing
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     */
     void (*irq_handler)(ieee802154_dev_t *dev);
-    int (*get_tx_status)(ieee802154_dev_t *dev, ieee802154_tx_info_t *info);
-    int (*set_hw_addr_filter)(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_t *ext_addr, uint16_t pan_id);
-    int (*set_frame_retries)(ieee802154_dev_t *dev, int retries);
-    int (*set_csma_params)(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd, int8_t retries);
+
+    /**
+     * @brief Start the device
+     *
+     * @pre the init function of the radio succeeded.
+     *
+     * This function puts the radio in a state where it can be operated. It
+     * should enable interrupts and set the transceiver state to
+     * @ref IEEE802154_TRX_STATE_TRX_OFF
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
+    int (*start)(ieee802154_dev_t *dev);
+
+    /**
+     * @brief Set IEEE802.15.4 promiscuous mode
+     *
+     * @pre the device is not sleeping
+     *
+     * @note this function pointer can be NULL if the device doesn't support
+     *       hardware address filtering.
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] enable whether the promiscuous mode should be enabled or not.
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
     int (*set_promiscuous)(ieee802154_dev_t *dev, bool enable);
 
-    int (*start)(ieee802154_dev_t *dev);
+    /**
+     * @brief Get the SubMAC TX information (number of retransmissions,
+     *        pending bit, status, etc).
+     *
+     * @pre the device is not sleeping
+     *
+     * @note this function pointer can be NULL if the device doesn't support
+     *       frame retransmissions
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[out] info the TX information
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
+    int (*get_tx_status)(ieee802154_dev_t *dev, ieee802154_tx_info_t *info);
+
+    /**
+     * @brief Set IEEE802.15.4 addresses in hardware address filter
+     *
+     * @pre the device is not sleeping
+     *
+     * @note this function pointer can be NULL if the device doesn't support
+     *       hardware address filtering.
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] short_addr the IEEE802.15.4 short address
+     * @param[in] ext_addr the IEEE802.15.4 extended address
+     * @param[in] pan_id the IEEE802.15.4 PAN ID
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
+    int (*set_hw_addr_filter)(ieee802154_dev_t *dev, uint8_t *short_addr,
+                              uint8_t *ext_addr, uint16_t pan_id);
+
+    /**
+     * @brief Set number of frame retransmissions
+     *
+     * @pre the device is not sleeping
+     *
+     * @note this function pointer can be NULL if the device doesn't support
+     *       frame retransmissions
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] retries the number of retransmissions
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
+    int (*set_frame_retries)(ieee802154_dev_t *dev, int retries);
+
+    /**
+     * @brief 
+     *
+     * @pre the device is not sleeping
+     *
+     * @note this function pointer can be NULL if the device doesn't support
+     *       frame retransmissions
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] bd parameters of the exponential backoff
+     * @param[in] retries number of CSMA-CA retries
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
+    int (*set_csma_params)(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd,
+                           int8_t retries);
 };
 
 static inline int ieee802154_radio_prepare(ieee802154_dev_t *dev, iolist_t *pkt)
@@ -107,14 +388,9 @@ static inline int ieee802154_radio_set_cca_threshold(ieee802154_dev_t *dev, int8
     return dev->driver->set_cca_threshold(dev, threshold);
 }
 
-static inline int ieee802154_radio_set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
+static inline int ieee802154_radio_config_phy(ieee802154_dev_t *dev, ieee802154_phy_conf_t *conf)
 {
-    return dev->driver->set_channel(dev, channel, page);
-}
-
-static inline int ieee802154_radio_set_tx_power(ieee802154_dev_t *dev, int16_t pow)
-{
-    return dev->driver->set_tx_power(dev, pow);
+    return dev->driver->config_phy(dev, conf);
 }
 
 static inline int ieee802154_radio_set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)

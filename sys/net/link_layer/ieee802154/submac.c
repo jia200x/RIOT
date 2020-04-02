@@ -148,7 +148,8 @@ int ieee802154_submac_init(ieee802154_submac_t *submac)
 #if IS_ACTIVE(MODULE_AT86RF2XX)
     ieee802154_radio_set_hw_addr_filter(dev, (uint8_t*) &submac->short_addr, (uint8_t*) &submac->ext_addr, 0x23);
 #endif
-    ieee802154_radio_set_channel(dev, 21, 0);
+    ieee802154_phy_conf_t conf = {.channel=21, .page=0, .pow=1000};
+    ieee802154_radio_config_phy(dev, &conf);
     /* TODO: remove */
     /*
     if(!dev->driver->start) {
@@ -178,6 +179,7 @@ int ieee802154_set_addresses(ieee802154_submac_t *submac, network_uint16_t *shor
 int ieee802154_set_channel(ieee802154_submac_t *submac, uint8_t channel_num, uint8_t channel_page)
 {
     ieee802154_dev_t *dev = submac->dev;
-    return ieee802154_radio_set_channel(dev, channel_num, channel_page);
+    ieee802154_phy_conf_t conf = {.channel=channel_num, .page=channel_page, .pow=1000};
+    return ieee802154_radio_config_phy(dev, &conf);
 }
 
