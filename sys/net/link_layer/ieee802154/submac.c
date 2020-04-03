@@ -72,7 +72,7 @@ int ieee802154_submac_rx_done_cb(ieee802154_submac_t *submac, struct iovec *iov,
         }
     }
     else {
-        if (!ieee802154_radio_has_ack_timeout(dev)) {
+        if (!ieee802154_radio_has_auto_ack(dev)) {
             if (buf[0] & 0x2) {
                 return -EINVAL;
             }

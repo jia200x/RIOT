@@ -245,6 +245,7 @@ static bool _get_cap(ieee802154_dev_t *dev, ieee802154_rf_caps_t cap)
         case IEEE802154_CAP_CSMA_BACKOFF:
         case IEEE802154_CAP_FRAME_RETRIES:
         case IEEE802154_CAP_AUTO_ACK:
+        case IEEE802154_CAP_HW_ADDR_FILTER:
             return true;
 #endif
         default:
