@@ -53,7 +53,7 @@ and the following acronyms and definitions:
 
 # 3. Introduction
 This document defines the proposed API for the IEEE802.15.4 radio abstraction
-layer. 
+layer.
 
 The IEEE802.15.4 Radio HAL abstract common functionalities of IEEE802.15.4
 compliant radios, so upper layers have a hardware independent layer to control
@@ -61,51 +61,6 @@ the radio.
 
 The HAL is intended to be used to implement the whole IEEE802.15.4 layer under
 the network stack interface or southbound API.
-
-Consider the current network architecture:
-
-```
-+-----------------------------------------------------------------------+
-|                                                                       |
-|                              GNRC Netif                               |
-|                                                                       |
-+-----------------------------------------------------------------------+
-             ^                                           ^
-             |                                           |
-      gnrc_netif_ops_t                            gnrc_netif_ops_t
-             |                                           |
-             v                                           v
-+---------------------------+              +----------------------------+
-|                           |              |                            |
-|   gnrc_netif_ieee802154   |              |     gnrc_netif_ethernet    |
-|     (Southbound API)      |              |       (Southbound API)     |
-+---------------------------+              +----------------------------+
-             ^                                           ^               
-             |              Stack dependent              |               
- -----------------------------------------------------------------------
-             |              Stack independent            |
-       netdev_driver_t                             netdev_driver_t
-             |                                           | 
-             |                                           |               
-             v                                           v               
-+---------------------------+              +----------------------------+
-|                           |              |                            |
-|          netdev           |              |           netdev           |
-|                           |              |                            |
-+---------------------------+              +----------------------------+
-            ^                                            ^
-            |                                            |
-       Device Driver API      HW independent       Device Driver API 
------------------------------------------------------------------------
-            |                 HW dependent               |
-            |                                            |
-            v                                            v
-+---------------------------+              +----------------------------+
-|                           |              |                            |
-| IEEE802.15.4 Device Driver|              |   Ethernet Device Driver   |
-|                           |              |                            |
-+---------------------------+              +----------------------------+
-```
 
 The `netdev` component mixes MAC, PHY and transceiver elements. Thus, in
 practice it's problematic to integrate a full IEEE802.15.4 MAC layer or
@@ -115,112 +70,81 @@ The following picture shows how the Radio HAL can be used to provide a
 well known layer to implement a IEEE802.15.4 MAC on top, as well as an analogue
 approach to Ethernet (not in the scope of this document)
 
-```
-+-----------------------------------------------------------------------+
-|                                                                       |
-|                              GNRC Netif                               |
-|                                                                       |
-+-----------------------------------------------------------------------+
-             ^                                           ^
-             |                                           |
-      gnrc_netif_ops_t                            gnrc_netif_ops_t
-             |                                           |
-             v                                           v
-+---------------------------+              +----------------------------+
-|                           |              |                            |
-|   gnrc_netif_ieee802154   |              |     gnrc_netif_ethernet    |
-|                           |              |                            |
-+---------------------------+              +----------------------------+
-             ^                                           ^               
-             |              Stack dependent              |               
- -----------------------------------------------------------------------
-             |              Stack independent            |
-        MCPS/MLME API                             Ethernet MAC API
-             |                                           | 
-             |                                           |               
-             v                                           v               
-+---------------------------+              +----------------------------+
-|                           |              |                            |
-|     IEEE802.15.4 MAC      |              |         Ethernet MAC       |
-|                           |              |                            |
-+---------------------------+              +----------------------------+
-             ^                                           ^
-             |                                           |
-       Radio HAL API           HW independent      Ethernet HAL API
------------------------------------------------------------------------
-             |                 HW dependent              |
-             |                                           |
-             v                                           v
-+---------------------------+              +----------------------------+
-|                           |              |                            |
-|  IEEE802.15.4 Radio HAL   |              |    Ethernet Radio HAL      |
-|                           |              |                            |
-+---------------------------+              +----------------------------+
-             ^                                           ^
-             |                                           |
-       Device Driver API                          Device Driver API 
-             |                                           |             
-             |                                           |
-             |                                           |
-             v                                           v
-+---------------------------+              +----------------------------+
-|                           |              |                            |
-| IEEE802.15.4 Device Driver|              |   Ethernet Device Driver   |
-|                           |              |                            |
-+---------------------------+              +----------------------------+
-```
 
+```
+         OLD             |                        NEW             
+         ===             |                        ===             
+                         |                                     
++---------------------+  |  +---------------------+   +---------------------+
+|                     |  |  |                     |   |                     |
+|  GNRC Network Stack |  |  |  GNRC Network Stack |   |                     |
+|                     |  |  |                     |   |                     |
++---------------------+  |  +---------------------+   |                     |
+          ^              |            ^               |                     |
+          |              |            |               |                     |
+     gnrc_netapi         |       gnrc_netapi          | OpenThread, OpenWSN |
+          |              |            |               |                     |
+          v              |            v               |                     |
++---------------------+  |  +---------------------+   |                     |
+|                     |  |  |                     |   |                     |
+|     GNRC Netif      |  |  |     GNRC Netif      |   |                     |
+|                     |  |  |                     |   |                     |
++---------------------+  |  +---------------------+   +---------------------+
+          ^              |            ^                         ^
+          |              |            |                         |
+   gnrc_netif_ops_t      |     gnrc_netif_ops_t                 |
+          |              |            |                         |
+          v              |            v                         |
++---------------------+  |  +---------------------+             |              
+|                     |  |  |                     |             |              
+|gnrc_netif_ieee802154|  |  |gnrc_netif_ieee802154|             |              
+|                     |  |  |                     |             |              
++---------------------+  |  +---------------------+             |              
+          ^              |            ^                         |              
+          |              |            |                         |              
+    netdev_driver_t      |     802.15.4 MAC API           Radio HAL API
+          |              |            |                         |              
+          v              |            v                         |              
++---------------------+  |  +---------------------+             |              
+|                     |  |  |                     |             |              
+|       netdev        |  |  |    802.15.4 MAC     |             |              
+|                     |  |  |                     |             |              
++---------------------+  |  +---------------------+             |              
+          ^              |            ^                         |              
+          |              |            |                         |              
+          |              |      Radio HAL API                   |
+          |              |            |                         |              
+          |              |            v                         v              
+          |              |  +-----------------------------------------------+           
+          |              |  |                                               |           
+   netdev_driver_t       |  |               802.15.4 Radio HAL              |
+          |              |  |                                               |           
+          |              |  +-----------------------------------------------+           
+          |              |                         ^                                               
+          |              |                         |                                               
+          |              |                   Device Driver API                                       
+          |              |                         |                                               
+          v              |                         v                                               
++---------------------+  |  +-----------------------------------------------+
+|                     |  |  |                                               |
+|    Device Driver    |  |  |                  Device Driver                |
+|                     |  |  |                                               |
++---------------------+  |  +-----------------------------------------------+
+```
 As seen, the HAL is more specific than `netdev` and clearly defines an
 interface for a specific network device.
 
-For instance, a network stacks that requires direct access to the radio
-(e.g OpenThread) can be integrated to RIOT with the following architecture:
-```
-+-----------------------------------------------------------------------+
-|                                                                       |
-|                         otPlatRadio (OpenThread Southbound API)       |
-|                                                                       |
-+-----------------------------------------------------------------------+
-                                     ^
-                                     |
-                                     |
-                               Radio HAL API             HW independent
- ------------------------------------------------------------------------
-                                     |                   HW dependent
-                                     |
-                                     |
-                                     v
-+-----------------------------------------------------------------------+
-|                                                                       |
-|                                Radio HAL                              |
-|                                                                       |
-+-----------------------------------------------------------------------+
-                                     ^
-                                     |
-                                     |
-                             Device Driver API           
-                                     |                   
-                                     |
-                                     |
-                                     v
-+-----------------------------------------------------------------------+
-|                                                                       |
-|                         IEEE802.154 Device Driver                     |
-|                                                                       |
-+-----------------------------------------------------------------------+
-```
-
 # 4. Architecture
 ```
-+-----------------------------------------------------------------------------+            
-|                                                                             |            
-|                               Upper layer                                   |            
-|                                                                             |            
-+-----------------------------------------------------------------------------+            
-      ^                                 
-      |                                 
-      |                                  
-      |                                  
++-----------------------------------------------------------------------------+
+|                                                                             |
+|                               Upper layer                                   |
+|                                                                             |
++-----------------------------------------------------------------------------+
+      ^
+      |
+      |
+      |
   Radio HAL API                                  +----------------------------+
       |                         Radio HAL API    |                            |
       |                   +----------------------|    Bottom-Half processor   |
@@ -234,11 +158,11 @@ For instance, a network stacks that requires direct access to the radio
 |   IEEE802.15.4 Radio HAL    |------------------------------------------------
 |                             |               HW dependent    |
 +-----------------------------+                               |
-                |                                             |                 
-       Device Specific API                                    |                 
-                |                                             |                 
-                v                                             |                 
-+-----------------------------+                               |                 
+                |                                             |
+       Device Specific API                                    |
+                |                                             |
+                v                                             |
++-----------------------------+                               |
 |                             |                               |
 |       Device Driver         |-------------------------------+
 |       implementation        |
@@ -287,53 +211,13 @@ stack independent are prefered because it can be reused between different
 network stacks.
 
 ## 4.3 Radio HAL
-```
-+-----------------------------------------------------------------------+
-|                                                                       |
-|                         Upper Layer / BH processor                    |
-|                                                                       |
-+-----------------------------------------------------------------------+
-         |                                                   ^
-         |                                                   |
-         |                                                   |
-==========================================================================
-         |                  IEEE802.15.4 Radio HAL           |
-         |                                                   |
-         |                                                   |
-   Radio HAL API                                        Radio HAL API
-    (Radio Ops)               HW independent         (Event Notification)
- -------------------------------------------------------------------------
-         |                    HW dependent                   |           
-         |                                                   |
-         |                                                   |
-         v                                                   |
-+-----------------------------------------------------------------------+
-|                                                                       |
-|            Device Specific IEEE802.15.4 HAL implementation            |
-|                                                                       |
-+-----------------------------------------------------------------------+
-                                     ^
-                                     |
-                                     |             IEEE802.15.4 Radio HAL          
-==========================================================================
-                                     |
-                             Device Driver API           
-                                     |                   
-                                     |
-                                     |
-                                     v
-+-----------------------------------------------------------------------+
-|                                                                       |
-|                               Device Driver                           |
-|                                                                       |
-+-----------------------------------------------------------------------+
-```
+
 The Radio HAL is defined by the Radio HAL API (`radio_ops` + Event Notification)
 and the Device Specific IEEE802.15.4 HAL implementation.
 
-The Radio HAL implements a set of functionalities to control the operation of
-the radio, process the IRQ handler and receive event notifications from the
-device.
+As this suggests, the Radio HAL implements a set of functionalities to control
+the operation of the radio, process the IRQ handler and receive event
+notifications from the device.
 
 ### 4.3.1 Radio Ops
 The Radio Ops interface exposes common operations to control the radio device,
@@ -421,7 +305,7 @@ Besides implementing functions for the HAL, the Device Driver API should
 - Init function: The driver should provide a function to setup the device
   and put it in a state that minimizes power consumption. This is because there
   might be some delay between the device initialization and starting the
-  device (e.g setting a network interface up). 
+  device (e.g setting a network interface up).
 - Start function: This function should set the device in a state where is ready
   to operate (IRQ enabled, transceiver enabled). The PHY settings (channel,
   tx power) should be the defaults. If this function succeeds the transceiver
@@ -559,7 +443,7 @@ static inline int ieee802154_radio_len(ieee802154_dev_t *dev)
 
 /**
  * @brief Read a packet into a buffer of given size
- * 
+ *
  * @pre the radio already received a packet (e.g
  *      @ref ieee802154_dev_t::cb with @ref IEEE802154_RADIO_RX_DONE).
  * @pre the device is not sleeping
@@ -976,7 +860,7 @@ It's safe to call the radio HAL API from the event callback function.
  * @brief Prototype of the IEEE802.15.4 device event callback
  *
  * @param[in] dev IEEE802.15.4 device descriptor
- * @param[in] status the status 
+ * @param[in] status the status
  */
 typedef void (*ieee802154_cb_t)(ieee802154_dev_t *dev,
                                 ieee802154_tx_status_t status);
@@ -1006,7 +890,7 @@ typedef enum {
      * @brief the transceiver finished sending a packet or the
      *        retransmission procedure
      *
-     * If the radio supports frame retransmissions the 
+     * If the radio supports frame retransmissions the
      * @ref ieee802154_radio_get_tx_status MAY be called to retrieve useful
      * information (number of retries, frame pending bit, etc). The
      * transceiver is in @ref IEEE802154_TRX_STATE_TX_ON state when this function
@@ -1117,7 +1001,7 @@ struct ieee802154_radio_ops {
      * @pre the device is not sleeping
      *
      * @post the frame buffer is still protected against new packet arrivals.
-     *      
+     *
      * @param[in] dev IEEE802.15.4 device descriptor
      *
      * @return 0 on success
@@ -1346,7 +1230,7 @@ struct ieee802154_radio_ops {
     int (*set_frame_retries)(ieee802154_dev_t *dev, int retries);
 
     /**
-     * @brief 
+     * @brief
      *
      * @pre the device is not sleeping
      *
