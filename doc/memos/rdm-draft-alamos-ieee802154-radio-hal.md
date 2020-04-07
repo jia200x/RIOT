@@ -129,7 +129,7 @@ approach to Ethernet (not in the scope of this document)
 +---------------------------+              +----------------------------+
 |                           |              |                            |
 |   gnrc_netif_ieee802154   |              |     gnrc_netif_ethernet    |
-|     (Southbound API)      |              |       (Southbound API)     |
+|                           |              |                            |
 +---------------------------+              +----------------------------+
              ^                                           ^               
              |              Stack dependent              |               
@@ -144,21 +144,23 @@ approach to Ethernet (not in the scope of this document)
 |     IEEE802.15.4 MAC      |              |         Ethernet MAC       |
 |                           |              |                            |
 +---------------------------+              +----------------------------+
-             ^                                           ^               
-             |                                           |               
-       Radio HAL API                              Ethernet HAL API
-             |                                           |               
-             v                                           v               
+             ^                                           ^
+             |                                           |
+       Radio HAL API           HW independent      Ethernet HAL API
+-----------------------------------------------------------------------
+             |                 HW dependent              |
+             |                                           |
+             v                                           v
 +---------------------------+              +----------------------------+
 |                           |              |                            |
-|  IEEE802.15.4 Radio HAL   |              |         Ethernet HAL       |
+|  IEEE802.15.4 Radio HAL   |              |    Ethernet Radio HAL      |
 |                           |              |                            |
 +---------------------------+              +----------------------------+
              ^                                           ^
              |                                           |
-       Device Driver API      HW independent      Device Driver API 
------------------------------------------------------------------------
-             |                 HW dependent              |
+       Device Driver API                          Device Driver API 
+             |                                           |             
+             |                                           |
              |                                           |
              v                                           v
 +---------------------------+              +----------------------------+
@@ -182,23 +184,22 @@ For instance, a network stacks that requires direct access to the radio
                                      ^
                                      |
                                      |
-                               Radio HAL API             Stack dependent
+                               Radio HAL API             HW independent
  ------------------------------------------------------------------------
-                                     |                   Stack independent
+                                     |                   HW dependent
                                      |
                                      |
                                      v
 +-----------------------------------------------------------------------+
 |                                                                       |
-|                         IEEE802.154 radio HAL                         |
+|                                Radio HAL                              |
 |                                                                       |
 +-----------------------------------------------------------------------+
                                      ^
                                      |
                                      |
-                             Device Driver API           Hardware independent
- ------------------------------------------------------------------------
-                                     |                   Hardware dependent
+                             Device Driver API           
+                                     |                   
                                      |
                                      |
                                      v
@@ -211,130 +212,168 @@ For instance, a network stacks that requires direct access to the radio
 
 # 4. Architecture
 ```
-+-----------------------------+            +-----------------------------+
-|                             |            |                             |
-|         Upper layer         |            |    Bottom-Half processor    |                   
-|     (e.g SubMAC, OpenWSN)   |            | (e.g OpenWSN, event_thread) |                   
-+-----------------------------+            +-----------------------------+                   
-               ^                                   |                 ^
-               |                                   |                 |
-               |                                   |                 |
-          Radio HAL API                            |                 |
-               |                               Radio HAL API         |
-               |                               (Process IRQ)         |
-               v                                   |                 |
-+-----------------------------+                    |                 |
-|     IEEE802.154 radio HAL   |                    |                 |
-|     (wrapper implementation |<-------------------+                 |
-|     of `radio_ops`)         |                                      |
-+-----------------------------+                                     IRQ
-               ^                                                     |
-               |                                                     |
-               |                   HW independent                    |
--------------------------------------------------------------------------------
-           radio_ops               HW dependent                      |
-               |                                                     |
-               |                                                     |
-               v                                                     |
-+-----------------------------+                                      |
-|                             |                                      |
-|       Device Specific       |                                      |
-|      HAL implementation     |                                      |
-+-----------------------------+                                      |
-               ^                                                     |
-               |                                                     |
-               |                                                     |
-        Device Specific API                                          |
-               |                                                     |
-               |                                                     |
-               v                                                     |
-+-----------------------------+                                      |
-|                             |                                      |
-|        Device Driver        |--------------------------------------+
-|        implementation       |
++-----------------------------------------------------------------------------+            
+|                                                                             |            
+|                               Upper layer                                   |            
+|                                                                             |            
++-----------------------------------------------------------------------------+            
+      ^                                 
+      |                                 
+      |                                  
+      |                                  
+  Radio HAL API                                  +----------------------------+
+      |                         Radio HAL API    |                            |
+      |                   +----------------------|    Bottom-Half processor   |
+      |                   |     (Process IRQ)    |                            |
+      |                   |                      +----------------------------+
+      |                   |                                   ^
+      |                   |                                   |
+      v                   v                                  IRQ
++-----------------------------+                               |
+|                             |               HW independent  |
+|   IEEE802.15.4 Radio HAL    |------------------------------------------------
+|                             |               HW dependent    |
++-----------------------------+                               |
+                |                                             |                 
+       Device Specific API                                    |                 
+                |                                             |                 
+                v                                             |                 
++-----------------------------+                               |                 
+|                             |                               |
+|       Device Driver         |-------------------------------+
+|       implementation        |
 +-----------------------------+
 ```
 
-The radio HAL is designed to be on top of an autonomous device driver.
+As shown in the picture, the radio HAL lies on top of an autonomous device
+driver.
+The upper layer controls the radio using the radio HAL API. The latter also
+defines an Event Notification mechanism that will be described below.
+
 Since devices drivers don't have any dependency with the HAL, it's still
-possible to use the device without the HAL on top (e.g testing, device specific
+possible to use the device the raw device driver (e.g testing, device specific
 features).
 
-The upper layer controls the radio via a defined set of operations (process IRQ,
-set channel, transmit packet) using the radio HAL API.
-The radio communicates with the upper layer via an event callback.
-
 Same as `netdev`, the radio HAL requires an upper layer to do the Bottom-Half
-processing (a.k.a avoid processing the radio on ISR context).
+processing (a.k.a offloading the ISR to thread context).
 This allows the usage of different event processing mechanisms
 (msg, thread flags, event threads, etc). The Bottom-Half processer should use
-the Radio API to request the device driver to process the IRQ.
+the Radio API to process the IRQ.
 
-
-## 4.1 Components
-### 4.1.1 Upper layer
+### 4.1 Upper layer
 The upper layers are users that requires direct access to the primitive
 operations of the radio and/or to the hardware acceleration.
 
 For instance:
-- A SubMAC layer can use the radio HAL to implement the PHY layer (data
-communication, set/get PHY parameters, perform CCA, etc).
+- A MAC layer can use the radio HAL to implement the PHY layer part (data
+communication, set/get PHY parameters, perform CCA, etc)
 - A network stack that requires direct access to the radio (OpenWSN,
-  OpenThread), can use the radio HAL to implement the South Bound API.
+  OpenThread), can use the radio HAL to implement the integration code.
 - A user that wants to write a very simple application to send and receive
   data between radios (relying on hardware acceleration for retransmissions,
   CSMA-CA, etc).
 
 The upper layer controls the radio via the Radio HAL API. Events from the radio
-(packet received, transmission finished) are indicated via an event callback.
+(packet received, transmission finished) are indicated via an event notification
+mechanism, described below.
 
-## 4.1.2 Bottom-Half processor
+## 4.2 Bottom-Half processor
 The BH processor is a component to offload the IRQ processing to thread context.
 The component registers to the device IRQ and uses internal mechanisms to call
 the Radio API IRQ handler from a safe context.
 
-Examples of BH processors:
-- The `gnrc_netif` thread that waits for a message from the ISR implementation
-  of the device driver to call the IRQ handler.
-- A thread waiting for thread flags sent from ISR context.
+The BH can be dependent or independent of the network stack. However, network
+stack independent are prefered because it can be reused between different
+network stacks.
 
-## 4.1.3 IEEE802.15.4 Radio HAL
-The Radio HAL implement a set of functionalities to control the operation of
-the radio, process the IRQ handler and fetch events from the device (Event
-Callback).
+## 4.3 Radio HAL
+```
++-----------------------------------------------------------------------+
+|                                                                       |
+|                         Upper Layer / BH processor                    |
+|                                                                       |
++-----------------------------------------------------------------------+
+         |                                                   ^
+         |                                                   |
+         |                                                   |
+==========================================================================
+         |                  IEEE802.15.4 Radio HAL           |
+         |                                                   |
+         |                                                   |
+   Radio HAL API                                        Radio HAL API
+    (Radio Ops)               HW independent         (Event Notification)
+ -------------------------------------------------------------------------
+         |                    HW dependent                   |           
+         |                                                   |
+         |                                                   |
+         v                                                   |
++-----------------------------------------------------------------------+
+|                                                                       |
+|            Device Specific IEEE802.15.4 HAL implementation            |
+|                                                                       |
++-----------------------------------------------------------------------+
+                                     ^
+                                     |
+                                     |             IEEE802.15.4 Radio HAL          
+==========================================================================
+                                     |
+                             Device Driver API           
+                                     |                   
+                                     |
+                                     |
+                                     v
++-----------------------------------------------------------------------+
+|                                                                       |
+|                               Device Driver                           |
+|                                                                       |
++-----------------------------------------------------------------------+
+```
+The Radio HAL is defined by the Radio HAL API (`radio_ops` + Event Notification)
+and the Device Specific IEEE802.15.4 HAL implementation.
 
-The API has a group of common functions and some functions specific to radios
-with a certain kind of hardware acceleration.
+The Radio HAL implements a set of functionalities to control the operation of
+the radio, process the IRQ handler and receive event notifications from the
+device.
 
-Examples of common operations are:
+### 4.3.1 Radio Ops
+The Radio Ops interface exposes common operations to control the radio device,
+get capabilities information (e.g support for frame retransmissions) and process
+the radio IRQ.
+
+The interface defines a group of mandatory functions, such as:
 - Set the transceiver state
-- Prepare a packet in the framebuffer
-- Transmit a packet
-- Read a packet into a buffer and RX information (LQI, RSSI, etc).
-- Check if the device support retransmissions
+- Set PHY configuration (channel, tx power, etc)
+- Load and transmit a packet
+- Get device capabilities
+- Process IRQ
 
-Examples of specific operations
-- Read TX info after retransmission procedure (frame retries, pending bit, etc)
+Some functions are optional and can be implemented by devices that support
+hardware acceleration. For instance
+- Read number of retransmissions
 - Set address filter addresses (extended, short, PAN ID)
+- Set CSMA-CA backoff parameters.
 
-The API also provides a function to process IRQs from the radio. The Bottom-Half
-processor will call this function as soon as possible when an IRQ is requested.
+The full list of functions is defined in the Interface Definition section.
 
-The API provides an Event Callback that should be implemented by the Upper Layer
-in order to perform actions (e.g allocate a packet when a packet is received or
-start software ACK timers).
+### 4.3.2 Event Notification
+The Radio HAL provides an Event Notification mechanism to inform the upper layer
+about an event (a packet was received, a transmission finished, etc).
 
-The Radio HAL uses the `radio_ops` interface to access the device specific
-HAL implementation.
+The upper layer can subscribe to these events to perform different actions. For
+instance, a MAC layer would subscribe to the RX done event to allocate the
+received packet. It can also use the TX done event to release resources or
+update statistics.
 
-## 4.1.4 Device Specific HAL implementation
-The Device Specific HAL implementation implements the hardware dependent
-component of the Radio API. It implements the `radio_ops` interface so the
-Radio HAL can be agnostic to the hardware.
+The full list of events and implications are defined in the Interface Definition
+section.
 
-This component uses the Device Driver specific API to implement the operations.
+### 4.3.3 Device Specific IEEE802.15.4 HAL implementation
+This component implements the hardware dependent part of the IEEE802.15.4 Radio
+HAL. It basically implements the Radio Ops interface
 
-## 4.1.5 Device Driver
+This component uses the Device Driver API to implement all operations.
+
+## 4.4 Device Driver
 The Device Driver implements the Hardware Adoption Layer of the device. It
 should implement the minimal functionalities to implement the Device Specific
 HAL on top, but it could also include device specific functionalities not
@@ -343,59 +382,8 @@ exposed but the Radio HAL API (e.g Smart Listening in AT86RF2xx radios).
 The Device Driver can be used without the Radio HAL on top, for testing or
 device specific applications.
 
-How to implement the Device Driver is out of the scope of this document.
-
-## 4.2 Interfaces
-### 4.2.1 Radio HAL API
-The Radio HAL API is the North Bound API for accessing the Radio HAL
-features.
-The API can be divided in 2 groups:
-
-1. Control of the radio
-2. Radio events notification to the upper layer
- 
-The control of the radio defines a series of functions to perform common
-IEEE802.15.4 radio tasks, such as:
-- Load a packet in the framebuffer and trigger send
-- Perform CCA
-- Set PHY configuration (channel, page, TX power)
-- Check if the device radio supports a capability (frame retranmissions,
-  auto ACK, etc)
-- Extract TX or RX information (number of retries, LQI, RSSI, pending bit, etc)
-- Process radio IRQ
-
-The radio event notification is used to tell an upper layer about the occurrence
-of a radio event. For instance, a MAC layer will try to allocate a packet when
-the reception finished, or keep transmissions statistics up to date when the
-transmission is done.
-
-The full list of functions and evemts are available in the Radio HAL API
-section.
-
-### 4.2.2 IRQ
-The Device Driver API provides a mechanism to expose the ISR of the radio,
-so the Bottom-Half processor can offload the ISR processing.
-
-The ISR is exposed from the Device Driver instead of the HAL, because a radio
-can still be used without the HAL on top.
-
-## 4.2.3 `radio_ops`
-The `radio_ops` interface define the south bound API of the Radio HAL. This
-interface connects the Radio HAL with the Device Specific HAL implementation,
-so the operation of the radio is hardware independent.
-
-The full list of `radio_ops` is defined in the Interface Definition section
-
-### 4.2.4 Device Driver API
-The Device Driver API exposes the Hardware Adoption Layer of the device in order
-to be used by the radio HAL or a user of the raw radio. As the name suggests,
-the API is device specific. However, function semantics tend to be common
-between different driver implementations (functions for setting PHY
-configuration or sending data have the same signature). 
-
-A Device Driver API can expose functions that are not related to the Radio HAL
-but add some value to testing or simple radio applications (e.g getters from
-internal registers, device specific functions, etc).
+It also provides a mechanism to expose the ISR of the radio, so the Bottom-Half
+processor can offload the ISR.
 
 # 5 Interface definition and implementation details
 ## 5.1 Radio HAL API
