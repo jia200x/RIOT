@@ -174,7 +174,7 @@ the current lower layer architecture doesn't have a clear layer distinction.
 |                             |               HW dependent    |
 +-----------------------------+                               |
                 |                                             |
-       Device Specific API                                    |
+       Device Specific API                                    | 
                 |                                             |
                 v                                             |
 +-----------------------------+                               |
