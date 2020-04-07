@@ -184,55 +184,60 @@ the current lower layer architecture doesn't have a clear layer distinction.
 +-----------------------------+
 ```
 
-As shown in the above figure, the IEEE802.15.4 Radio HAL is a central component that provides any upper layer
-a technology dependent and unified access to the hardware specific device driver, by implementing the Radio HAL API.
-Since devices drivers do not depend on the Radio HAL, it is still
-possible to use a the raw driver of a specific device, for testing purposes or accessing device specific
-features.
+As shown in the above figure, the IEEE802.15.4 Radio HAL is a central component
+that provides any upper layer a technology dependent and unified access to the
+hardware specific device driver, by implementing the Radio HAL API.  Since
+devices drivers do not depend on the Radio HAL, it is still possible to use a
+the raw driver of a specific device, for testing purposes or accessing device
+specific features.
 
-Similar to the preceding approach based on `netdev` , the Radio HAL requires an upper layer to take over the Bottom-Half
-processing which means, offloading the ISR to thread context.
-This allows for different event processing mechanisms such as `msg`, `thread flags`, `event threads`, etc. 
-The Bottom-Half processor should use the Radio HAL API to process the IRQ.
+Similar to the preceding approach based on `netdev` , the Radio HAL requires an
+upper layer to take over the Bottom-Half processing which means, offloading the
+ISR to thread context.  This allows for different event processing mechanisms
+such as `msg`, `thread flags`, `event threads`, etc. The Bottom-Half processor
+should use the Radio HAL API to process the IRQ.
 
 ## 4.1 Upper layer
-Upper layers are users that requires direct access to the primitive
-operations of a radio and its hardware acceleration features, if available.
+Upper layers are users that requires direct access to the primitive operations
+of a radio and its hardware acceleration features, if available.
 
 Examples for Upper Layers:
 - A MAC layer can use the Radio HAL to implement parts of a PHY layer (data
-communication, set/get parameters, perform CCA, etc.) .
+  communication, set/get parameters, perform CCA, etc.) .
 - A network stack that requires direct access to the radio (OpenWSN,
   OpenThread) can use the Radio HAL to implement the integration code.
-- A developer who implements a simple application to send and receive
-  data between 802.15.4 radios (relying on hardware accelerated MAC features, if available).
+- A developer who implements a simple application to send and receive data
+  between 802.15.4 radios (relying on hardware accelerated MAC features, if
+available).
 
-The upper layer accesses the radio using the Radio HAL API. Events that are triggered
-by the device (packet received, transmission finished) are indicated by an event notification
-mechanism, described below.
+The upper layer accesses the radio using the Radio HAL API. Events that are
+triggered by the device (packet received, transmission finished) are indicated
+by an event notification mechanism, described below.
 
 ## 4.2 Bottom-Half processor
-The Bottom-Half (BH) processor is a component to offload the IRQ processing to thread context.
-The component registers an IRQ handler during initialization which is executed when the device triggers and interrupt.
-This handler uses internal mechanisms to call the Radio API IRQ handler from a safe context.
+The Bottom-Half (BH) processor is a component to offload the IRQ processing to
+thread context.  The component registers an IRQ handler during initialization
+which is executed when the device triggers and interrupt. This handler uses
+internal mechanisms to call the Radio API IRQ handler from a safe context.
 
-The BH processor can be implemented dependent or independent of the network stack. A network
-stack independent solution is preferred in order to reuse functionality between different
-network stacks.
+The BH processor can be implemented dependent or independent of the network
+stack. A network stack independent solution is preferred in order to reuse
+functionality between different network stacks.
 
 ## 4.3 Radio HAL
 
-The Radio HAL is defined by the Radio HAL API which consists of three main components:
-Radio Operations, Event Notification, and the Device Specific IEEE802.15.4 HAL implementation.
+The Radio HAL is defined by the Radio HAL API which consists of three main
+components: Radio Operations, Event Notification, and the Device Specific
+IEEE802.15.4 HAL implementation.
 
-The Radio HAL Implementation provides a set of functionalities to control
-the operation of the device, to process the IRQ handler and to receive event
+The Radio HAL Implementation provides a set of functionalities to control the
+operation of the device, to process the IRQ handler and to receive event
 notifications from the device.
 
 ### 4.3.1 Radio Operations
-The Radio Operations (`radio_ops`) interface exposes operations that are common to control 802.15.4 devices,
-to request their hardware capabilities information (i.e., MAC acceleration hardware) and to process
-the radio IRQ.
+The Radio Operations (`radio_ops`) interface exposes operations that are common
+to control 802.15.4 devices, to request their hardware capabilities information
+(i.e., MAC acceleration hardware) and to process the radio IRQ.
 
 The interface defines a collection of mandatory functions:
 - Set the transceiver state
@@ -241,8 +246,9 @@ The interface defines a collection of mandatory functions:
 - Get device capabilities
 - Process IRQ
 
-The interface provides a collection of optional functions that may or may not be implemented, dependent on
-the hardware acceleration features of a device. These functions include:
+The interface provides a collection of optional functions that may or may not
+be implemented, dependent on the hardware acceleration features of a device.
+These functions include:
 - Read the number of retransmissions
 - Set address filter addresses (extended, short, PAN ID)
 - Set CSMA-CA backoff parameters.
@@ -250,34 +256,35 @@ the hardware acceleration features of a device. These functions include:
 The full list of functions can be found in the Interface Definition section.
 
 ### 4.3.2 Event Notification
-The Radio HAL provides an Event Notification mechanism to inform the upper layer
-about an event (a packet was received, a transmission finished, etc).
+The Radio HAL provides an Event Notification mechanism to inform the upper
+layer about an event (a packet was received, a transmission finished, etc).
 
-The upper layer can subscribe to these events to perform different actions. A an example,
-a MAC layer would subscribe to the RX done event to allocate the
+The upper layer can subscribe to these events to perform different actions. A
+an example, a MAC layer would subscribe to the RX done event to allocate the
 received packet. The TX done event is commonly used to release resources or
 update statistics.
 
-The full list of events and implications are defined in the Interface Definition
-section.
+The full list of events and implications are defined in the Interface
+Definition section.
 
 ### 4.3.3 Device Specific IEEE802.15.4 HAL implementation
-The Device Specific IEEE802.15.4 HAL implementation is part of the IEEE802.15.4 Radio HAL component
-in the above figure. It implements the hardware dependent part of the IEEE802.15.4 Radio
-HAL by wrapping the `radio_ops` interface around the device specific code by using the Device Driver API
-which grants access to all device operations.
+The Device Specific IEEE802.15.4 HAL implementation is part of the IEEE802.15.4
+Radio HAL component in the above figure. It implements the hardware dependent
+part of the IEEE802.15.4 Radio HAL by wrapping the `radio_ops` interface around
+the device specific code by using the Device Driver API which grants access to
+all device operations.
 
 ## 4.4 Device Driver
 The Device Driver implements the Hardware Adoption Layer of the device. It
-should provide minimal functionalities to implement the Device Specific
-API, and it additionally provides a mechanism to expose the ISR of the radio, so the Bottom-Half
-processor can offload the ISR.
+should provide minimal functionalities needed by the Radio Operations,
+and additionally provides a mechanism to expose the ISR of the radio, so the
+Bottom-Half processor can offload the ISR.
 
-The function set of the Device Driver can include device specific features that are not
-exposed but the Radio HAL API (e.g., Smart Listening with AT86RF2xx radios).
-The Device Driver is an independent component and it can be used without the Radio HAL on top, for testing purposes
-or device specific applications.
-
+The function set of the Device Driver can include device specific features that
+are not exposed but the Radio HAL API (e.g., Smart Listening with AT86RF2xx
+radios).  The Device Driver is an independent component and it can be used
+without the Radio HAL on top, for testing purposes or device specific
+applications.
 
 # 5 Interface definition and implementation details
 ## 5.1.1 Init vs Start
