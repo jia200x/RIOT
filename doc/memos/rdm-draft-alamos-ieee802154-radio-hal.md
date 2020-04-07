@@ -59,17 +59,30 @@ The IEEE802.15.4 Radio HAL abstract common functionalities of IEEE802.15.4
 compliant radios, so upper layers have a hardware independent layer to control
 the radio.
 
-The HAL is intended to be used to implement the whole IEEE802.15.4 layer under
-the network stack interface or southbound API.
+In our current architecture, components of the 802.15.4 MAC are spread between
+the IEEE802.15.4 component of the network interface (`gnrc_netif_ieee802154`)
+and `netdev`. This strategy has some issues:
+- The `netdev` has Link Layer semantics, so it's problematic to integrate
+  network stacks that require radio access (OpenWSN) or write a 802.15.4 MAC
+  layer
+- The `gnrc_netif_ieee80214` components of the 802.15.4 MAC are GNRC specific
+  and cannot be reused in other network stacks.
 
-The `netdev` component mixes MAC, PHY and transceiver elements. Thus, in
-practice it's problematic to integrate a full IEEE802.15.4 MAC layer or
-a network stack that requires direct access to the radio.
+Ideally, these components should be separated in:
+1. Network Stack specific glue code (netif) that operates the Link Layer
+2. Link Layer (802.15.4 MAC)
+3. Radio Hardware Abstraction Layer
 
-The following picture shows how the Radio HAL can be used to provide a
-well known layer to implement a IEEE802.15.4 MAC on top, as well as an analogue
-approach to Ethernet (not in the scope of this document)
+The last one (Radio HAL) is intended to control IEEE802.15.4 radios in a
+hardware independent manner. For instance, a 802.15.4 MAC layer (not in the
+scope of this document) would use the Radio HAL to implement the SubMAC
+components like sending and receiving data, retransmissions with CSMA-CA, etc.
+It can also be used to have raw access to radios (e.g test aplications,
+very simple communication protocols) and to integrate network stacks that
+require direct access to the radio device (OpenWSN, OpenThread).
 
+The following picture compares the current RIOT lower network architecture with
+the approach described above:
 
 ```
          OLD             |                        NEW             
@@ -131,8 +144,10 @@ approach to Ethernet (not in the scope of this document)
 |                     |  |  |                                               |
 +---------------------+  |  +-----------------------------------------------+
 ```
-As seen, the HAL is more specific than `netdev` and clearly defines an
-interface for a specific network device.
+Compared to the `netdev` interface, the 802.15.4 Radio HAL is more specific and
+only includes pure radio operations. Note that the blocks in the old approach
+are not necessarily at the same layer as the ones in the new approach, because
+the current lower layer architecture doesn't have a clear layer distinction.
 
 # 4. Architecture
 ```
@@ -184,7 +199,7 @@ This allows the usage of different event processing mechanisms
 (msg, thread flags, event threads, etc). The Bottom-Half processer should use
 the Radio API to process the IRQ.
 
-### 4.1 Upper layer
+## 4.1 Upper layer
 The upper layers are users that requires direct access to the primitive
 operations of the radio and/or to the hardware acceleration.
 
