@@ -276,8 +276,8 @@ all device operations.
 
 ## 4.4 Device Driver
 The Device Driver implements the Hardware Adoption Layer of the device. It
-should provide minimal functionalities needed by the Radio Operations,
-and additionally provides a mechanism to expose the ISR of the radio, so the
+provides minimal functionalities needed by the Radio Operations,
+and additionally a mechanism to expose the ISR of the radio, so the
 Bottom-Half processor can offload the ISR.
 
 The function set of the Device Driver can include device specific features that
