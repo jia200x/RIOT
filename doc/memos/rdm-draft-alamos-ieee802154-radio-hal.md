@@ -301,7 +301,7 @@ stages:
   `xxx_setup` functions) and puts it in a state that minimizes power
   consumption.
 - Start: This stage is intended to be triggered during network interface
-  initialization (e.g. by `ifconfig up`) to put the device in a state where it is
+  initialization (e.g. via `ifconfig up`) to put the device in a state where it is
   ready to operate (enable IRQ lines, turn on the transceiver, etc).
 
 Explicitly separating the Init and Start process is more efficient in terms
