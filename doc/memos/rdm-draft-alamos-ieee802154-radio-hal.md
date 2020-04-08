@@ -203,7 +203,7 @@ ISR to thread context.  This allows for different event processing mechanisms
 such as `msg`, `thread flags`, `event threads`, etc. The Bottom-Half processor
 should use the Radio HAL API to process the IRQ.
 
-## 4.1 Upper layer
+## 4.1 Upper Layer
 Upper layers are users that requires direct access to the primitive operations
 of a radio and its hardware acceleration features, if available.
 
@@ -220,7 +220,7 @@ The upper layer accesses the radio using the Radio HAL API. Events that are
 triggered by the device (packet received, transmission finished) are indicated
 by an event notification mechanism, described below.
 
-## 4.2 Bottom-Half processor
+## 4.2 Bottom-Half Processor
 The Bottom-Half (BH) processor is a component to offload the IRQ processing to
 thread context.  The component registers an IRQ handler during initialization
 which is executed when the device triggers and interrupt. This handler uses
@@ -273,7 +273,7 @@ update statistics.
 The full list of events and implications are defined in the Interface
 Definition section.
 
-### 4.3.3 Device Specific IEEE802.15.4 HAL implementation
+### 4.3.3 Device Specific IEEE802.15.4 HAL Implementation
 The Device Specific IEEE802.15.4 HAL implementation is part of the IEEE802.15.4
 Radio HAL component in the above figure. It implements the hardware dependent
 part of the IEEE802.15.4 Radio HAL by wrapping the `radio_ops` interface around
@@ -292,27 +292,25 @@ radios).  The Device Driver is an independent component and it can be used
 without the Radio HAL on top, for testing purposes or device specific
 applications.
 
-# 5 Interface definition and implementation details
-## 5.1 Init vs Start
-In order to implement the 802.15.4 on top of a device driver, the driver
-requires to separate the the initialization process of the device in 2
+# 5 Implementation Details
+## 5.1 Initialization and Start of Device Drivers
+In order to implement the 802.15.4 abstraction on top of a device driver, it
+is required to separate the initialization process of the device in two
 stages:
 - Init: This stage sets up the device driver (analogue to the current
   `xxx_setup` functions) and puts it in a state that minimizes power
   consumption.
-- Start: This state is intended to be triggered during network interface
-  initialization (e.g `ifconfig up`) to put the device in a state where is
+- Start: This stage is intended to be triggered during network interface
+  initialization (e.g. by `ifconfig up`) to put the device in a state where it is
   ready to operate (enable IRQ lines, turn on the transceiver, etc).
 
 Explicitly separating the Init and Start process is more efficient in terms
 of power consumption, because a network stack might take some time to set an
-interface up.
+interface up. The `radio_ops` interface provides a "start" function that should be mapped
+to the devices Start function proposed above.
 
-The Radio Ops interface provides a "start" function that should be mapped to the
-Start proposed above.
-
-## 5.2 Explicit transceiver states
-Following the IEEE802.15.4 PHY definition, there are only 3 transceiver states:
+## 5.2 Explicit Transceiver States
+Following the IEEE802.15.4 PHY definition, there are three generic transceiver states:
 
 ```c
 typedef enum {
@@ -322,76 +320,73 @@ typedef enum {
 } ieee802154_trx_state_t;
 ```
 
-The implementation of the HAL is responsible to map other states to the
-PHY state. For instance, a radio in sleep mode or with the transceiver disabled
-will map to the same `TRX_OFF` state.  This simplify a lot the operation and
-implementation of the HAL.
+The implementation of the Radio HAL is responsible to map device specific states to these
+PHY states. That means, a radio in sleep mode or with the transceiver disabled
+will map to the same `TRX_OFF` state.  This simplifies the operation and
+implementation of the abstraction layer.
 
 The 802.15.4 Radio HAL will never perform a state change if the user doesn't
-request it.  The only exception is the "sleep" function (that sets the state to
-`TRX_OFF`). As expected, some functions of the radio HAL API require that the
-transceiver is in a specific state.
+request it.  The only exception is the "sleep" function that sets the state to
+`TRX_OFF`. Some functions of the Radio HAL API require the transceiver to be in a specific
+state.
 
 This does not only allow the usage of upper layers that require total control of
 the radio (OpenWSN) but also ensures that the radio is always in a well known
-state. It also avoid unnecessary state changes. 
+state. It also avoids unnecessary state changes.
 
-## 5.3 Prepare and transmit
-Unlike `netdev`, the Radio HAL separates the send procedure in frame loading
-and triggering the transmissions start. This is required for MAC layers
-with timing contraints. (E.g TSCH mode of 802.15.4 MAC)
+## 5.3 Prepare and Transmit
+The Radio HAL bases on separation of the send procedure into frame loading
+and triggering the transmissions start. Unlike the `netdev` approach, this is
+not optional. Separated load and start is required for MAC layers
+with timing constraints (e.g., TSCH mode of 802.15.4 MAC).
 
-It's expected that a proper "send" function is defined by a higher layer (for
-instance a 802.15.4 MAC or a helper function)
+It is expected that a higher layer "send" function is defined for convenience which handles
+both loading and frame sending. Typically, this would be a 802.15.4 MAC implementation which
+preloads the devices buffer once accessible, and triggers a send operation at a scheduled
+time slot. Alternatively, this could be a helper function for non MAC users.
 
-## 5.4 TX and RX info
-All information associated to the reception of a packet (LQI, RSSI) as well
-as the transmission information (if a device supports frame retransmissions) is
-exposed to the user via the Radio HAL API.
 
-Requesting this information is optional (an application might not be
-interested in the RSSI information or the TX status on packets without the
-ACK request bit)
+## 5.4 TX and RX Information
+Information associated with the reception of a packet (LQI, RSSI) and
+the transmission information (availability of automatic retransmission or hardware CSMA-CA)
+is exposed to the user by the Radio HAL API. Requesting this information is optional
+(an application might not be interested in the RSSI information or the TX status of packets
+that do not request an ACK).
 
 ## 5.5 Thread Safety
 
-The radio API is designed to be called from a single thread context. Thus,
-the API is not thread safe. 
+The Radio HAL API is designed to be called from a single thread context. Thus,
+the API is not thread safe.
 
-However, as long as the the API functions are called sequencially, it would be
+Provided that the API functions are called sequentially, it would be
 possible to use any synchronization mechanism to use the radio in a
 multi-thread environment.  The API guarantees that the event callback is
 invoked from the process IRQ function of the Radio HAL, so this should be taken
 into consideration when implementing a synchronization mechanism for a
 multi-thread environment (e.g usage of recursive mutex).
 
-## 5.6 802.15.4 Radio HAL definition
+# 6 802.15.4 Radio HAL Interface definition
 
-### 5.6.1 Radio Ops interface definition
-The Radio Ops interface is implemented using vtables (function pointers)
-Although this pattern can be implemented with switch-case, there some evidence
-suggesting that for this case the vtable approach can generate more efficient
-instructions and it's easier to write. 
-
-See the Appendix to see the comparison betweem the switch-case and vtable
-approach.
+## 6.1 Radio Operations
+The Radio Ops interface is implemented using function pointers (vtables). In comparison
+to a switch-case solution, it increases ?TODO WHICH METRIC? efficiency.  See the Appendix
+for a performance comparison between a switch-case and the vtable approach.
 
 These functions should be implemented with device specific validations only.
-Everything that's not device specific (valid channels, address length, etc)
-should be checked by higher layers in order to avoids redundant checks.
+Parameters that are not device specific (valid channel settings, address lengths, etc)
+should be checked by higher layers in order to avoids redundancy.
 
-Note the Radio Ops interface has just a few getters. This is done on purpose,
-because it's assumed that higher layers will already have a copy of the PIB and
-MIB.
+Note that the Radio Ops interface only implements a few get functions. It's expected that
+higher layers will already have a copy of the PIB and MIB.
 
-#### 5.6.1.1 Send/Receive related functions
+### Send/Receive
 ```c
     /**
      * @brief Load packet in the framebuffer of a radio.
      *
      * This function shouldn't do any checks, so the packet MUST be valid.
-     * If the radio is still transmitting, it should block until is safe to
-     * write again in the frame buffer
+     * If the radio is still transmitting, it should block until it is safe to
+     * write to the frame buffer again.
      *
      * @pre the PHY state is @ref IEEE802154_TRX_STATE_TX_ON.
      *
@@ -404,7 +399,7 @@ MIB.
     int (*prepare)(ieee802154_dev_t *dev, iolist_t *pkt);
 
     /**
-     * @brief Transmit a preloaded packet
+     * @brief Transmit a preloaded packet.
      *
      * @pre the PHY state is @ref IEEE802154_TRX_STATE_TX_ON and the packet
      *      is already in the framebuffer.
@@ -419,7 +414,7 @@ MIB.
     int (*transmit)(ieee802154_dev_t *dev);
 
     /**
-     * @brief Get the lenght of the received packet.
+     * @brief Get the length of the received packet.
      *
      * This function can use SRAM, a reg value or similar to read the packet
      * length.
@@ -465,7 +460,7 @@ MIB.
                 ieee802154_rx_info_t *info);
 ```
 
-#### 5.6.1.2 PHY related functions
+### PHY Operations
 ```c
     /**
      * @brief Perform Stand-Alone Clear Channel Assessment
@@ -512,8 +507,8 @@ MIB.
     /**
      * @brief Set IEEE802.15.4 PHY configuration (channel, TX power)
      *
-     * This function SHOULD NOT validate the PHY configurations unless
-     * it's specific to the device. The upper layer is responsible of all kind
+     * This function SHOULD NOT validate the PHY configuration unless
+     * it is specific to the device. The upper layer is responsible of all kind
      * of validations.
      *
      * @pre the device is not sleeping
@@ -544,7 +539,7 @@ MIB.
 
 ```
 
-#### 5.6.1.3 Device Management related functions
+### Device State Management
 ```c
     /**
      * @brief Set the sleep state of the device (sleep or awake)
@@ -562,8 +557,8 @@ MIB.
     /**
      * @brief Process radio IRQ.
      *
-     * This function calls the @ref ieee802154_cb_t::cb function with all
-     * the corresponding events.
+     * This function calls the @ref ieee802154_cb_t::cb function with
+     * the corresponding event type.
      *
      * @note if the device is sleeping, this function should do nothing
      *
@@ -588,7 +583,7 @@ MIB.
     int (*start)(ieee802154_dev_t *dev);
 ```
 
-#### 5.6.1.4 Caps related and optional functions
+### Caps and Optional Functions
 ```c
     /**
      * @brief Get a cap from the radio
@@ -619,7 +614,7 @@ MIB.
 
     /**
      * @brief Get the SubMAC TX information (number of retransmissions,
-     *        pending bit, status, etc).
+     *        pending frame bit, status, etc).
      *
      * @pre the device is not sleeping
      *
@@ -635,7 +630,7 @@ MIB.
     int (*get_tx_status)(ieee802154_dev_t *dev, ieee802154_tx_info_t *info);
 
     /**
-     * @brief Set IEEE802.15.4 addresses in hardware address filter
+     * @brief Set IEEE802.15.4 address in hardware address filter
      *
      * @pre the device is not sleeping
      *
@@ -670,7 +665,7 @@ MIB.
     int (*set_frame_retries)(ieee802154_dev_t *dev, int retries);
 
     /**
-     * @brief 
+     * @brief Set IEEE802.15.4 CSMA configuration parameters
      *
      * @pre the device is not sleeping
      *
@@ -689,10 +684,10 @@ MIB.
                            int8_t retries);
 ```
 
-### 5.6.2 Event Notification definition
+## 6.2 Event Notification
 
 The Event Notification mechanism is implemented with a function callback.
-As expected, the callback is supposed to be implemented by the upper layer.
+The callback function is supposed to be implemented by the upper layer.
 
 The callback signature, the events and their expected behavior are defined
 in the following block:
@@ -705,15 +700,15 @@ typedef enum {
     IEEE802154_RADIO_RX_START,
 
     /**
-     * @brief the transceiver received a packet and there's a packet in the
+     * @brief the transceiver received a packet and there is a packet in the
      *        internal framebuffer.
      *
      * The transceiver is in @ref IEEE802154_TRX_STATE_RX_ON state when
-     * this funcion is called, but with framebuffer protection (either
+     * this function is called, but with framebuffer protection (either
      * dynamic framebuffer protection or disabled RX). Thus, the packet
-     * won't be overwritten before calling the @ref ieee802154_radio_read
+     * will not be overwritten before calling the @ref ieee802154_radio_read
      * function. However, @ref ieee802154_radio_read MUST be called in
-     * order to receive new packets. If there's no interest in the
+     * order to receive new packets. If there is no interest in the
      * packet, the function can be called with a NULL buffer to drop
      * the packet.
      */
@@ -721,9 +716,9 @@ typedef enum {
 
     /**
      * @brief the transceiver finished sending a packet or the
-     *        retransmission procedure
+     *        retransmission procedure.
      *
-     * If the radio supports frame retransmissions the 
+     * If the radio supports frame retransmissions the
      * @ref ieee802154_radio_get_tx_status MAY be called to retrieve useful
      * information (number of retries, frame pending bit, etc). The
      * transceiver is in @ref IEEE802154_TRX_STATE_TX_ON state when this function
@@ -752,16 +747,16 @@ typedef void (*ieee802154_cb_t)(ieee802154_dev_t *dev,
                                 ieee802154_tx_status_t status);
 ```
 
-Other MAC specific events are not included (e.g TX done with frame pending,
-CSMA-CA medium busy or exceeded number of retranmissions). This can be
-extracted on TX done event using the Radio HAL API.
+Other MAC specific events such as TX done with frame pending, CSMA-CA medium busy or
+exceeded number of retransmissions are not explicitly reported because they can be
+extracted after the TX done event using the Radio HAL API.
 
-The Radio HAL is designed to be able tp call the Radio Ops interface from the
+The Radio HAL is designed to be able to call the Radio Ops interface from the
 event notification callback.
 
-### 5.6.3 Radio capabilities
+## 6.3 Radio Capabilities
 The following list defines the basic capabilities available in common
-IEEE802.15.4 compliants radios. More caps can be added to support other
+IEEE802.15.4 compliant radios. More caps can be added to support other
 hardware features.
 
 ```c
@@ -793,9 +788,9 @@ typedef enum {
 } ieee802154_rf_caps_t;
 ```
 
-### 5.6.4 802.15.4 Radio Hal Device Descriptor
+## 6.4 802.15.4 Radio HAL Device Descriptor
 The 802.15.4 Device Descriptor holds the Radio Ops driver and the Event
-Notification for an instance of a device.
+Notification callback for one instance of a device.
 
 It has the following structure:
 ```c
@@ -814,12 +809,12 @@ struct ieee802154_dev {
 };
 ```
 
-The allocation of the HAL descriptor and pointer to the actual device
+The allocation of the HAL descriptor and the pointer to the actual device
 instance is up to the implementor of the HAL. For instance, the first member
 of the internal device descriptor can be an `ieee802154_dev_t` struct, but other
 techniques are also possible.
 
-# 6 Measurements and comparison to netdev
+# 7 Measurements and comparison to netdev
 
 ## Footprint
 TBD
