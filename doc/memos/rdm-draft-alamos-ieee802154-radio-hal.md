@@ -614,7 +614,7 @@ higher layers will already have a copy of the PIB and MIB.
 
     /**
      * @brief Get the SubMAC TX information (number of retransmissions,
-     *        pending frame bit, status, etc).
+     *        frame pending bit, status, etc).
      *
      * @pre the device is not sleeping
      *
