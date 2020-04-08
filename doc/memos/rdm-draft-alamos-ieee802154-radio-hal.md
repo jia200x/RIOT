@@ -56,8 +56,8 @@ This document defines the proposed API for the IEEE802.15.4 radio abstraction
 layer.
 
 The IEEE802.15.4 Radio HAL abstract common functionalities of IEEE802.15.4
-compliant radios, so upper layers have a hardware independent layer to control
-the radio.
+compliant radios for upper layers that require a hardware independent layer
+to drive the radio.
 
 In our current architecture, components of the 802.15.4 MAC are spread between
 the IEEE802.15.4 component of the network interface (`gnrc_netif_ieee802154`)
@@ -465,7 +465,7 @@ MIB.
                 ieee802154_rx_info_t *info);
 ```
 
-####5.6.1.2 PHY related functions
+#### 5.6.1.2 PHY related functions
 ```c
     /**
      * @brief Perform Stand-Alone Clear Channel Assessment
@@ -695,7 +695,7 @@ The Event Notification mechanism is defined with a function callback that is
 supposed to be implemented by the upper layer.
 
 The callback signature, the events and their expected behavior are available
-in the following snippet:
+in the following block:
 
 ```c
 typedef enum {
