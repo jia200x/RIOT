@@ -52,34 +52,42 @@ and the following acronyms and definitions:
        instructions to control the radio device.
 
 # 3. Introduction
-This document defines the proposed API for the IEEE802.15.4 radio abstraction
-layer.
+This document defines a Hardware Abstraction Layer for IEEE802.15.4 compliant
+radios.
 
 The IEEE802.15.4 Radio HAL abstract common functionalities of IEEE802.15.4
-compliant radios for upper layers that require a hardware independent layer
-to drive the radio.
+compliant radios such as loading packets, transmitting, configuraring PHY
+parameters, etc. This abstraction is required for upper layers that require a
+hardware independent layer to drive radio devices (802.15.4 MAC, network stacks,
+test applications, etc).
 
-In our current architecture, components of the 802.15.4 MAC are spread between
-the IEEE802.15.4 component of the network interface (`gnrc_netif_ieee802154`)
-and `netdev`. This strategy has some issues:
-- The `netdev` has Link Layer semantics, so it's problematic to integrate
-  network stacks that require radio access (OpenWSN) or write a 802.15.4 MAC
-  layer
-- The `gnrc_netif_ieee80214` components of the 802.15.4 MAC are GNRC specific
-  and cannot be reused in other network stacks.
+In the current RIOT lower network stack architecture radios are driven by the
+`netdev` interface, which includes components of the 802.15.4 MAC/PHY such as
+transmission of Physical Service Data Unit packets (PSDU), retransmissions with
+CSMA-CA and ACK handling. The latter, only available if the hardware supports
+these capabilities.
+
+Other components of the 802.15.4 MAC are present in the GNRC Netif
+implementation of the 802.15.4 Link Layer (`gnrc_netif_ieee802154`). These
+components prepare and parse 802.15.4 frames in order to send and receive data.
+However, these components don't include mandatory features of the 802.15.4 MAC
+(commissioning, security, channel scanning, etc).
+
+There are some evident problems of this strategy:
+- The 802.15.4 MAC components of `gnrc_netif_ieee802154` are GNRC specific and
+  cannot be reused in other network stacks that require a 802.15.4 MAC.
+- The `netdev` interface exposes (Sub)MAC semantics to the upper layer. This is
+  not good for users that require direct access to the radio (OpenWSN,
+  OpenThread, 802.15.4 PHY, etc).
 
 Ideally, these components should be separated in:
-1. Network Stack specific glue code (netif) that operates the Link Layer
-2. Link Layer (802.15.4 MAC)
-3. Radio Hardware Abstraction Layer
+1. 802.15.4 Radio HAL: hardware agnostic interface to drive radio devices
+2. 802.15.4 MAC: full link layer including PHY definition
+3. Network Stack interface (netif): controls the 802.15.4 MAC layer to send
+   and receive packets.
 
-The last one (Radio HAL) is intended to control IEEE802.15.4 radios in a
-hardware independent manner. For instance, a 802.15.4 MAC layer (not in the
-scope of this document) would use the Radio HAL to implement the SubMAC
-components like sending and receiving data, retransmissions with CSMA-CA, etc.
-It can also be used to have raw access to radios (e.g test aplications,
-very simple communication protocols) and to integrate network stacks that
-require direct access to the radio device (OpenWSN, OpenThread).
+The 802.15.4 MAC and netif are out of the scope of this document, but they are
+mentioned to give more context for the proposed work.
 
 The following picture compares the current RIOT lower network architecture with
 the approach described above:
@@ -144,10 +152,8 @@ the approach described above:
 |                     |  |  |                                               |
 +---------------------+  |  +-----------------------------------------------+
 ```
-Compared to the `netdev` interface, the 802.15.4 Radio HAL is more specific and
-only includes pure radio operations. Note that the blocks in the old approach
-are not necessarily at the same layer as the ones in the new approach, because
-the current lower layer architecture doesn't have a clear layer distinction.
+As seen, the 802.15.4 Radio HAL is more specific than `netdev` and doesn't
+include any 802.15.4 MAC components. 
 
 # 4. Architecture
 ```
