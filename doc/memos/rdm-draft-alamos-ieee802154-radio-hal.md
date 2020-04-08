@@ -293,7 +293,7 @@ without the Radio HAL on top, for testing purposes or device specific
 applications.
 
 # 5 Interface definition and implementation details
-## 5.1.1 Init vs Start
+## 5.1 Init vs Start
 In order to implement the 802.15.4 on top of a device driver, the driver
 requires to separate the the initialization process of the device in 2
 stages:
@@ -308,10 +308,10 @@ Explicitly separating the Init and Start process is more efficient in terms
 of power consumption, because a network stack might take some time to set an
 interface up.
 
-The Radio HAL "start" function should be mapped to the Start stage proposed
-above.
+The Radio Ops interface provides a "start" function that should be mapped to the
+Start proposed above.
 
-## 5.1.2 Explicit transceiver states
+## 5.2 Explicit transceiver states
 Following the IEEE802.15.4 PHY definition, there are only 3 transceiver states:
 
 ```c
@@ -327,25 +327,18 @@ PHY state. For instance, a radio in sleep mode or with the transceiver disabled
 will map to the same `TRX_OFF` state.  This simplify a lot the operation and
 implementation of the HAL.
 
-Some functions of the radio API require that the transceiver is on a specific
-state. This does not only allow the usage of upper layers that require total
-control of the radio (OpenWSN) but also ensures that the radio is always in a
-well known state since the HAL won't perform any hidden state change. It also
-avoid unnecessary state changes.
+The 802.15.4 Radio HAL will never perform a state change if the user doesn't
+request it.  The only exception is the "sleep" function (that sets the state to
+`TRX_OFF`). As expected, some functions of the radio HAL API require that the
+transceiver is in a specific state.
 
-For instance, functions to prepare and transmit packets require the radio to be
-in `TX_ON` state.
-
-The only exception is the "sleep" function (that sets the state to `TRX_OFF`).
-There might be some flags in the future to allow the radio to change to a well
-defined state after certain operations. E.g if the radio doesn't allow CSMA-CA
-but provides Auto CCA, the radio should try to send data as soon as possible.
-Some radios alreayd include this feature to automatically change to `TX_ON`
-after CCA without an explicit call to the function to set the transceiver state.
+This does not only allow the usage of upper layers that require total control of
+the radio (OpenWSN) but also ensures that the radio is always in a well known
+state. It also avoid unnecessary state changes. 
 
 ## 5.3 Prepare and transmit
-The Radio HAL defines separates the send procedure in preloading the frame
-buffer and triggering the transmissions start. This is required for MAC layers
+Unlike `netdev`, the Radio HAL separates the send procedure in frame loading
+and triggering the transmissions start. This is required for MAC layers
 with timing contraints. (E.g TSCH mode of 802.15.4 MAC)
 
 It's expected that a proper "send" function is defined by a higher layer (for
@@ -356,20 +349,21 @@ All information associated to the reception of a packet (LQI, RSSI) as well
 as the transmission information (if a device supports frame retransmissions) is
 exposed to the user via the Radio HAL API.
 
-However, requesting this information is optional. An application might not be
-interested in the RSSI information or the TX status if unconfirmed MAC messages
-are sent.
+Requesting this information is optional (an application might not be
+interested in the RSSI information or the TX status on packets without the
+ACK request bit)
 
 ## 5.5 Thread Safety
 
 The radio API is designed to be called from a single thread context. Thus,
-the API is not thread safe. However, as long as the the API functions are
-called sequencially, it would be possible to use any synchronization mechanism
-to use the radio in a multi-thread environment.
-The API guarantees that the event callback is invoked from the
-process IRQ function of the Radio HAL, so this should be taken into
-consideration when implementing a synchronization mechanism for a multi-thread
-environment (e.g usage of recursive mutex).
+the API is not thread safe. 
+
+However, as long as the the API functions are called sequencially, it would be
+possible to use any synchronization mechanism to use the radio in a
+multi-thread environment.  The API guarantees that the event callback is
+invoked from the process IRQ function of the Radio HAL, so this should be taken
+into consideration when implementing a synchronization mechanism for a
+multi-thread environment (e.g usage of recursive mutex).
 
 ## 5.6 802.15.4 Radio HAL definition
 
@@ -384,7 +378,7 @@ approach.
 
 These functions should be implemented with device specific validations only.
 Everything that's not device specific (valid channels, address length, etc)
-should be checked by higher layers. This avoids redundant checks.
+should be checked by higher layers in order to avoids redundant checks.
 
 Note the Radio Ops interface has just a few getters. This is done on purpose,
 because it's assumed that higher layers will already have a copy of the PIB and
@@ -697,10 +691,10 @@ MIB.
 
 ### 5.6.2 Event Notification definition
 
-The Event Notification mechanism is defined with a function callback that is
-supposed to be implemented by the upper layer.
+The Event Notification mechanism is implemented with a function callback.
+As expected, the callback is supposed to be implemented by the upper layer.
 
-The callback signature, the events and their expected behavior are available
+The callback signature, the events and their expected behavior are defined
 in the following block:
 
 ```c
@@ -762,7 +756,8 @@ Other MAC specific events are not included (e.g TX done with frame pending,
 CSMA-CA medium busy or exceeded number of retranmissions). This can be
 extracted on TX done event using the Radio HAL API.
 
-It's safe to call the radio HAL API from the event callback function.
+The Radio HAL is designed to be able tp call the Radio Ops interface from the
+event notification callback.
 
 ### 5.6.3 Radio capabilities
 The following list defines the basic capabilities available in common
@@ -799,8 +794,9 @@ typedef enum {
 ```
 
 ### 5.6.4 802.15.4 Radio Hal Device Descriptor
-The 802.15.4 Device Descriptor simply holds the Radio Ops driver and the Event
+The 802.15.4 Device Descriptor holds the Radio Ops driver and the Event
 Notification for an instance of a device.
+
 It has the following structure:
 ```c
 /**
