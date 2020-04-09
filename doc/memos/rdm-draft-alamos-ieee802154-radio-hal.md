@@ -399,6 +399,15 @@ Note that retrieving this information is optional in cases where the RX
 information is not needed or when the device doesn't support frame
 retransmissions.
 
+## 5.5 Thread Safety
+
+The 802.15.4 Radio HAL is not thread safe. As a consecuence of this, it is
+required that the Bottom-Half processor and all function calls to the Radio HAL
+API run in the same thread context. This is the same approach of the `netdev`
+interface.
+
+As a future work this work can be adapted to be thread safe.
+
 # 6 802.15.4 Radio HAL Interface definition
 
 ## 6.1 Radio Operations
@@ -825,9 +834,21 @@ typedef enum {
 A 802.15.4 HAL implementation MUST indicate all capabilities supported by the
 device and driver implementation.
 
-# Annex
+# 7 Acknowledgements
 
-## Feature Matrix
-TBD
-## Vtables vs FP
-TBD
+Thanks to Thomas Eichinger, Oliver Hahm, Ludwig Knüpfer, Martine Lenders,
+Sebastian Meiling, Hauke Petersen, Dan Petry, Kaspar Schleiser and
+Matthias Wählisch for their comments and suggestions.
+
+# 8 References
+
+- Internet Engineering Task Force ([IETF](http://ietf.org/))
+- Guide to [Contributing to RIOT](https://github.com/RIOT-OS/RIOT/wiki/Contributing-to-RIOT)
+
+# 9 Revision
+
+- Rev0: initial document
+
+# 10 Contact
+
+The author of this memo can be contacted via email at jose.alamos@haw-hamburg.de
