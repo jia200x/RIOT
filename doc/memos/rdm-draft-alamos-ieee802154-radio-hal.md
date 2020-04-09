@@ -55,7 +55,7 @@ as a Hardware Abstraction Layer:
 
 - `netdev` is too generic to be used as a HAL to cover the wide range of different
   technologies in RIOT (IEEE802.15.4, BLE, Ethernet, WiFi,
-  Proprietary devices, ...). The semantics of a standardized radio are technology
+  Proprietary devices, ...). The semantics of a standarized radio are technology
   specific and in most cases well defined. In the case of IEEE802.15.4 devices,
   they are defined by IEEE.
 - `netdev` includes PHY and MAC components that are not in the scope of a hardware abstraction
