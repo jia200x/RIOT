@@ -7,11 +7,11 @@
 
 # 1. Abstract
 
-This memo describes a Hardware Abstraction Layer (HAL) for radios
-compliant with the IEEE802.15.4 standard. The work follows a technology specific
-approach to provide well defined hardware access that allows to implement agnostic IEEE802.15.4
-PHY and MAC layers on top. Additionally, the new HAL enables integration of network stacks
-that require direct access to the radio.
+This memo describes a Hardware Abstraction Layer (HAL) for radios compliant
+with the IEEE802.15.4 standard. The work follows a technology specific approach
+to provide well defined hardware access that allows to implement agnostic
+IEEE802.15.4 PHY and MAC layers on top. Additionally, the new HAL enables
+integration of network stacks that require direct access to the radio.
 
 # 2. Status
 
@@ -19,7 +19,8 @@ This document is currently under open discussions. This document is a product of
 the [Lower Network Stack rework](https://github.com/RIOT-OS/RIOT/issues/12688)
 and aims to describe the architecture of the IEEE802.15.4 radio abstraction
 layer.
-The content of this document is licensed with a Creative Commons CC-BY-SA license.
+The content of this document is licensed with a Creative Commons CC-BY-SA
+license.
 
 ## 2.1 Terminology
 This memo uses the [RFC2119](https://www.ietf.org/rfc/rfc2119.txt) terminology
@@ -43,40 +44,42 @@ and the following acronyms and definitions:
 
 # 3. Introduction
 This document defines a Hardware Abstraction Layer for IEEE802.15.4 compliant
-radios. The IEEE802.15.4 Radio HAL abstracts common functionalities of IEEE802.15.4
-compliant radios such as loading packets, transmitting, configuring PHY
-parameters, etc. This abstraction is required for upper layers that require
-hardware independent access to drive IEEE802.15.4 radio devices (802.15.4 MAC, network stacks,
-test applications, etc).
+radios. The IEEE802.15.4 Radio HAL abstracts common functionalities of
+IEEE802.15.4 compliant radios such as loading packets, transmitting,
+configuring PHY parameters, etc. This abstraction is required for upper layers
+that require hardware independent access to drive IEEE802.15.4 radio devices
+(802.15.4 MAC, network stacks, test applications, etc).
 
-In the current RIOT lower network stack architecture, all network interfaces are driven by the
-`netdev` interface. The work presented in this document addresses deficits of using `netdev`
-as a Hardware Abstraction Layer:
+In the current RIOT lower network stack architecture, all network interfaces
+are driven by the `netdev` interface. The work presented in this document
+addresses deficits of using `netdev` as a Hardware Abstraction Layer:
 
-- `netdev` is too generic to be used as a HAL to cover the wide range of different
-  technologies in RIOT (IEEE802.15.4, BLE, Ethernet, WiFi,
+- `netdev` is too generic to be used as a HAL to cover the wide range of
+  different technologies in RIOT (IEEE802.15.4, BLE, Ethernet, WiFi,
   Proprietary devices, ...). The semantics of a standarized radio are technology
   specific and in most cases well defined. In the case of IEEE802.15.4 devices,
   they are defined by IEEE.
-- `netdev` includes PHY and MAC components that are not in the scope of a hardware abstraction
-  layer. The `netdev` interface is implemented as a device driver but it additionally includes technology
-  dependent components for every single device. For the case of IEEE802.15.4, this includes
-  components of the 802.15.4 MAC/PHY such as transmission of Physical Service Data Unit
-  (PSDU) packets, or retransmissions with CSMA-CA and ACK handling.
-  As a consequence, code is duplicated,
-  feature sets of similar devices heavily depend on the specific implementation, and integration
-  of new devices is more complex than need be. Furthermore, duplication and unspecified
-  device access complicate code maintenance.
+- `netdev` includes PHY and MAC components that are not in the scope of a
+  hardware abstraction layer. The `netdev` interface is implemented as a device
+  driver but it additionally includes technology dependent components for every
+  single device. For the case of IEEE802.15.4, this includes components of the
+  802.15.4 MAC/PHY such as transmission of Physical Service Data Unit (PSDU)
+  packets, or retransmissions with CSMA-CA and ACK handling.  As a consequence,
+  code is duplicated, feature sets of similar devices heavily depend on the
+  specific implementation, and integration of new devices is more complex than
+  need be. Furthermore, duplication and unspecified device access complicate
+  code maintenance.
 - `netdev` does not expose primitive operations (set transceiver state) and
-  hardcodes MAC layer functionalities, which is likely the consequence of hardware MAC
-  acceleration on certain devices. These capabilities are currently only available if the
-  hardware provides integrated support. An indication mechanism which MAC features are
-  provided within a `netdev`  implementation is missing.
-  A full MAC layer that is situated on top
-  of the HAL requires a defined access to specific radio functionalities in order to meet
-  timing constraints or energy requirements. That means, varying properties between implementations
-  and partly implemented MAC features within the device driver interfere with the concept
-  of transparent hardware access by one MAC layer implementation.
+  hardcodes MAC layer functionalities, which is likely the consequence of
+  hardware MAC acceleration on certain devices. These capabilities are currently
+  only available if the hardware provides integrated support. An indication
+  mechanism which MAC features are provided within a `netdev`  implementation is
+  missing.  A full MAC layer that is situated on top of the HAL requires a
+  defined access to specific radio functionalities in order to meet timing
+  constraints or energy requirements. That means, varying properties between
+  implementations and partly implemented MAC features within the device driver
+  interfere with the concept of transparent hardware access by one MAC layer
+  implementation.
 
 
 Other components of the 802.15.4 MAC are present in the GNRC Netif
@@ -87,27 +90,24 @@ channel scanning, etc). One major drawback of this approach is the fact that
 802.15.4 MAC components of `gnrc_netif_ieee802154` are GNRC specific and
 cannot be reused in other network stacks that require a 802.15.4 MAC.
 
-<!-- There are some evident problems of this strategy:
-- The `netdev` interface exposes (Sub)MAC semantics to the upper layer. This is
-  harmful for users that require direct access to the radio (OpenWSN,
-  OpenThread, 802.15.4 PHY, etc). -->
-
 As a solution, the lower layer should be separated into three main components:
-1. 802.15.4 Radio HAL: hardware agnostic interface to drive radio devices (proposed in this RDM).
+1. 802.15.4 Radio HAL: hardware agnostic interface to drive radio devices
+   (proposed in this RDM).
 2. 802.15.4 MAC: full link layer including PHY definition.
 3. Network Stack interface (netif): controls the 802.15.4 MAC layer to send
-   and receive packets. It provides transparent and technology independent access to the
-   medium.
+   and receive packets. It provides transparent and technology independent
+   access to the medium.
 
-The 802.15.4 MAC and netif are not part of this document, but they are
-affected by this work, thus, they are mentioned to give an outlook for upcoming efforts
+The 802.15.4 MAC and netif are not part of this document, but they are affected
+by this work, thus, they are mentioned to give an outlook for upcoming efforts
 on the lower network stack.
 
-The following picture compares the current RIOT lower network stack architecture (left) with
-the approach described in this document (right). As can be seen, the new approach adds
-IEEE802.15.4 specific APIs and layers between the lower layer network stack interface (GNRC Netif)
-and the hardware dependent device driver. In contrast, the `netdev` based solution misses
-a specific Radio HAL which prevents to run a hardware agnostic MAC on top.
+The following picture compares the current RIOT lower network stack
+architecture (left) with the approach described in this document (right). As
+can be seen, the new approach adds IEEE802.15.4 specific APIs and layers
+between the lower layer network stack interface (GNRC Netif) and the hardware
+dependent device driver. In contrast, the `netdev` based solution misses a
+specific Radio HAL which prevents to run a hardware agnostic MAC on top.
 
 
 ```
@@ -318,13 +318,13 @@ stages:
   `xxx_setup` functions) and puts it in a state that minimizes power
   consumption.
 - Start: This stage is intended to be triggered during network interface
-  initialization (e.g. via `ifconfig up`) to put the device in a state where it is
-  ready to operate (enable IRQ lines, turn on the transceiver, etc).
+  initialization (e.g. via `ifconfig up`) to put the device in a state where it
+  is ready to operate (enable IRQ lines, turn on the transceiver, etc).
 
-Explicitly separating the Init and Start process is more efficient in terms
-of power consumption, because a network stack might take some time to set an
-interface up. The `radio_ops` interface provides a "start" function that should be mapped
-to the devices Start function proposed above.
+Explicitly separating the Init and Start process is more efficient in terms of
+power consumption, because a network stack might take some time to set an
+interface up. The `radio_ops` interface provides a "start" function that should
+be mapped to the devices Start function proposed above.
 
 ## 5.2 Transceiver States
 Following the IEEE802.15.4 PHY definition, there are three generic transceiver
@@ -333,8 +333,8 @@ states:
 ```c
 typedef enum {
     IEEE802154_TRX_STATE_TRX_OFF, /**< the transceiver state if off */
-    IEEE802154_TRX_STATE_RX_ON, /**< the transceiver is ready to receive packets */
-    IEEE802154_TRX_STATE_TX_ON, /**< the transceiver is ready to send packets */
+    IEEE802154_TRX_STATE_RX_ON, /**< the transceiver is ready to receive */
+    IEEE802154_TRX_STATE_TX_ON, /**< the transceiver is ready to send  */
 } ieee802154_trx_state_t;
 ```
 
@@ -403,13 +403,13 @@ retransmissions.
 
 ## 6.1 Radio Operations
 The Radio Ops interface is implemented using function pointers. In comparison
-to a switch-case solution, it increases ?TODO WHICH METRIC? efficiency.  See the Appendix
-for a performance comparison between a switch-case and the function
-pointers approach.
+to a switch-case solution, it increases ?TODO WHICH METRIC? efficiency.  See
+the Appendix for a performance comparison between a switch-case and the
+function pointers approach.
 
 These functions should be implemented with device specific validations only.
-Parameters that are not device specific (valid channel settings, address lengths, etc)
-should be checked by higher layers in order to avoids redundancy.
+Parameters that are not device specific (valid channel settings, address
+lengths, etc) should be checked by higher layers in order to avoids redundancy.
 
 Note that the Radio Ops interface only implements a few get functions. The
 reason behind this is the fact most members of the PHY and MAC Information
