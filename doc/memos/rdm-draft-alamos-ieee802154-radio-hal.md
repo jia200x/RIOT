@@ -382,47 +382,21 @@ Note that retrieving this information is optional in cases where the RX
 information is not needed or when the device doesn't support frame
 retransmissions.
 
-## 5.5 Thread Safety
-
-As opposed to the current strategy of driving radios from one IPC-controlled
-thread, being able to drive a network device from different thread context can
-be beneficial in order to meet real time requirements with a low memory
-footprint.
-
-Consider the following scenario:
-- A thread receive events to offload ISR from the radio and a critical sensor,
-  and events to control the radio (send data, set PHY configuration ,etc)
-- A thread 
-
-The `netdev` interface is not designed to be thread safe. In order to use
-`netdev` in a multithreaded environment, it is required that the upper layer
-synchronizes concurrent access when calling members of the netdev API using
-techniques such as mutex or thread flags.
-
-In contrast, the 802.15.4 Radio HAL is designed to be thread safe. The HAL
-locks internally critical sections such as setting PHY configuration and
-writing a packet into the framebuffer. Compared to the `netdev` case using
-external locks, the Radio HAL API will lock only the atomic operations of a
-function and not the whole function. This reduces the time spent in locks.
-
-The 802.15.4 Radio HAL API guarantees that the internal lock is released on
-function return and right before calling the Event Notification. These
-guarantees ensure that the Radio API can be used from different thread
-context without risks of deadlocks.
-
 # 6 802.15.4 Radio HAL Interface definition
 
 ## 6.1 Radio Operations
-The Radio Ops interface is implemented using function pointers (vtables). In comparison
+The Radio Ops interface is implemented using function pointers. In comparison
 to a switch-case solution, it increases ?TODO WHICH METRIC? efficiency.  See the Appendix
-for a performance comparison between a switch-case and the vtable approach.
+for a performance comparison between a switch-case and the function
+pointers approach.
 
 These functions should be implemented with device specific validations only.
 Parameters that are not device specific (valid channel settings, address lengths, etc)
 should be checked by higher layers in order to avoids redundancy.
 
-Note that the Radio Ops interface only implements a few get functions. It's expected that
-higher layers will already have a copy of the PIB and MIB.
+Note that the Radio Ops interface only implements a few get functions. The
+reason behind this is the fact most members of the PHY and MAC Information
+Base (such as address, TX power, channel number) are already stored in RAM.
 
 ### Send/Receive
 ```c
@@ -460,9 +434,6 @@ higher layers will already have a copy of the PIB and MIB.
 
     /**
      * @brief Get the length of the received packet.
-     *
-     * This function can use SRAM, a reg value or similar to read the packet
-     * length.
      *
      * @pre the radio already received a packet (e.g
      *      @ref ieee802154_dev_t::cb with @ref IEEE802154_RADIO_RX_DONE).
@@ -740,7 +711,8 @@ in the following block:
 ```c
 typedef enum {
     /**
-     * @brief the transceiver detected a valid SFD
+     * @brief the transceiver detected a valid Start Frame Delimiter, which
+              indicates the radio started to receive a packet.
      */
     IEEE802154_RADIO_RX_START,
 
@@ -770,16 +742,6 @@ typedef enum {
      * is called.
      */
     IEEE802154_RADIO_TX_DONE,
-    /**
-     * @brief the transceiver reports that the ACK timeout expired
-     *
-     * This event is present only if the radio support ACK timeout.
-     */
-    IEEE802154_RADIO_ACK_TIMEOUT,
-    /**
-     * @brief the transceiver received a packet but the CRC check failed
-     */
-    IEEE802154_RADIO_CRC_FAIL,
 } ieee802154_trx_ev_t;
 
 /**
@@ -792,17 +754,27 @@ typedef void (*ieee802154_cb_t)(ieee802154_dev_t *dev,
                                 ieee802154_tx_status_t status);
 ```
 
-Other MAC specific events such as TX done with frame pending, CSMA-CA medium busy or
-exceeded number of retransmissions are not explicitly reported because they can be
-extracted after the TX done event using the Radio HAL API.
+Other MAC specific events such as TX done with frame pending, CSMA-CA medium
+busy or exceeded number of retransmissions are not explicitly reported because
+they can be extracted after the TX done event using the Radio HAL API.
 
 The Radio HAL is designed to be able to call the Radio Ops interface from the
 event notification callback.
 
+All Radio HAL implementation MUST implement at least the `RX_START`, `RX_DONE`
+and `TX_DONE` events. All these event might be disabled via compile time
+configurations if the upper layer doesn't require them.
+
+Other events such as `ACK_TIMEOUT` in radios that support ACK timers
+and `CSMA_BACKOFF_TIMEOUT` in radios that support CSMA-CA backoff timers are
+out of the scope of this document. However, these might be added and implemented
+at any time if required by upper layers.
+
 ## 6.3 Radio Capabilities
 The following list defines the basic capabilities available in common
-IEEE802.15.4 compliant radios. More caps can be added to support other
-hardware features.
+IEEE802.15.4 compliant radios. Other capabilities such as support for CSMA-CA
+backoff and ACK timers are not included in the list because they are out of
+the scope of this document.
 
 ```c
 typedef enum {
@@ -833,38 +805,8 @@ typedef enum {
 } ieee802154_rf_caps_t;
 ```
 
-## 6.4 802.15.4 Radio HAL Device Descriptor
-The 802.15.4 Device Descriptor holds the Radio Ops driver and the Event
-Notification callback for one instance of a device.
-
-It has the following structure:
-```c
-/**
- * @brief the IEEE802.15.4 device descriptor
- */
-struct ieee802154_dev {
-    /**
-     * @brief pointer to the operations of the device
-     */
-    const ieee802154_radio_ops_t *driver;
-    /**
-     * @brief the event callback of the device
-     */
-    ieee802154_cb_t cb;
-};
-```
-
-The allocation of the HAL descriptor and the pointer to the actual device
-instance is up to the implementor of the HAL. For instance, the first member
-of the internal device descriptor can be an `ieee802154_dev_t` struct, but other
-techniques are also possible.
-
-# 7 Measurements and comparison to netdev
-
-## Footprint
-TBD
-## Speed
-TBD
+A 802.15.4 HAL implementation MUST indicate all capabilities supported by the
+device and driver implementation.
 
 # Annex
 
