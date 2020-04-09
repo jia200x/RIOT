@@ -265,7 +265,7 @@ The full list of functions can be found in the Interface Definition section.
 The Radio HAL provides an Event Notification mechanism to inform the upper
 layer about an event (a packet was received, a transmission finished, etc).
 
-The upper layer can subscribe to these events to perform different actions. A
+The upper layer can subscribe to these events to perform different actions. As
 an example, a MAC layer would subscribe to the RX done event to allocate the
 received packet. The TX done event is commonly used to release resources or
 update statistics.
@@ -309,8 +309,9 @@ of power consumption, because a network stack might take some time to set an
 interface up. The `radio_ops` interface provides a "start" function that should be mapped
 to the devices Start function proposed above.
 
-## 5.2 Explicit Transceiver States
-Following the IEEE802.15.4 PHY definition, there are three generic transceiver states:
+## 5.2 Transceiver States
+Following the IEEE802.15.4 PHY definition, there are three generic transceiver
+states:
 
 ```c
 typedef enum {
@@ -320,50 +321,94 @@ typedef enum {
 } ieee802154_trx_state_t;
 ```
 
-The implementation of the Radio HAL is responsible to map device specific states to these
-PHY states. That means, a radio in sleep mode or with the transceiver disabled
-will map to the same `TRX_OFF` state.  This simplifies the operation and
-implementation of the abstraction layer.
+Unlike the `netdev` interface, the 802.15.4 Radio HAL requires only these three
+states to drive the radio. This is due to the fact that the radio is either in
+a state for sending data (`TX_ON`), receiving data (`RX_ON`) or the
+transceiver circuit is off (`TRX_OFF`). Using only these three PHY states
+simplify the operation and implementation of the abstraction layer.
 
-The 802.15.4 Radio HAL will never perform a state change if the user doesn't
-request it.  The only exception is the "sleep" function that sets the state to
-`TRX_OFF`. Some functions of the Radio HAL API require the transceiver to be in a specific
-state.
+It is extremely important not to confuse between transceiver states and device
+internal states. Although in some cases both states are equivalent, the device
+internal states are usually more fine-grained and can be mapped to exactly one
+transceiver state.
 
-This does not only allow the usage of upper layers that require total control of
-the radio (OpenWSN) but also ensures that the radio is always in a well known
-state. It also avoids unnecessary state changes.
+As an example, a radio device may be in a state where the transceiver circuit
+is off but the device can still operate as a crypto accelerator (only if the
+hardware support that capabilitiy). A device might also be in a deep sleep
+state where the device cannot operate but the energy consumption is very low.
+These internal states are different, but in both cases the transceiver is off
+(`TRX_OFF`).
+
+Some functions of the 802.15.4 Radio HAL API require that the transceiver is in
+a specific state. This differs from the `netdev` approach where most functions
+handle transceiver states internally. As an example, the "send" function of the
+`netdev` interface changes the transceiver state to `TX_ON` and then the TX
+done event returns the transceiver to `RX_ON` state. The 802.15.4 Radio HAL
+requires that the transceiver is in `TX_ON` state before transmitting the
+packet and will not go back to `RX_ON` state unless the upper layer explicitly
+requests it. This is desired because the 802.15.4 MAC layer requires full
+control of the transceiver states.
+
+Also, this approach presents some advantages:
+- It makes network stack integration easier if the network stack requires direct
+  access to the radio (OpenWSN)
+- It avoids unnecesary state changes. It is possible to set the `TX_ON` state
+  once and sequentially send packets. When the upper layer finishes sending
+  the batch of packets, it can manually request the radio to set the `RX_ON`
+  state.
 
 ## 5.3 Prepare and Transmit
 The Radio HAL bases on separation of the send procedure into frame loading
 and triggering the transmissions start. Unlike the `netdev` approach, this is
 not optional. Separated load and start is required for MAC layers
-with timing constraints (e.g., TSCH mode of 802.15.4 MAC).
+with timing constraints (E.g. TSCH mode of 802.15.4 MAC).
 
-It is expected that a higher layer "send" function is defined for convenience which handles
-both loading and frame sending. Typically, this would be a 802.15.4 MAC implementation which
-preloads the devices buffer once accessible, and triggers a send operation at a scheduled
-time slot. Alternatively, this could be a helper function for non MAC users.
-
+It is expected that a higher layer "send" function is defined for convenience
+which handles both loading and frame sending. Typically, this would be a
+802.15.4 MAC implementation which preloads the devices buffer once accessible,
+and triggers a send operation at a scheduled time slot. Alternatively, this
+could be a helper function for non MAC users.
 
 ## 5.4 TX and RX Information
-Information associated with the reception of a packet (LQI, RSSI) and
-the transmission information (availability of automatic retransmission or hardware CSMA-CA)
-is exposed to the user by the Radio HAL API. Requesting this information is optional
-(an application might not be interested in the RSSI information or the TX status of packets
-that do not request an ACK).
+Sometimes upper layers require information associated to the transmission
+or reception of a packet. The TSCH mode of the 802.15.4 MAC may require
+LQI and RSSI data from a received packet to schedule new cells.
+The 802.15.4 MAC may also require the information associated to the
+frame retransmission component (frame pending bit, number of retransmission,
+status) if the hardware provides support for hardware retransmissions.
+
+The 802.15.4 Radio HAL API provides functions to retrieve this data.
+Note that retrieving this information is optional in cases where the RX
+information is not needed or when the device doesn't support frame
+retransmissions.
 
 ## 5.5 Thread Safety
 
-The Radio HAL API is designed to be called from a single thread context. Thus,
-the API is not thread safe.
+As opposed to the current strategy of driving radios from one IPC-controlled
+thread, being able to drive a network device from different thread context can
+be beneficial in order to meet real time requirements with a low memory
+footprint.
 
-Provided that the API functions are called sequentially, it would be
-possible to use any synchronization mechanism to use the radio in a
-multi-thread environment.  The API guarantees that the event callback is
-invoked from the process IRQ function of the Radio HAL, so this should be taken
-into consideration when implementing a synchronization mechanism for a
-multi-thread environment (e.g usage of recursive mutex).
+Consider the following scenario:
+- A thread receive events to offload ISR from the radio and a critical sensor,
+  and events to control the radio (send data, set PHY configuration ,etc)
+- A thread 
+
+The `netdev` interface is not designed to be thread safe. In order to use
+`netdev` in a multithreaded environment, it is required that the upper layer
+synchronizes concurrent access when calling members of the netdev API using
+techniques such as mutex or thread flags.
+
+In contrast, the 802.15.4 Radio HAL is designed to be thread safe. The HAL
+locks internally critical sections such as setting PHY configuration and
+writing a packet into the framebuffer. Compared to the `netdev` case using
+external locks, the Radio HAL API will lock only the atomic operations of a
+function and not the whole function. This reduces the time spent in locks.
+
+The 802.15.4 Radio HAL API guarantees that the internal lock is released on
+function return and right before calling the Event Notification. These
+guarantees ensure that the Radio API can be used from different thread
+context without risks of deadlocks.
 
 # 6 802.15.4 Radio HAL Interface definition
 
