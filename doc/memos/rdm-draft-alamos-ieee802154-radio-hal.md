@@ -15,13 +15,8 @@ integration of network stacks that require direct access to the radio.
 
 # 2. Status
 
-This document is currently under open discussions. This document is a product
-of the Uniform Network Stack Integration [1] and aims to describe the
-architecture of the IEEE802.15.4 radio hardware abstraction layer, required by
-the IEEE802.15.4 lower layers.
-
-The content of this document is licensed with a Creative Commons CC-BY-SA
-license.
+This document is currently under open discussions. The content of this document
+is licensed with a Creative Commons CC-BY-SA license.
 
 ## 2.1 Terminology
 This memo uses the [RFC2119](https://www.ietf.org/rfc/rfc2119.txt) terminology
@@ -44,8 +39,11 @@ and the following acronyms and definitions:
        instructions to control the radio device.
 
 # 3. Introduction
-This document defines a Hardware Abstraction Layer for IEEE802.15.4 compliant
-radios. The IEEE802.15.4 Radio HAL abstracts common functionalities of
+This document is a product of the Uniform Network Stack Integration [1] and
+aims to describe the architecture of a Hardware Abstraction Layer for
+IEEE802.15.4 compliant radios.
+
+The IEEE802.15.4 Radio HAL abstracts common functionalities of
 IEEE802.15.4 compliant radios such as loading packets, transmitting,
 configuring PHY parameters, etc. This abstraction is required for upper layers
 that require hardware independent access to drive IEEE802.15.4 radio devices
