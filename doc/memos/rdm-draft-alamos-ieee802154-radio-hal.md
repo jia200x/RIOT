@@ -410,10 +410,7 @@ As a future work this work can be adapted to be thread safe.
 # 6 802.15.4 Radio HAL Interface definition
 
 ## 6.1 Radio Operations
-The Radio Ops interface is implemented using function pointers. In comparison
-to a switch-case solution, it increases ?TODO WHICH METRIC? efficiency.  See
-the Appendix for a performance comparison between a switch-case and the
-function pointers approach.
+The Radio Ops interface is implemented using function pointers. 
 
 These functions should be implemented with device specific validations only.
 Parameters that are not device specific (valid channel settings, address
