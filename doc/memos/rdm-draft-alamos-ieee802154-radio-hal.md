@@ -15,10 +15,11 @@ integration of network stacks that require direct access to the radio.
 
 # 2. Status
 
-This document is currently under open discussions. This document is a product of
-the [Lower Network Stack rework](https://github.com/RIOT-OS/RIOT/issues/12688)
-and aims to describe the architecture of the IEEE802.15.4 radio abstraction
-layer.
+This document is currently under open discussions. This document is a product
+of the Uniform Network Stack Integration [1] and aims to describe the
+architecture of the IEEE802.15.4 radio hardware abstraction layer, required by
+the IEEE802.15.4 lower layers.
+
 The content of this document is licensed with a Creative Commons CC-BY-SA
 license.
 
@@ -836,14 +837,12 @@ device and driver implementation.
 
 # 7 Acknowledgements
 
-Thanks to Thomas Eichinger, Oliver Hahm, Ludwig Knüpfer, Martine Lenders,
-Sebastian Meiling, Hauke Petersen, Dan Petry, Kaspar Schleiser and
-Matthias Wählisch for their comments and suggestions.
+Thanks to Peter Kietzmann, Leandro Lanzieri and Martine Lenders for their
+reviews, comments and suggestions.
 
 # 8 References
 
-- Internet Engineering Task Force ([IETF](http://ietf.org/))
-- Guide to [Contributing to RIOT](https://github.com/RIOT-OS/RIOT/wiki/Contributing-to-RIOT)
+- [1]: https://github.com/RIOT-OS/RIOT/issues/13771
 
 # 9 Revision
 
