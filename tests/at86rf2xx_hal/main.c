@@ -76,7 +76,7 @@ void _ack_timeout(void *arg)
 
 uint8_t buffer[127];
             
-static void radio_cb(ieee802154_dev_t *dev, int status)
+static void radio_cb(ieee802154_dev_t *dev, ieee802154_tx_status_t status)
 {
     switch(status) {
         case IEEE802154_RADIO_TX_DONE:
@@ -91,7 +91,9 @@ static void radio_cb(ieee802154_dev_t *dev, int status)
             if (info.crc_ok) {
                 ieee802154_submac_rx_done_cb(&submac, &_iov, &info);
             }
-       }
+        }
+        default:
+           break;
     }
 }
 

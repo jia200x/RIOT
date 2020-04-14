@@ -593,7 +593,7 @@ static inline int ieee802154_radio_set_cca_threshold(ieee802154_dev_t *dev,
 static inline int ieee802154_radio_set_cca_mode(ieee802154_dev_t *dev,
                                                 ieee802154_cca_mode_t mode)
 {
-    return dev->driver-set_cca_mode(dev, mode);
+    return dev->driver->set_cca_mode(dev, mode);
 }
 
 /**
@@ -860,7 +860,7 @@ static inline bool ieee802154_radio_has_sub_ghz(ieee802154_dev_t *dev)
  * @return true if the device has support
  * @return false otherwise
  */
-static inline bool ieee802154_radio_has_sub_ghz(ieee802154_dev_t *dev)
+static inline bool ieee802154_radio_has_24_ghz(ieee802154_dev_t *dev)
 {
     return dev->driver->get_cap(dev, IEEE802154_CAP_24_GHZ);
 }
