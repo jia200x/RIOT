@@ -8,7 +8,7 @@
 # 1. Abstract
 
 This memo describes a Hardware Abstraction Layer (HAL) for radios compliant
-with the IEEE802.15.4 standard. The work follows a technology specific approach
+with the IEEE802.15.4 standard. The work follows a technology-specific approach
 to provide well defined hardware access that allows to implement agnostic
 IEEE802.15.4 PHY and MAC layers on top. Additionally, the new HAL enables
 integration of network stacks that require direct access to the radio.
@@ -30,7 +30,7 @@ and the following acronyms and definitions:
 ## 2.3 Definitions
 - SubMAC: Lower layer of the IEEE802.15.4 MAC that provides the
   retransmissions with CSMA-CA logic, address filtering and CRC validation.
-- Stand Alone CCA: Single run of the Clear Channel Assessment procedure.
+- Standalone CCA: Single run of the Clear Channel Assessment procedure.
 - Continuous CCA: Clear Channel Assessment procedure followed by transmission
   (required by the CSMA-CA algorithm)
 - Caps: Short word for capabilities. In this context, capabilities are the
@@ -39,14 +39,14 @@ and the following acronyms and definitions:
        instructions to control the radio device.
 
 # 3. Introduction
-This document is a product of the Uniform Network Stack Integration [1] and
+This document is a product of the Uniform Network Stack Integration [[1]] and
 aims to describe the architecture of a Hardware Abstraction Layer for
 IEEE802.15.4 compliant radios.
 
 The IEEE802.15.4 Radio HAL abstracts common functionalities of
 IEEE802.15.4 compliant radios such as loading packets, transmitting,
 configuring PHY parameters, etc. This abstraction is required for upper layers
-that require hardware independent access to drive IEEE802.15.4 radio devices
+that require hardware-independent access to drive IEEE802.15.4 radio devices
 (802.15.4 MAC, network stacks, test applications, etc).
 
 In the current RIOT lower network stack architecture, all network interfaces
@@ -57,10 +57,10 @@ addresses deficits of using `netdev` as a Hardware Abstraction Layer:
   different technologies in RIOT (IEEE802.15.4, BLE, Ethernet, WiFi,
   Proprietary devices, ...). The semantics of a standarized radio are technology
   specific and in most cases well defined. In the case of IEEE802.15.4 devices,
-  they are defined by IEEE.
+  they are defined by the IEEE.
 - `netdev` includes PHY and MAC components that are not in the scope of a
   hardware abstraction layer. The `netdev` interface is implemented as a device
-  driver but it additionally includes technology dependent components for every
+  driver but it additionally includes technology-dependent components for every
   single device. For the case of IEEE802.15.4, this includes components of the
   802.15.4 MAC/PHY such as transmission of Physical Service Data Unit (PSDU)
   packets, or retransmissions with CSMA-CA and ACK handling.  As a consequence,
@@ -90,11 +90,11 @@ channel scanning, etc). One major drawback of this approach is the fact that
 cannot be reused in other network stacks that require a 802.15.4 MAC.
 
 As a solution, the lower layer should be separated into three main components:
-1. 802.15.4 Radio HAL: hardware agnostic interface to drive radio devices
+1. 802.15.4 Radio HAL: hardware-agnostic interface to drive radio devices
    (proposed in this RDM).
 2. 802.15.4 MAC: full link layer including PHY definition.
 3. Network Stack interface (netif): controls the 802.15.4 MAC layer to send
-   and receive packets. It provides transparent and technology independent
+   and receive packets. It provides transparent and technology-independent
    access to the medium.
 
 The 802.15.4 MAC and netif are not part of this document, but they are affected
@@ -106,7 +106,7 @@ architecture (left) with the approach described in this document (right). As
 can be seen, the new approach adds IEEE802.15.4 specific APIs and layers
 between the lower layer network stack interface (GNRC Netif) and the hardware
 dependent device driver. In contrast, the `netdev` based solution misses a
-specific Radio HAL which prevents to run a hardware agnostic MAC on top.
+specific Radio HAL which prevents to run a hardware-agnostic MAC on top.
 
 
 ```
@@ -207,8 +207,8 @@ specific Radio HAL which prevents to run a hardware agnostic MAC on top.
 ```
 
 As shown in the above figure, the IEEE802.15.4 Radio HAL is a central component
-that provides any upper layer a technology dependent and unified access to the
-hardware specific device driver, by implementing the Radio HAL API.  Since
+that provides any upper layer a technology-dependent and unified access to the
+hardware-specific device driver, by implementing the Radio HAL API.  Since
 devices drivers do not depend on the Radio HAL, it is still possible to use a
 the raw driver of a specific device, for testing purposes or accessing device
 specific features.
@@ -291,7 +291,7 @@ Definition section.
 
 ### 4.3.3 Device Specific IEEE802.15.4 HAL Implementation
 The Device Specific IEEE802.15.4 HAL implementation is part of the IEEE802.15.4
-Radio HAL component in the above figure. It implements the hardware dependent
+Radio HAL component in the above figure. It implements the hardware-dependent
 part of the IEEE802.15.4 Radio HAL by wrapping the `radio_ops` interface around
 the device specific code by using the Device Driver API which grants access to
 all device operations.
@@ -350,7 +350,7 @@ transceiver state.
 
 As an example, a radio device may be in a state where the transceiver circuit
 is off but the device can still operate as a crypto accelerator (only if the
-hardware support that capabilitiy). A device might also be in a deep sleep
+hardware supports that capability). A device might also be in a deep sleep
 state where the device cannot operate but the energy consumption is very low.
 These internal states are different, but in both cases the transceiver is off
 (`TRX_OFF`).
@@ -501,7 +501,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
 ### PHY Operations
 ```c
     /**
-     * @brief Perform Stand-Alone Clear Channel Assessment
+     * @brief Perform Standalone Clear Channel Assessment
      *
      * This function performs blocking CCA to check if the channel is clear.
      * @pre the PHY state is @ref IEEE802154_TRX_STATE_RX_ON.
@@ -731,6 +731,9 @@ The callback signature, the events and their expected behavior are defined
 in the following block:
 
 ```c
+/**
+ * @brief   Event notification status
+ */
 typedef enum {
     /**
      * @brief the transceiver detected a valid Start Frame Delimiter, which
@@ -764,16 +767,16 @@ typedef enum {
      * is called.
      */
     IEEE802154_RADIO_TX_DONE,
-} ieee802154_trx_ev_t;
+} ieee802154_trx_status_t;
 
 /**
  * @brief Prototype of the IEEE802.15.4 device event callback
  *
  * @param[in] dev IEEE802.15.4 device descriptor
- * @param[in] status the status 
+ * @param[in] status the event status
  */
 typedef void (*ieee802154_cb_t)(ieee802154_dev_t *dev,
-                                ieee802154_tx_status_t status);
+                                ieee802154_trx_status_t status);
 ```
 
 Other MAC specific events such as TX done with frame pending, CSMA-CA medium
