@@ -848,20 +848,73 @@ typedef enum {
 A 802.15.4 HAL implementation MUST indicate all capabilities supported by the
 device and driver implementation.
 
-# 7 Acknowledgements
+# 7 Future proof considerations
+
+The Radio HAL is designed to be agnostic to the 802.15.4 MAC version on top.
+However, it is important to mention that most radio devices are optimized for a
+single version of the standard. In practice, hardware accelerations are usually
+not interchangeable between different versions of 802.15.4. As an example,
+devices that support frame retransmissions for IEEE802.15.4 2006 don't support
+Enhanced Beacons required by the TSCH layer of the 2012 standard.
+
+In order to implement future versions of the 802.15.4 standard, the radio HAL
+adapts some principles defined in the following sections
+
+## Transmission modes
+
+The HAL defines three transmission modes:
+- Direct transmission: the packet is sent immediately, without CCA or CSMA-CA
+- CCA transmission: the packet is sent using CCA
+- CSMA-CA transmission: the packet is sent using CSMA-CA
+
+The "transmit" function provides a "mode" argument to specify which
+transmission mode should be used.
+
+A HAL implementation can implement several TX modes, but MUST implement at
+least one.
+
+It is recommended that a HAL implements the TX mode that fits best the internal
+capabilities. However, implementing "Direct Transmission" mode is desired for
+certain modes of the 802.15.4 MAC (slotted operation) or versions beyond the
+capabilities of the hardware.
+
+As an example, radios that support frame retransmissions with CSMA-CA for
+IEEE802.15.4 2006 frames would benefit from a "CSMA-CA transmission" mode.
+However, a "Direct Transmission" implementation would be required to support
+TSCH (2012 standard) in those radios.
+
+## PHY definition
+
+PHY definitions are specific to a 802.15.4 version. Older standards use to
+define PHY channels with a channel number. In modern standards, channels are
+defined using a (`channel number`, `channel page` and `channel modulation`)
+tuple.
+
+The `config_phy` function receives a pointer to a `ieee802154_phy_conf_t`
+structure that describes the PHY configuration.  The proposed structure is
+compliant with the 2012 standard. In order to support the 2015 standard, a
+channel modulation member can be added at any time without breaking the Radio
+HAL API.
+
+## Functionalities specific to modern standards
+
+The Radio HAL ops can be extended to support certain functionalities present in
+newer standards, such as Listen Before Talk (supported by SubGHz radios).
+
+# 8 Acknowledgements
 
 Thanks to Peter Kietzmann, Leandro Lanzieri and Martine Lenders for their
 reviews, comments and suggestions.
 
-# 8 References
+# 9 References
 
 - [Uniform Network Stack Integration](https://github.com/RIOT-OS/RIOT/issues/13771)
 - [Top and Bottom Halves](http://www.makelinux.net/ldd3/chp-10-sect-4.shtml)
 
-# 9 Revision
+# 10 Revision
 
 - Rev0: initial document
 
-# 10 Contact
+# 11 Contact
 
 The author of this memo can be contacted via email at jose.alamos@haw-hamburg.de
