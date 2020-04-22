@@ -41,8 +41,12 @@ static int prepare(ieee802154_dev_t *dev, iolist_t *pkt)
     return 0;
 }
 
-static int transmit(ieee802154_dev_t *dev)
+static int transmit(ieee802154_dev_t *dev, ieee802154_tx_mode_t mode)
 {
+    if ((IS_ACTIVE(AT86RF2XX_EXT) && mode != IEEE802154_TX_MODE_CSMA_CA) ||
+        mode != IEEE802154_TX_MODE_DIRECT) {
+        return -ENOTSUP;
+    }
     at86rf2xx_tx_exec((at86rf2xx_t*) dev);
     return 0;
 }

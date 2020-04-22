@@ -50,7 +50,7 @@ static void _send_ack(ieee802154_submac_t *submac, uint8_t *mhr)
     ieee802154_radio_set_trx_state(dev, IEEE802154_TRX_STATE_TX_ON);
 
     ieee802154_radio_prepare(dev, &ack);
-    ieee802154_radio_transmit(dev);
+    ieee802154_radio_transmit(dev, IEEE802154_TX_MODE_DIRECT);
 }
 
 /* All callbacks run in the same context */
@@ -123,7 +123,7 @@ int ieee802154_send(ieee802154_submac_t *submac, iolist_t *iolist)
         }
         else {
         }
-        ieee802154_radio_transmit(dev);
+        ieee802154_radio_transmit(dev, IEEE802154_TX_MODE_CSMA_CA);
     }
     else {
         submac->wait_for_ack = true;

@@ -13,6 +13,7 @@
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 
+#ifndef NETDEV
 static volatile uint8_t _ifs;
 static uint8_t rxbuf[IEEE802154_FRAME_LEN_MAX + 3]; /* len PHR + PSDU + LQI */
 static uint8_t txbuf[IEEE802154_FRAME_LEN_MAX + 3]; /* len PHR + PSDU + LQI */
@@ -29,7 +30,7 @@ static void (*__isr)(void *arg);
 #define TIMER_FREQ          (62500UL)
 static volatile uint8_t _state;
 static mutex_t _txlock;
-ieee802154_radio_ops_t nrf802154_ops;
+static const ieee802154_radio_ops_t nrf802154_ops;
 
 ieee802154_dev_t nrf802154_dev = {
     .driver = &nrf802154_ops,
@@ -43,14 +44,11 @@ static int prepare(ieee802154_dev_t *dev, iolist_t *iolist)
 
     assert(iolist);
 
-    mutex_lock(&_txlock);
-
     /* copy packet data into the transmit buffer */
     unsigned int len = 0;
     for (; iolist; iolist = iolist->iol_next) {
         if ((IEEE802154_FCS_LEN + len + iolist->iol_len) > (IEEE802154_FRAME_LEN_MAX)) {
             DEBUG("[nrf802154] send: unable to do so, packet is too large!\n");
-            mutex_unlock(&_txlock);
             return -EOVERFLOW;
         }
         /* Check if there is data to copy, prevents undefined behaviour with
@@ -76,6 +74,7 @@ static int transmit(ieee802154_dev_t *dev)
 {
     (void) dev;
     /* trigger the actual transmission */
+    mutex_lock(&_txlock);
     NRF_RADIO->TASKS_TXEN = 1;
     while (!(NRF_RADIO->EVENTS_TXREADY)) {};
     DEBUG("[nrf802154] Device state: TXIDLE\n");
@@ -84,26 +83,22 @@ static int transmit(ieee802154_dev_t *dev)
 }
 
 /**
- * @brief   Reset the RXIDLE state
- */
- static void _reset_rx(void)
- {
-    if (NRF_RADIO->STATE != RADIO_STATE_STATE_RxIdle) {
-        return;
-    }
-
+* @brief   Reset the RXIDLE state
+*/
+static void _reset_rx(void)
+{
     /* reset RX state and listen for new packets */
     _state &= ~RX_COMPLETE;
     NRF_RADIO->TASKS_START = 1;
- }
+}
 
-#if 0
 static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_rx_info_t *info)
 {
+    (void) dev;
     size_t pktlen = (size_t)rxbuf[0] - IEEE802154_FCS_LEN;
     int res = -ENOBUFS;
 
-    if (iov->iov_len < pktlen) {
+    if (max_size < pktlen) {
         DEBUG("[nrf802154] recv: buffer is to small\n");
         return res;
     }
@@ -123,23 +118,12 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_r
              * match real world performance better */
             radio_info->rssi = (int16_t)hwlqi + ED_RSSIOFFS;
         }
-        iov->iov_base = &rxbuf[1];
-        iov->iov_len = pktlen;
-        res = rx_done(dev, iov, info);
+        memcpy(buf, &rxbuf[1], pktlen);
     }
 
     _reset_rx();
 
-    return res;
-}
-#endif
-
-static int set_channel(ieee802154_dev_t *dev, uint8_t channel, uint8_t page)
-{
-    (void) dev;
-    (void) page;
-    NRF_RADIO->FREQUENCY = (channel - 10) * 5;
-    return 0;
+    return pktlen;
 }
 
 /**
@@ -225,13 +209,6 @@ static void _set_txpower(int16_t txpower)
     }
 }
 
-static int set_tx_power(ieee802154_dev_t *dev, int16_t pow)
-{
-    (void) dev;
-    _set_txpower(pow);
-    return 0;
-}
-
 static void _disable(void)
 {
     /* set device into DISABLED state */
@@ -283,61 +260,24 @@ static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)
     return 0;
 }
 
-static int set_flag(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag, bool value)
-{
-    (void) dev;
-    (void) flag;
-    (void) value;
-    return 0;
-}
-
-static bool get_flag(ieee802154_dev_t *dev, ieee802154_rf_flags_t flag)
-{
-    (void) dev;
-    (void) flag;
-    return false;
-}
-
 void _irq_handler(ieee802154_dev_t *dev)
 {
     (void) dev;
     if (_state & RX_COMPLETE) {
-        ieee802154_rx_data_t data;
-        size_t pktlen = (size_t)rxbuf[0] - IEEE802154_FCS_LEN;
-
-        DEBUG("[nrf802154] recv: reading packet of length %i\n", pktlen);
-#if 0
-        if (info != NULL) {
-            ieee802154_rx_info_t *radio_info = info;
-            /* Hardware link quality indicator */
-            uint8_t hwlqi = rxbuf[pktlen + 1];
-            /* Convert to 802.15.4 LQI (page 319 of product spec v1.1) */
-            radio_info->lqi = (uint8_t)(hwlqi > UINT8_MAX/ED_RSSISCALE
-                                       ? UINT8_MAX
-                                       : hwlqi * ED_RSSISCALE);
-            /* Calculate RSSI by subtracting the offset from the datasheet.
-             * Intentionally using a different calculation than the one from
-             * figure 122 of the v1.1 product specification. This appears to
-             * match real world performance better */
-            radio_info->rssi = (int16_t)hwlqi + ED_RSSIOFFS;
-        }
-#endif
-        data.buf = &rxbuf[1];
-        data.len = pktlen;
-
-        dev->cb(dev, IEEE802154_RADIO_RX_DONE, &data);
-        _reset_rx();
+        dev->cb(dev, IEEE802154_RADIO_RX_DONE);
     }
 
     if (_state & TX_COMPLETE) {
-        dev->cb(dev, IEEE802154_RADIO_TX_DONE, NULL);
+        dev->cb(dev, IEEE802154_RADIO_TX_DONE);
         _state &= ~TX_COMPLETE;
     }
 }
 
-void nrf802154_init_int(void (*isr)(void *arg))
+void nrf802154_init_int(void)
 {
-    __isr = isr;
+    /* enable interrupts */
+    NVIC_EnableIRQ(RADIO_IRQn);
+    NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk;
 }
 
 static void _timer_cb(void *arg, int chan)
@@ -351,8 +291,9 @@ static void _timer_cb(void *arg, int chan)
 /**
  * @brief   Set radio into DISABLED state
  */
-int nrf802154_init(void)
+int nrf802154_init(void (*isr)(void *arg))
 {
+    __isr = isr;
     int result = timer_init(NRF802154_TIMER, TIMER_FREQ, _timer_cb, NULL);
     assert(result >= 0);
     (void)result;
@@ -394,14 +335,10 @@ int nrf802154_init(void)
     NRF_RADIO->MODECNF0 |= RADIO_MODECNF0_RU_Msk;
 
     /* set default CCA threshold */
-    _set_cca_thresh(CONFIG_NRF802154_CCA_THRESH_DEFAULT);
+    //_set_cca_thresh(CONFIG_NRF802154_CCA_THRESH_DEFAULT);
 
     /* configure some shortcuts */
     NRF_RADIO->SHORTS = RADIO_SHORTS_RXREADY_START_Msk | RADIO_SHORTS_TXREADY_START_Msk;
-
-    /* enable interrupts */
-    NVIC_EnableIRQ(RADIO_IRQn);
-    NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk;
 
     return 0;
 }
@@ -446,16 +383,56 @@ void isr_radio(void)
     cortexm_isr_end();
 }
 
-ieee802154_radio_ops_t nrf802154_ops = {
+static int _start(ieee802154_dev_t *dev)
+{
+    (void) dev;
+    nrf802154_init_int();
+    return 0;
+}
+
+static int _config_phy(ieee802154_dev_t *dev, ieee802154_phy_conf_t *conf)
+{
+    (void) dev;
+    _disable();
+    NRF_RADIO->FREQUENCY = (conf->channel - 10) * 5;
+    _set_txpower(conf->pow);
+    return 0;
+}
+
+static int _set_sleep(ieee802154_dev_t *dev, bool sleep)
+{
+    (void) dev;
+    (void) sleep;
+    return 0;
+}
+
+static bool _get_cap(ieee802154_dev_t *dev, ieee802154_rf_caps_t cap)
+{
+    (void) dev;
+    (void) cap;
+    return false;
+}
+
+int _len(ieee802154_dev_t *dev)
+{
+    return (size_t)rxbuf[0] - IEEE802154_FCS_LEN;
+}
+
+static const ieee802154_radio_ops_t nrf802154_ops = {
     .prepare = prepare,
     .transmit = transmit,
-    //.read = _read,
+    .read = _read,
+    .len = _len,
     .cca = cca,
     .set_cca_threshold = set_cca_threshold,
-    .set_channel = set_channel,
-    .set_tx_power = set_tx_power,
+    .set_cca_mode = _set_cca_mode,
+    .config_phy = _config_phy,
     .set_trx_state = set_trx_state,
-    .set_flag = set_flag,
-    .get_flag = get_flag,
+    .set_sleep = _set_sleep,
+    .get_cap = _get_cap,
     .irq_handler = _irq_handler,
+    .start = _start,
 };
+#else
+int dont_be_pedantic;
+#endif

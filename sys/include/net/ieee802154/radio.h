@@ -61,6 +61,12 @@ typedef enum {
 } ieee802154_trx_state_t;
 
 typedef enum {
+    IEEE802154_TX_MODE_DIRECT,      /**< direct transmissions */
+    IEEE802154_TX_MODE_CCA,         /**< transmit using CCA */
+    IEEE802154_TX_MODE_CSMA_CA,     /**< transmit using CSMA-CA */
+} ieee802154_tx_mode_t;
+
+typedef enum {
     /**
      * @brief the transceiver detected a valid SFD
      */
@@ -172,8 +178,6 @@ struct ieee802154_radio_ops {
      * If the radio is still transmitting, it should block until is safe to
      * write again in the frame buffer
      *
-     * @pre the PHY state is @ref IEEE802154_TRX_STATE_TX_ON.
-     *
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] pkt the packet to be sent with valid length
      *
@@ -191,11 +195,14 @@ struct ieee802154_radio_ops {
      * @post the PHY state is @ref IEEE802154_TRX_STATE_TX_ON.
      *
      * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] mode transmissions mode
      *
      * @return 0 on success
+     * @return -ENOTSUP if a transmission mode is not supported
+     * @return -EBUSY if the transceiver or medium is busy
      * @return negative errno on error
      */
-    int (*transmit)(ieee802154_dev_t *dev);
+    int (*transmit)(ieee802154_dev_t *dev, ieee802154_tx_mode_t mode);
 
     /**
      * @brief Get the lenght of the received packet.
@@ -247,7 +254,6 @@ struct ieee802154_radio_ops {
      * @brief Perform Stand-Alone Clear Channel Assessment
      *
      * This function performs blocking CCA to check if the channel is clear.
-     * @pre the PHY state is @ref IEEE802154_TRX_STATE_RX_ON.
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      *
@@ -293,7 +299,6 @@ struct ieee802154_radio_ops {
      * of validations.
      *
      * @pre the device is not sleeping
-     * @pre the PHY state is @ref IEEE802154_TRX_STATE_TRX_OFF.
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] conf the PHY configuration
@@ -324,8 +329,9 @@ struct ieee802154_radio_ops {
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] sleep whether the device should sleep or not.
      *
-     * @post if @p sleep == true, the transceiver PHY state is
-     *        @ref IEEE802154_TRX_STATE_TRX_OFF
+     * @post the state is @ref IEEE802154_TRX_STATE_TRX_OFF when the radio
+     *       wakes up.
+     *
      * @return 0 on success
      * @return negative errno on error
      */
@@ -491,9 +497,9 @@ static inline int ieee802154_radio_prepare(ieee802154_dev_t *dev, iolist_t *pkt)
  * @return 0 on success
  * @return negative errno on error
  */
-static inline int ieee802154_radio_transmit(ieee802154_dev_t *dev)
+static inline int ieee802154_radio_transmit(ieee802154_dev_t *dev, ieee802154_tx_mode_t mode)
 {
-    return dev->driver->transmit(dev);
+    return dev->driver->transmit(dev, mode);
 }
 
 /**
@@ -604,7 +610,6 @@ static inline int ieee802154_radio_set_cca_mode(ieee802154_dev_t *dev,
  * of validations.
  *
  * @pre the device is not sleeping
- * @pre the PHY state is @ref IEEE802154_TRX_STATE_TRX_OFF.
  *
  * @param[in] dev IEEE802.15.4 device descriptor
  * @param[in] conf the PHY configuration
