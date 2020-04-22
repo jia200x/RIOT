@@ -444,8 +444,6 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      * If the radio is still transmitting, it should block until it is safe to
      * write to the frame buffer again.
      *
-     * @pre the PHY state is @ref IEEE802154_TRX_STATE_TX_ON.
-     *
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] pkt the packet to be sent with valid length
      *
@@ -463,8 +461,11 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      * @post the PHY state is @ref IEEE802154_TRX_STATE_TX_ON.
      *
      * @param[in] dev IEEE802.15.4 device descriptor
+     * @param[in] mode transmissions mode
      *
      * @return 0 on success
+     * @return -ENOTSUP if a transmission mode is not supported
+     * @return -EBUSY if medium is busy (if sending with CCA)
      * @return negative errno on error
      */
     int (*transmit)(ieee802154_dev_t *dev);
@@ -519,7 +520,6 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      * @brief Perform Standalone Clear Channel Assessment
      *
      * This function performs blocking CCA to check if the channel is clear.
-     * @pre the PHY state is @ref IEEE802154_TRX_STATE_RX_ON.
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      *
@@ -565,7 +565,6 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      * of validations.
      *
      * @pre the device is not sleeping
-     * @pre the PHY state is @ref IEEE802154_TRX_STATE_TRX_OFF.
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] conf the PHY configuration
@@ -600,8 +599,9 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] sleep whether the device should sleep or not.
      *
-     * @post if @p sleep == true, the transceiver PHY state is
-     *        @ref IEEE802154_TRX_STATE_TRX_OFF
+     * @post the transceiver state is @ref IEEE802154_TRX_STATE_TRX_OFF when the
+     *       radio wakes up.
+     *
      * @return 0 on success
      * @return negative errno on error
      */
