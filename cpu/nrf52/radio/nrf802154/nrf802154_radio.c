@@ -12,7 +12,6 @@
 #define ENABLE_DEBUG    (0)
 #include "debug.h"
 
-#ifndef NETDEV
 static uint8_t rxbuf[IEEE802154_FRAME_LEN_MAX + 3]; /* len PHR + PSDU + LQI */
 static uint8_t txbuf[IEEE802154_FRAME_LEN_MAX + 3]; /* len PHR + PSDU + LQI */
 static void (*__isr)(void *arg);
@@ -456,6 +455,3 @@ static const ieee802154_radio_ops_t nrf802154_ops = {
     .irq_handler = _irq_handler,
     .start = _start,
 };
-#else
-int dont_be_pedantic;
-#endif
