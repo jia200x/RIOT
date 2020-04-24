@@ -1,0 +1,4 @@
+[submodule "tests/hal_test"]
+	path = tests/hal_test
+	url = https://github.com/jia200x/hal_test.git
+	branch = master
