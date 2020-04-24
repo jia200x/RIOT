@@ -199,7 +199,7 @@ struct ieee802154_radio_ops {
      *
      * @return 0 on success
      * @return -ENOTSUP if a transmission mode is not supported
-     * @return -EBUSY if the transceiver or medium is busy
+     * @return -EBUSY if the medium is busy
      * @return negative errno on error
      */
     int (*transmit)(ieee802154_dev_t *dev, ieee802154_tx_mode_t mode);
