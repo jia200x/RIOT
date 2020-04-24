@@ -74,5 +74,8 @@ extern "C" {
 #define NRF802154_TIMER TIMER_DEV(1)
 #endif
 
+int nrf802154_init(void (*isr)(void *arg));
+void nrf802154_init_int(void);
+
 #endif /* NRF802154_H */
 /** @} */

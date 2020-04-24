@@ -15,19 +15,13 @@ static inline bool _is_sleep(ieee802154_dev_t *dev)
     return _dev->is_sleep;
 }
 
-/* This wakes up the radio! */
-/* This doesn't check sizes!! */
 static int prepare(ieee802154_dev_t *dev, iolist_t *pkt)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
     uint8_t len = 0;
-    bool sleep = _is_sleep(dev);
 
-    if (sleep) {
-        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-    }
-
-    /* load packet data into FIFO */
+    /* Load packet data into FIFO. Size checks are handled by higher
+     * layers */
     for (const iolist_t *iol = pkt; iol; iol = iol->iol_next) {
         if (iol->iol_len) {
             at86rf2xx_sram_write(_dev, len + 1, iol->iol_base, iol->iol_len);
@@ -43,6 +37,9 @@ static int prepare(ieee802154_dev_t *dev, iolist_t *pkt)
 
 static int transmit(ieee802154_dev_t *dev, ieee802154_tx_mode_t mode)
 {
+    /* Basic Mode enables support for direct transmission, while Extended Mode
+     * enables support for CSMA-CA transmission. It's possible to implement
+     * both in the same binary, but it is out of the scope of this demo */
     if ((IS_ACTIVE(AT86RF2XX_EXT) && mode != IEEE802154_TX_MODE_CSMA_CA) ||
         mode != IEEE802154_TX_MODE_DIRECT) {
         return -ENOTSUP;
@@ -53,13 +50,14 @@ static int transmit(ieee802154_dev_t *dev, ieee802154_tx_mode_t mode)
 
 static int _len(ieee802154_dev_t *dev)
 {
-    /* get the size of the received packet */
     uint8_t phr;
 
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
+    /* Read the length from the Physical HDR (first byte) */
     at86rf2xx_sram_read(_dev, 0, &phr, 1);
 
-    return phr;
+    /* ignore MSB (refer p.80) and subtract length of FCS field */
+    return (phr & 0x7f) - IEEE802154_FCS_LEN;
 }
 
 /* The radio should be woken up */
@@ -77,14 +75,14 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_in
     at86rf2xx_fb_read(_dev, &phr, 1);
 
     /* ignore MSB (refer p.80) and subtract length of FCS field */
-    pkt_len = (phr & 0x7f) - 2;
+    pkt_len = (phr & 0x7f) - IEEE802154_FCS_LEN;
 
     /* not enough space in buf */
     if (pkt_len > size) {
+        /* Stop the frame buffer. The transceiver state is still RX_ON, but the
+         * frame buffer protection is raised. So, it's possible to receive more
+         * packets */
         at86rf2xx_fb_stop(_dev);
-        /* set device back in operation state which was used before last transmission.
-         * This state is saved in at86rf2xx.c/at86rf2xx_tx_prepare() e.g RX_AACK_ON */
-/* TODO: RX_CONTINUOUS here */
         return -ENOBUFS;
     }
     /* copy payload */
@@ -134,9 +132,8 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_in
         at86rf2xx_fb_stop(_dev);
     }
 
-    /* TODO: Set RX state if not RX continuous */
-    /* set device back in operation state which was used before last transmission.
-     * This state is saved in at86rf2xx.c/at86rf2xx_tx_prepare() e.g RX_AACK_ON */
+    /* At this point the transceiver state is RX_ON and the radio is able to
+       receive more packets */
 
     return pkt_len;
 }
@@ -144,6 +141,8 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_in
 static bool cca(ieee802154_dev_t *dev)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
+
+    /* Perform CCA */
     uint8_t old_state = _dev->trx_state;
     at86rf2xx_set_state(_dev, AT86RF2XX_TRX_STATE_TRX_OFF);
     bool result = at86rf2xx_cca(_dev);
@@ -153,25 +152,14 @@ static bool cca(ieee802154_dev_t *dev)
 
 static int set_cca_threshold(ieee802154_dev_t *dev, int8_t threshold)
 {
-    bool sleep = _is_sleep(dev);
-    if (sleep) {
-        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-    }
     at86rf2xx_set_cca_threshold((at86rf2xx_t*) dev, threshold);
-    if (sleep) {
-        at86rf2xx_sleep((at86rf2xx_t*) dev);
-    }
     return 0;
 }
 
 static int _config_phy(ieee802154_dev_t *dev, ieee802154_phy_conf_t *conf)
 {
-    bool sleep = _is_sleep(dev);
     uint8_t channel = conf->channel;
     int16_t pow = conf->pow;
-    if (sleep) {
-        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-    }
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
     /* we must be in TRX_OFF before changing the PHY configuration */
     int prev_state = _dev->trx_state;
@@ -188,16 +176,13 @@ static int _config_phy(ieee802154_dev_t *dev, ieee802154_phy_conf_t *conf)
     /* Return to the state we had before reconfiguring */
     at86rf2xx_set_state(_dev, prev_state);
     at86rf2xx_set_txpower((at86rf2xx_t*) dev, pow);
-    if (sleep) {
-        at86rf2xx_sleep((at86rf2xx_t*) dev);
-    }
+
     return 0;
 }
 
 static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
-    bool sleep = _is_sleep(dev);
     int int_state;
     switch(state) {
         case IEEE802154_TRX_STATE_TRX_OFF:
@@ -211,9 +196,6 @@ static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)
             break;
         default:
             return -EINVAL;
-    }
-    if (sleep) {
-        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
     }
     at86rf2xx_set_state(_dev, int_state);
     return 0;
@@ -236,6 +218,7 @@ static int _set_sleep(ieee802154_dev_t *dev, bool sleep)
 static bool _get_cap(ieee802154_dev_t *dev, ieee802154_rf_caps_t cap)
 {
     (void) dev;
+    /* Expose caps for Extended and Basic mode */
     switch(cap) {
 #if IS_ACTIVE(AT86RF2XX_EXT)
         case IEEE802154_CAP_FRAME_RETRIES:
@@ -251,10 +234,7 @@ static bool _get_cap(ieee802154_dev_t *dev, ieee802154_rf_caps_t cap)
 static int set_hw_addr_filter(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_t *ext_addr, uint16_t pan_id)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
-    bool sleep = _is_sleep(dev);
-    if (sleep) {
-        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-    }
+
     le_uint16_t le_pan = byteorder_btols(byteorder_htons(pan_id));
     at86rf2xx_reg_write(_dev, AT86RF2XX_REG__SHORT_ADDR_0,
                         short_addr[1]);
@@ -267,37 +247,25 @@ static int set_hw_addr_filter(ieee802154_dev_t *dev, uint8_t *short_addr, uint8_
 
     at86rf2xx_reg_write(_dev, AT86RF2XX_REG__PAN_ID_0, le_pan.u8[0]);
     at86rf2xx_reg_write(_dev, AT86RF2XX_REG__PAN_ID_1, le_pan.u8[1]);
-    if (sleep) {
-        at86rf2xx_sleep((at86rf2xx_t*) dev);
-    }
     return 0;
 }
 
 static int set_frame_retries(ieee802154_dev_t *dev, int retries)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
-    bool sleep = _is_sleep(dev);
-    if (sleep) {
-        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-    }
     uint8_t tmp = at86rf2xx_reg_read(_dev, AT86RF2XX_REG__XAH_CTRL_0);
 
     tmp &= ~(AT86RF2XX_XAH_CTRL_0__MAX_FRAME_RETRIES);
     tmp |= ((retries > 7) ? 7 : retries) << 4;
     at86rf2xx_reg_write(_dev, AT86RF2XX_REG__XAH_CTRL_0, tmp);
-    if (sleep) {
-        at86rf2xx_sleep((at86rf2xx_t*) dev);
-    }
+
     return 0;
 }
 
 static int set_csma_params(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd, int8_t retries)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
-    bool sleep = _is_sleep(dev);
-    if (sleep) {
-        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-    }
+
     retries = (retries > 5) ? 5 : retries;  /* valid values: 0-5 */
     retries = (retries < 0) ? 7 : retries;  /* max < 0 => disable CSMA (set to 7) */
     uint8_t tmp = at86rf2xx_reg_read(_dev, AT86RF2XX_REG__XAH_CTRL_0);
@@ -312,25 +280,14 @@ static int set_csma_params(ieee802154_dev_t *dev, ieee802154_csma_be_t *bd, int8
         min = (min > max) ? max : min;
         at86rf2xx_reg_write(_dev, AT86RF2XX_REG__CSMA_BE, (max << 4) | (min));
     }
-    if (sleep) {
-        at86rf2xx_sleep((at86rf2xx_t*) dev);
-    }
 
     return 0;
 }
 
 static int set_promiscuous(ieee802154_dev_t *dev, bool enable)
 {
-    bool sleep = _is_sleep(dev);
-    if (sleep) {
-        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-    }
 
     at86rf2xx_set_promiscuous((at86rf2xx_t*) dev, enable);
-
-    if (sleep) {
-        at86rf2xx_sleep((at86rf2xx_t*) dev);
-    }
     return 0;
 }
 
@@ -366,20 +323,29 @@ int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params, void (*is
         return -ENOTSUP;
     }
 
-    /* reset device to default values and put it into RX state */
-    at86rf2xx_reset(dev);
-    at86rf2xx_set_state(dev, AT86RF2XX_TRX_STATE_RX_ON);
+    /* Go to sleep. The HAL might take some time to call the `start` function
+     * and we don't want to waste power */
+    at86rf2xx_sleep(dev);
 
     return 0;
 }
 
 void at86rf2xx_init_int(at86rf2xx_t *dev)
 {
+    /* `at86rf2xx_init` puts the device in sleep mode. We wake the radio up
+     * again */
+    at86rf2xx_assert_awake(dev);
+
     /* enable interrupts */
     at86rf2xx_reg_write(dev, AT86RF2XX_REG__IRQ_MASK,
                         AT86RF2XX_IRQ_STATUS_MASK__TRX_END);
     /* clear interrupt flags */
     at86rf2xx_reg_read(dev, AT86RF2XX_REG__IRQ_STATUS);
+
+    /* reset device to default values and put it into RX state */
+    at86rf2xx_reset(dev);
+    at86rf2xx_set_state(dev, AT86RF2XX_TRX_STATE_TRX_OFF);
+
 }
 
 void _irq_handler(ieee802154_dev_t *dev)
@@ -449,6 +415,8 @@ int get_tx_status(ieee802154_dev_t *dev, ieee802154_tx_info_t *info)
 
 static int _start(ieee802154_dev_t *dev)
 {
+    /* Put the radio in a state that can be used by the upper layer.
+     * The transceiver state will be TRX_OFF */
     at86rf2xx_init_int((at86rf2xx_t*) dev);
     return 0;
 }

@@ -43,11 +43,10 @@ static int prepare(ieee802154_dev_t *dev, iolist_t *iolist)
 
     /* copy packet data into the transmit buffer */
     unsigned int len = 0;
+
+    /* Load packet data into FIFO. Size checks are handled by higher
+     * layers */
     for (; iolist; iolist = iolist->iol_next) {
-        if ((IEEE802154_FCS_LEN + len + iolist->iol_len) > (IEEE802154_FRAME_LEN_MAX)) {
-            DEBUG("[nrf802154] send: unable to do so, packet is too large!\n");
-            return -EOVERFLOW;
-        }
         /* Check if there is data to copy, prevents undefined behaviour with
          * memcpy when iolist->iol_base == NULL */
         if (iolist->iol_len) {
@@ -57,6 +56,7 @@ static int prepare(ieee802154_dev_t *dev, iolist_t *iolist)
     }
 
     DEBUG("[nrf802154] send: putting %i byte into the ether\n", len);
+
     /* specify the length of the package. */
     txbuf[0] = len + IEEE802154_FCS_LEN;
 
@@ -68,7 +68,9 @@ static int prepare(ieee802154_dev_t *dev, iolist_t *iolist)
 
 static int _send_direct(void)
 {
+    /* Configure shortcuts to send with direct transmission */
     NRF_RADIO->SHORTS = RADIO_SHORTS_TXREADY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
+
     /* trigger the actual transmission */
     NRF_RADIO->TASKS_TXEN = 1;
     DEBUG("[nrf802154] Device state: TXIDLE\n");
@@ -77,7 +79,10 @@ static int _send_direct(void)
 
 static int _send_cca(void)
 {
-    NRF_RADIO->SHORTS = RADIO_SHORTS_RXREADY_CCASTART_Msk | RADIO_SHORTS_CCAIDLE_TXEN_Msk | RADIO_SHORTS_CCABUSY_DISABLE_Msk | RADIO_SHORTS_TXREADY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
+    /* Configure shortcuts to send with CCA transmission */
+    NRF_RADIO->SHORTS = RADIO_SHORTS_RXREADY_CCASTART_Msk |
+        RADIO_SHORTS_CCAIDLE_TXEN_Msk | RADIO_SHORTS_CCABUSY_DISABLE_Msk |
+        RADIO_SHORTS_TXREADY_START_Msk | RADIO_SHORTS_END_DISABLE_Msk;
 
     NRF_RADIO->EVENTS_CCAIDLE = 0;
     NRF_RADIO->EVENTS_CCABUSY = 0;
@@ -91,6 +96,9 @@ static int _send_cca(void)
             break;
         }
     }
+
+    /* Note that the shortcuts will handle the actual send procedure, if
+     * the channel is clear */
 
     DEBUG("[nrf802154] Device state: TXIDLE\n");
 
@@ -106,6 +114,7 @@ static int transmit(ieee802154_dev_t *dev, ieee802154_tx_mode_t mode)
         case IEEE802154_TX_MODE_CCA:
             return _send_cca();
         case IEEE802154_TX_MODE_CSMA_CA:
+            /* CSMA-CA TX mode not supported */
             break;
     }
     return 0;
@@ -149,6 +158,8 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_r
         memcpy(buf, &rxbuf[1], pktlen);
     }
 
+    /* Raise frame buffer protection. The transceiver state right after is
+     * RX_ON */
     _reset_rx();
 
     return pktlen;
@@ -160,7 +171,6 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t max_size, ieee802154_r
  */
 static bool _channel_is_clear(void)
 {
-    /* TODO: Go back to correct state on CCA */
     NRF_RADIO->CCACTRL |= RADIO_CCACTRL_CCAMODE_EdMode;
     NRF_RADIO->EVENTS_CCAIDLE = 0;
     NRF_RADIO->EVENTS_CCABUSY = 0;
@@ -307,29 +317,9 @@ void _irq_handler(ieee802154_dev_t *dev)
 
 void nrf802154_init_int(void)
 {
-    /* enable interrupts */
-    NVIC_EnableIRQ(RADIO_IRQn);
-    NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk;
-}
-
-/**
- * @brief   Set radio into DISABLED state
- */
-int nrf802154_init(void (*isr)(void *arg))
-{
-    __isr = isr;
-
-    /* reset buffer */
-    rxbuf[0] = 0;
-    txbuf[0] = 0;
-    _state = 0;
-
-    /* power on peripheral */
     NRF_RADIO->POWER = 1;
-
     /* make sure the radio is disabled/stopped */
     _disable();
-
     /* we configure it to run in IEEE802.15.4 mode */
     NRF_RADIO->MODE = RADIO_MODE_MODE_Ieee802154_250Kbit;
     /* and set some fitting configuration */
@@ -351,9 +341,27 @@ int nrf802154_init(void (*isr)(void *arg))
     /* Disable the hardware IFS handling  */
     NRF_RADIO->MODECNF0 |= RADIO_MODECNF0_RU_Msk;
 
-    /* configure some shortcuts */
-    //NRF_RADIO->SHORTS = RADIO_SHORTS_RXREADY_START_Msk | RADIO_SHORTS_TXREADY_START_Msk;
     _set_cca_thresh(CONFIG_NRF802154_CCA_THRESH_DEFAULT);
+
+    /* enable interrupts */
+    NVIC_EnableIRQ(RADIO_IRQn);
+    NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk;
+}
+
+/**
+ * @brief   Set radio into DISABLED state
+ */
+int nrf802154_init(void (*isr)(void *arg))
+{
+    __isr = isr;
+
+    /* reset buffer */
+    rxbuf[0] = 0;
+    txbuf[0] = 0;
+    _state = 0;
+
+    /* power off peripheral */
+    NRF_RADIO->POWER = 0;
 
     return 0;
 }
@@ -413,6 +421,7 @@ static int _config_phy(ieee802154_dev_t *dev, ieee802154_phy_conf_t *conf)
 
 static int _set_sleep(ieee802154_dev_t *dev, bool sleep)
 {
+    /* TODO: implement */
     (void) dev;
     (void) sleep;
     return 0;
@@ -422,6 +431,7 @@ static bool _get_cap(ieee802154_dev_t *dev, ieee802154_rf_caps_t cap)
 {
     (void) dev;
     (void) cap;
+    /* This radio has no caps */
     return false;
 }
 
@@ -434,6 +444,7 @@ int _len(ieee802154_dev_t *dev)
 int _set_cca_mode(ieee802154_dev_t *dev, ieee802154_cca_mode_t mode)
 {
     (void) dev;
+    /* Only ED threshold mode is implemented and set by default! */
     if (mode != IEEE802154_CCA_MODE_ED_THRESHOLD) {
         return -ENOTSUP;
     }

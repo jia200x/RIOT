@@ -531,6 +531,9 @@ void at86rf2xx_set_frame_pending(at86rf2xx_t *dev, bool pending);
 void at86rf2xx_set_internal_state(const at86rf2xx_t *dev, int state);
 void at86rf2xx_sleep(at86rf2xx_t *dev);
 
+void at86rf2xx_init_int(at86rf2xx_t *dev);
+int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params, void (*isr)(void *arg));
+
 #ifdef __cplusplus
 }
 #endif
