@@ -25,7 +25,6 @@
 #include "at86rf2xx_internal.h"
 #include "at86rf2xx_registers.h"
 
-#if !defined(MODULE_AT86RFA1) && !defined(MODULE_AT86RFR2)
 #include "periph/spi.h"
 #include "periph/gpio.h"
 
@@ -103,8 +102,6 @@ void at86rf2xx_fb_stop(const at86rf2xx_t *dev)
     spi_release(SPIDEV);
 }
 
-#endif /* SPI based transceiver */
-
 uint8_t at86rf2xx_get_status(const at86rf2xx_t *dev)
 {
     return (at86rf2xx_reg_read(dev, AT86RF2XX_REG__TRX_STATUS)
@@ -114,13 +111,7 @@ uint8_t at86rf2xx_get_status(const at86rf2xx_t *dev)
 void at86rf2xx_assert_awake(at86rf2xx_t *dev)
 {
     /* wake up and wait for transition to TRX_OFF */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-    /* Setting SLPTR bit in TRXPR to 0 returns the radio transceiver
-     * to the TRX_OFF state */
-    *AT86RF2XX_REG__TRXPR &= ~(AT86RF2XX_TRXPR_SLPTR);
-#else
     gpio_clear(dev->params.sleep_pin);
-#endif
     xtimer_usleep(AT86RF2XX_WAKEUP_DELAY);
 
     /* update state: on some platforms, the timer behind xtimer
@@ -138,14 +129,9 @@ void at86rf2xx_assert_awake(at86rf2xx_t *dev)
 void at86rf2xx_hardware_reset(at86rf2xx_t *dev)
 {
     /* trigger hardware reset */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-    /* set reset Bit */
-    *(AT86RF2XX_REG__TRXPR) |= AT86RF2XX_TRXPR_TRXRST;
-#else
     gpio_clear(dev->params.reset_pin);
     xtimer_usleep(AT86RF2XX_RESET_PULSE_WIDTH);
     gpio_set(dev->params.reset_pin);
-#endif
     xtimer_usleep(AT86RF2XX_RESET_DELAY);
 
     /* update state: if the radio state was P_ON (initialization phase),

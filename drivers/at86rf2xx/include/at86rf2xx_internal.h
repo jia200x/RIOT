@@ -29,11 +29,6 @@
 #include "at86rf2xx.h"
 #include "at86rf2xx_registers.h"
 
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-#include <string.h>
-#endif
-
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -41,9 +36,7 @@ extern "C" {
 /**
  * @brief Max. allowed transmit power for the transceiver
  */
-#ifdef MODULE_AT86RF212B
-#define AT86RF2XX_TXPOWER_MAX           (36)
-#elif MODULE_AT86RF233
+#if MODULE_AT86RF233
 #define AT86RF2XX_TXPOWER_MAX           (21)
 #else
 #define AT86RF2XX_TXPOWER_MAX           (20)
@@ -52,11 +45,7 @@ extern "C" {
 /**
  * @brief Transmit power offset
  */
-#ifdef MODULE_AT86RF212B
-#define AT86RF2XX_TXPOWER_OFF           (25)
-#else
 #define AT86RF2XX_TXPOWER_OFF           (17)
-#endif
 
 /**
  * @brief   Transition time from SLEEP to TRX_OFF in us, refer figure 7-4, p.42.
@@ -86,14 +75,7 @@ extern "C" {
  *
  * @return              the value of the specified register
  */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-static inline uint8_t at86rf2xx_reg_read(const at86rf2xx_t *dev, volatile uint8_t *addr) {
-    (void) dev;
-    return *addr;
-}
-#else
 uint8_t at86rf2xx_reg_read(const at86rf2xx_t *dev, uint8_t addr);
-#endif
 
 /**
  * @brief   Write to a register at address `addr` from device `dev`.
@@ -102,15 +84,7 @@ uint8_t at86rf2xx_reg_read(const at86rf2xx_t *dev, uint8_t addr);
  * @param[in] addr      address of the register to write
  * @param[in] value     value to write to the given register
  */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-static inline void at86rf2xx_reg_write(const at86rf2xx_t *dev, volatile uint8_t *addr,
-                                       const uint8_t value) {
-    (void) dev;
-    *addr = value;
-}
-#else
 void at86rf2xx_reg_write(const at86rf2xx_t *dev, uint8_t addr, uint8_t value);
-#endif
 
 /**
  * @brief   Read a chunk of data from the SRAM of the given device
@@ -120,16 +94,8 @@ void at86rf2xx_reg_write(const at86rf2xx_t *dev, uint8_t addr, uint8_t value);
  * @param[out] data     buffer to read data into
  * @param[in]  len      number of bytes to read from SRAM
  */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-static inline void at86rf2xx_sram_read(const at86rf2xx_t *dev, uint8_t offset,
-                                       uint8_t *data, size_t len) {
-    (void)dev;
-    memcpy(data, (void*)(AT86RF2XX_REG__TRXFBST + offset), len);
-}
-#else
 void at86rf2xx_sram_read(const at86rf2xx_t *dev, uint8_t offset,
                          uint8_t *data, size_t len);
-#endif
 /**
  * @brief   Write a chunk of data into the SRAM of the given device
  *
@@ -138,16 +104,8 @@ void at86rf2xx_sram_read(const at86rf2xx_t *dev, uint8_t offset,
  * @param[in] data      data to copy into SRAM
  * @param[in] len       number of bytes to write to SRAM
  */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-static inline void at86rf2xx_sram_write(const at86rf2xx_t *dev, uint8_t offset,
-                                        const uint8_t *data, size_t len) {
-    (void)dev;
-    memcpy((void*)(AT86RF2XX_REG__TRXFBST + offset), data, len);
-}
-#else
 void at86rf2xx_sram_write(const at86rf2xx_t *dev, uint8_t offset,
                           const uint8_t *data, size_t len);
-#endif
 /**
  * @brief   Start a read transcation internal frame buffer of the given device
  *
@@ -156,13 +114,7 @@ void at86rf2xx_sram_write(const at86rf2xx_t *dev, uint8_t offset,
  *
  * @param[in]  dev      device to start read
  */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-static inline void at86rf2xx_fb_start(const at86rf2xx_t *dev) {
-    (void) dev;
-}
-#else
 void at86rf2xx_fb_start(const at86rf2xx_t *dev);
-#endif
 /**
  * @brief   Read the internal frame buffer of the given device
  *
@@ -172,14 +124,7 @@ void at86rf2xx_fb_start(const at86rf2xx_t *dev);
  * @param[out] data     buffer to copy the data to
  * @param[in]  len      number of bytes to read from the frame buffer
  */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-static inline void at86rf2xx_fb_read(const at86rf2xx_t *dev, uint8_t *data, size_t len) {
-    (void)dev;
-    memcpy(data, (void*)AT86RF2XX_REG__TRXFBST, len);
-}
-#else
 void at86rf2xx_fb_read(const at86rf2xx_t *dev, uint8_t *data, size_t len);
-#endif
 /**
  * @brief   Stop a read transcation internal frame buffer of the given device
  *
@@ -187,13 +132,7 @@ void at86rf2xx_fb_read(const at86rf2xx_t *dev, uint8_t *data, size_t len);
  *
  * @param[in]  dev      device to stop read
  */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-static inline void at86rf2xx_fb_stop(const at86rf2xx_t *dev) {
-    (void) dev;
-}
-#else
 void at86rf2xx_fb_stop(const at86rf2xx_t *dev);
-#endif
 /**
  * @brief   Convenience function for reading the status of the given device
  *

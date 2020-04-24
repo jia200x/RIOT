@@ -42,65 +42,7 @@
 #define _TX_STATE AT86RF2XX_STATE_PLL_ON
 #endif
 
-#ifdef MODULE_AT86RF212B
-/* See: Table 9-15. Recommended Mapping of TX Power, Frequency Band, and
- * PHY_TX_PWR (register 0x05), AT86RF212B data sheet. */
-static const uint8_t dbm_to_tx_pow_868[] = { 0x1d, 0x1c, 0x1b, 0x1a, 0x19, 0x18,
-                                             0x17, 0x15, 0x14, 0x13, 0x12, 0x11,
-                                             0x10, 0x0f, 0x31, 0x30, 0x2f, 0x94,
-                                             0x93, 0x91, 0x90, 0x29, 0x49, 0x48,
-                                             0x47, 0xad, 0xcd, 0xcc, 0xcb, 0xea,
-                                             0xe9, 0xe8, 0xe7, 0xe6, 0xe4, 0x80,
-                                             0xa0 };
-static const uint8_t dbm_to_tx_pow_915[] = { 0x1d, 0x1c, 0x1b, 0x1a, 0x19, 0x17,
-                                             0x16, 0x15, 0x14, 0x13, 0x12, 0x11,
-                                             0x10, 0x0f, 0x0e, 0x0d, 0x0c, 0x0b,
-                                             0x09, 0x91, 0x08, 0x07, 0x05, 0x27,
-                                             0x04, 0x03, 0x02, 0x01, 0x00, 0x86,
-                                             0x40, 0x84, 0x83, 0x82, 0x80, 0xc1,
-                                             0xc0 };
-static const int16_t rx_sens_to_dbm[] = { -110, -98, -94, -91, -88, -85, -82,
-                                          -79, -76, -73, -70, -67, -63, -60, -57,
-                                          -54 };
-static const uint8_t dbm_to_rx_sens[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                          0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                          0x01, 0x01, 0x01, 0x01, 0x02, 0x02,
-                                          0x02, 0x03, 0x03, 0x03, 0x04, 0x04,
-                                          0x04, 0x05, 0x05, 0x05, 0x06, 0x06,
-                                          0x06, 0x07, 0x07, 0x07, 0x08, 0x08,
-                                          0x08, 0x09, 0x09, 0x09, 0x0a, 0x0a,
-                                          0x0a, 0x0b, 0x0b, 0x0b, 0x0b, 0x0c,
-                                          0x0c, 0x0c, 0x0d, 0x0d, 0x0d, 0x0e,
-                                          0x0e, 0x0e, 0x0f };
-
-static int16_t _tx_pow_to_dbm_212b(uint8_t channel, uint8_t page, uint8_t reg)
-{
-    if (page == 0 || page == 2) {
-        const uint8_t *dbm_to_tx_pow;
-        size_t nelem;
-
-        if (channel == 0) {
-            /* Channel 0 is 868.3 MHz */
-            dbm_to_tx_pow = &dbm_to_tx_pow_868[0];
-            nelem = ARRAY_SIZE(dbm_to_tx_pow_868);
-        }
-        else {
-            /* Channels 1+ are 915 MHz */
-            dbm_to_tx_pow = &dbm_to_tx_pow_915[0];
-            nelem = ARRAY_SIZE(dbm_to_tx_pow_915);
-        }
-
-        for (size_t i = 0; i < nelem; ++i) {
-            if (dbm_to_tx_pow[i] == reg) {
-                return (i - AT86RF2XX_TXPOWER_OFF);
-            }
-        }
-    }
-
-    return 0;
-}
-
-#elif MODULE_AT86RF233
+#if MODULE_AT86RF233
 static const int16_t tx_pow_to_dbm[] = { 4, 4, 3, 3, 2, 2, 1,
                                          0, -1, -2, -3, -4, -6, -8, -12, -17 };
 static const uint8_t dbm_to_tx_pow[] = { 0x0f, 0x0f, 0x0f, 0x0e, 0x0e, 0x0e,
@@ -277,12 +219,7 @@ int8_t at86rf2xx_get_ed_level(at86rf2xx_t *dev)
 {
     uint8_t tmp = at86rf2xx_reg_read(dev, AT86RF2XX_REG__PHY_ED_LEVEL);
 
-#if MODULE_AT86RF212B
-    /* AT86RF212B has different scale than the other variants */
-    int8_t ed = (int8_t)(((int16_t)tmp * 103) / 100) + RSSI_BASE_VAL;
-#else
     int8_t ed = (int8_t)tmp + RSSI_BASE_VAL;
-#endif
     return ed;
 }
 
@@ -324,84 +261,13 @@ void at86rf2xx_set_frame_pending(at86rf2xx_t *dev, bool pending)
     at86rf2xx_reg_write(dev, AT86RF2XX_REG__CSMA_SEED_1, tmp);
 }
 
-#if 0
-void at86rf2xx_set_option(at86rf2xx_t *dev, uint16_t option, bool state)
-{
-    uint8_t tmp;
-
-    DEBUG("set option %i to %i\n", option, state);
-
-    /* set option field */
-    dev->flags = (state) ? (dev->flags |  option)
-                         : (dev->flags & ~option);
-    /* trigger option specific actions */
-    switch (option) {
-        case AT86RF2XX_OPT_PROMISCUOUS:
-        case AT86RF2XX_OPT_AUTOACK:
-            break;
-        case AT86RF2XX_OPT_TELL_RX_START:
-            DEBUG("[at86rf2xx] opt: %s SFD IRQ\n",
-                  (state ? "enable" : "disable"));
-            tmp = at86rf2xx_reg_read(dev, AT86RF2XX_REG__IRQ_MASK);
-            tmp = (state) ? (tmp |  AT86RF2XX_IRQ_STATUS_MASK__RX_START)
-                          : (tmp & ~AT86RF2XX_IRQ_STATUS_MASK__RX_START);
-            at86rf2xx_reg_write(dev, AT86RF2XX_REG__IRQ_MASK, tmp);
-            break;
-        case AT86RF2XX_OPT_ACK_PENDING:
-            break;
-        default:
-            /* do nothing */
-            break;
-    }
-}
-
-/**
- * @brief Internal function to change state
- * @details For all cases but AT86RF2XX_STATE_FORCE_TRX_OFF state and
- *          cmd parameter are the same.
- *
- * @param dev       device to operate on
- * @param state     target state
- * @param cmd       command to initiate state transition
- */
-
-static inline void _set_state(at86rf2xx_t *dev, uint8_t state, uint8_t cmd)
-{
-    at86rf2xx_reg_write(dev, AT86RF2XX_REG__TRX_STATE, cmd);
-
-    /* To prevent a possible race condition when changing to
-     * RX_AACK_ON state the state doesn't get read back in that
-     * case. See discussion
-     * in https://github.com/RIOT-OS/RIOT/pull/5244
-     */
-    if (state != AT86RF2XX_STATE_RX_AACK_ON) {
-        while (at86rf2xx_get_status(dev) != state) {}
-    }
-    /* Although RX_AACK_ON state doesn't get read back,
-     * at least make sure if state transition is in progress or not
-     */
-    else {
-        while (at86rf2xx_get_status(dev) == AT86RF2XX_STATE_IN_PROGRESS) {}
-    }
-
-    dev->state = state;
-}
-#endif
-
 void at86rf2xx_sleep(at86rf2xx_t *dev)
 {
     at86rf2xx_set_internal_state(dev, AT86RF2XX_STATE_FORCE_TRX_OFF);
     /* Discard all IRQ flags, framebuffer is lost anyway */
     at86rf2xx_reg_read(dev, AT86RF2XX_REG__IRQ_STATUS);
     /* Go to SLEEP mode from TRX_OFF */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-    /* reset interrupts states in device */
-    dev->irq_status = 0;
-    /* Setting SLPTR bit brings radio transceiver to sleep in in TRX_OFF*/
-    *AT86RF2XX_REG__TRXPR |= (AT86RF2XX_TRXPR_SLPTR);
-#else
     gpio_set(dev->params.sleep_pin);
-#endif
 }
 
 static inline bool _requires_trx_off(int old_state, int state)

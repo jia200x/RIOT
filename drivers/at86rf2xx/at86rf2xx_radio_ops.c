@@ -56,12 +56,8 @@ static int _len(ieee802154_dev_t *dev)
     /* get the size of the received packet */
     uint8_t phr;
 
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-    phr = TST_RX_LENGTH;
-#else
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
     at86rf2xx_sram_read(_dev, 0, &phr, 1);
-#endif
 
     return phr;
 }
@@ -78,11 +74,7 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_in
     at86rf2xx_fb_start(_dev);
 
     /* get the size of the received packet */
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-    phr = TST_RX_LENGTH;
-#else
     at86rf2xx_fb_read(_dev, &phr, 1);
-#endif
 
     /* ignore MSB (refer p.80) and subtract length of FCS field */
     pkt_len = (phr & 0x7f) - 2;
@@ -124,7 +116,7 @@ static int _read(ieee802154_dev_t *dev, void *buf, size_t size, ieee802154_rx_in
         uint8_t ed = 0;
         at86rf2xx_fb_read(_dev, &(info->lqi), 1);
 
-#if defined(MODULE_AT86RF231) || defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
+#if defined(MODULE_AT86RF231)
         /* AT86RF231 does not provide ED at the end of the frame buffer, read
          * from separate register instead */
         at86rf2xx_fb_stop(_dev);
@@ -348,14 +340,8 @@ int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params, void (*is
     dev->trx_state = AT86RF2XX_STATE_TRX_OFF;
     dev->dev.driver = &at86rf2xx_ops;
 
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-    (void) params;
-    /* set all interrupts off */
-    at86rf2xx_reg_write(dev, AT86RF2XX_REG__IRQ_MASK, 0x00);
-#else
     /* initialize device descriptor */
     dev->params = *params;
-#endif
 
     /* initialize GPIOs */
     spi_init_cs(dev->params.spi, dev->params.cs_pin);
@@ -395,46 +381,6 @@ void at86rf2xx_init_int(at86rf2xx_t *dev)
     /* clear interrupt flags */
     at86rf2xx_reg_read(dev, AT86RF2XX_REG__IRQ_STATUS);
 }
-
-#if 0
-static void _isr_send_complete(ieee802154_dev_t *dev, uint8_t trac_status)
-{
-/* Only radios with the XAH_CTRL_2 register support frame retry reporting */
-#if AT86RF2XX_HAVE_RETRIES
-    at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
-    _dev->tx_retries = (at86rf2xx_reg_read(_dev, AT86RF2XX_REG__XAH_CTRL_2)
-                       & AT86RF2XX_XAH_CTRL_2__ARET_FRAME_RETRIES_MASK) >>
-                      AT86RF2XX_XAH_CTRL_2__ARET_FRAME_RETRIES_OFFSET;
-#endif
-
-    DEBUG("[at86rf2xx] EVT - TX_END\n");
-
-    if(IS_ACTIVE(AT86RF2XX_EXT)) {
-        switch (trac_status) {
-                    case AT86RF2XX_TRX_STATE__TRAC_SUCCESS:
-                    case AT86RF2XX_TRX_STATE__TRAC_SUCCESS_DATA_PENDING:
-                        dev->cb(dev, IEEE802154_RF_EV_TX_DONE, NULL);
-                        DEBUG("[at86rf2xx] TX SUCCESS\n");
-                        break;
-                    case AT86RF2XX_TRX_STATE__TRAC_NO_ACK:
-                        dev->cb(dev, IEEE802154_RF_EV_TX_NO_ACK, NULL);
-                        DEBUG("[at86rf2xx] TX NO_ACK\n");
-                        break;
-                    case AT86RF2XX_TRX_STATE__TRAC_CHANNEL_ACCESS_FAILURE:
-                        dev->cb(dev, IEEE802154_RF_EV_TX_MEDIUM_BUSY, NULL);
-                        DEBUG("[at86rf2xx] TX_CHANNEL_ACCESS_FAILURE\n");
-                        break;
-                    default:
-                        DEBUG("[at86rf2xx] Unhandled TRAC_STATUS: %d\n",
-                              trac_status >> 5);
-                }
-    }
-    else {
-        dev->cb(dev, IEEE802154_RF_EV_TX_DONE, NULL);
-        DEBUG("[at86rf2xx] TX SUCCESS\n");
-    }
-}
-#endif
 
 void _irq_handler(ieee802154_dev_t *dev)
 {
@@ -501,54 +447,6 @@ int get_tx_status(ieee802154_dev_t *dev, ieee802154_tx_info_t *info)
     return -EINVAL;
 }
 
-#if 0
-void at86rf2xx_task_handler(ieee802154_dev_t *dev)
-{
-    uint8_t irq_mask;
-    uint8_t state;
-    uint8_t trac_status;
-
-    at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
-    /* If transceiver is sleeping register access is impossible and frames are
-     * lost anyway, so return immediately.
-     */
-    if (dev->flags & AT86RF2XX_FLAG_SLEEP) {
-        return;
-    }
-
-    state = _dev->trx_state;
-    /* read (consume) device status */
-    irq_mask = at86rf2xx_clear_irq_flags(_dev);
-    trac_status = at86rf2xx_reg_read(_dev, AT86RF2XX_REG__TRX_STATE)
-                  & AT86RF2XX_TRX_STATE_MASK__TRAC;
-
-    if (at86rf2xx_irq_has_rx_start(irq_mask)) {
-        dev->cb(dev, IEEE802154_RF_EV_RX_START, NULL);
-        DEBUG("[at86rf2xx] EVT - RX_START\n");
-    }
-
-    if (at86rf2xx_irq_has_trx_end(irq_mask)) {
-        if (state == AT86RF2XX_TRX_STATE_RX_ON) {
-            DEBUG("[at86rf2xx] EVT - RX_END\n");
-            dev->cb(dev, IEEE802154_RF_EV_RX_DONE, NULL);
-        }
-        else if (state == AT86RF2XX_TRX_STATE_TX_ON) {
-            _isr_send_complete(dev, trac_status);
-        }
-#if 0
-        if (dev->flags & AT86RF2XX_FLAG_RX_CONTINUOUS) {
-            state = AT86RF2XX_TRX_STATE_RX_ON; 
-        }
-        else {
-            state = AT86RF2XX_TRX_STATE_TRX_OFF;
-        }
-        at86rf2xx_set_state(_dev, state);
-        DEBUG("[at86rf2xx] return to idle state 0x%x\n", state);
-#endif
-    }
-}
-
-#endif
 static int _start(ieee802154_dev_t *dev)
 {
     at86rf2xx_init_int((at86rf2xx_t*) dev);

@@ -38,15 +38,11 @@
 
 static void at86rf2xx_disable_clock_output(at86rf2xx_t *dev)
 {
-#if defined(MODULE_AT86RFA1) || defined(MODULE_AT86RFR2)
-    (void) dev;
-#else
     uint8_t tmp = at86rf2xx_reg_read(dev, AT86RF2XX_REG__TRX_CTRL_0);
     tmp &= ~(AT86RF2XX_TRX_CTRL_0_MASK__CLKM_CTRL);
     tmp &= ~(AT86RF2XX_TRX_CTRL_0_MASK__CLKM_SHA_SEL);
     tmp |= (AT86RF2XX_TRX_CTRL_0_CLKM_CTRL__OFF);
     at86rf2xx_reg_write(dev, AT86RF2XX_REG__TRX_CTRL_0, tmp);
-#endif
 }
 
 static void at86rf2xx_enable_smart_idle(at86rf2xx_t *dev)
@@ -79,13 +75,6 @@ void at86rf2xx_reset(at86rf2xx_t *dev)
     /* enable safe mode (protect RX FIFO until reading data starts) */
     at86rf2xx_reg_write(dev, AT86RF2XX_REG__TRX_CTRL_2,
                         AT86RF2XX_TRX_CTRL_2_MASK__RX_SAFE_MODE);
-
-#if !defined(MODULE_AT86RFA1) && !defined(MODULE_AT86RFR2)
-    /* don't populate masked interrupt flags to IRQ_STATUS register */
-    uint8_t tmp = at86rf2xx_reg_read(dev, AT86RF2XX_REG__TRX_CTRL_1);
-    tmp &= ~(AT86RF2XX_TRX_CTRL_1_MASK__IRQ_MASK_MODE);
-    at86rf2xx_reg_write(dev, AT86RF2XX_REG__TRX_CTRL_1, tmp);
-#endif
 
     /* configure smart idle listening feature */
     at86rf2xx_enable_smart_idle(dev);
