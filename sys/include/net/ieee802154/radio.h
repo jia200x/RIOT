@@ -329,8 +329,8 @@ struct ieee802154_radio_ops {
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] sleep whether the device should sleep or not.
      *
-     * @post the state is @ref IEEE802154_TRX_STATE_TRX_OFF when the radio
-     *       wakes up.
+     * @post the transceiver state is @ref IEEE802154_TRX_STATE_TRX_OFF,
+     *       regardless of the value of @p sleep
      *
      * @return 0 on success
      * @return negative errno on error
@@ -468,7 +468,6 @@ struct ieee802154_radio_ops {
 /**
  * @brief Load a packet in the internal framebuffer of the device.
  *
- * @pre the PHY state is @ref IEEE802154_TRX_STATE_TX_ON.
  * @pre the device is not sleeping
  *
  * This function assumes @p pkt is valid and doesn't exceed the maximum PHY
@@ -552,7 +551,7 @@ static inline int ieee802154_radio_read(ieee802154_dev_t *dev, void *buf,
 /**
  * @brief Perform CCA to check if the channel is clear
  *
- * @pre the PHY state is @ref IEEE802154_TRX_STATE_RX_ON.
+ * @pre the device is not sleeping
  *
  * @param[in] dev IEEE802.15.4 device descriptor
  *
@@ -634,7 +633,6 @@ static inline int ieee802154_radio_config_phy(ieee802154_dev_t *dev,
  * @param[in] state the transceiver state to change to
  *
  * @return 0 on success
- * @return negative -EBUSY if the radio is busy
  * @return negative errno on error
  */
 static inline int ieee802154_radio_set_trx_state(ieee802154_dev_t *dev,
@@ -649,8 +647,8 @@ static inline int ieee802154_radio_set_trx_state(ieee802154_dev_t *dev,
  * @param[in] dev IEEE802.15.4 device descriptor
  * @param[in] sleep whether the device should sleep or not
  *
- * @post if @p sleep == true, the transceiver PHY state is
- *        @ref IEEE802154_TRX_STATE_TRX_OFF
+ * @post the transceiver state is @ref IEEE802154_TRX_STATE_TRX_OFF, regardless
+ * of the value of @p sleep
  *
  * @return 0 on success
  * @return negative errno on error
@@ -775,8 +773,9 @@ static inline int ieee802154_radio_set_promiscuous(ieee802154_dev_t *dev, bool e
 /**
  * @brief Start the device
  *
- * This function puts the radio in a state where it can be operated (enable
- * interrupts, etc)
+ * This function puts the radio in a state where it can be operated. It
+ * should enable interrupts and set the transceiver state to
+ * @ref IEEE802154_TRX_STATE_TRX_OFF
  *
  * @pre the device driver init function was already called
  *
