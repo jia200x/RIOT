@@ -308,7 +308,7 @@ Bottom-Half processor can offload the ISR.
 
 The function set of the Device Driver can include device specific features that
 are not exposed but the Radio HAL API (e.g., Smart Listening with AT86RF2xx
-radios).  The Device Driver is an independent component and it can be used
+radios). The Device Driver is an independent component and it can be used
 without the Radio HAL on top, for testing purposes or device specific
 applications.
 
