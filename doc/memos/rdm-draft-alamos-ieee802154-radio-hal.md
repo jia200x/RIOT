@@ -63,8 +63,8 @@ addresses deficits of using `netdev` as a Hardware Abstraction Layer:
   hardware abstraction layer. The `netdev` interface is implemented as a device
   driver but it additionally includes technology-dependent components for every
   single device. For the case of IEEE802.15.4, this includes components of the
-  802.15.4 MAC/PHY such as transmission of Physical Service Data Unit (PSDU)
-  packets, or retransmissions with CSMA-CA and ACK handling.  As a consequence,
+  802.15.4 MAC/PHY such as transmission of Physical Service Data Units (PSDU),
+  or retransmissions with CSMA-CA and ACK handling. As a consequence,
   code is duplicated, feature sets of similar devices heavily depend on the
   specific implementation, and integration of new devices is more complex than
   need be. Furthermore, duplication and unspecified device access complicate
