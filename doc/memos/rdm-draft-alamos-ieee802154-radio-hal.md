@@ -74,7 +74,7 @@ addresses deficits of using `netdev` as a Hardware Abstraction Layer:
   hardware MAC acceleration on certain devices. These capabilities are currently
   only available if the hardware provides integrated support. An indication
   mechanism which MAC features are provided within a `netdev`  implementation is
-  missing.  A full MAC layer that is situated on top of the HAL requires a
+  missing. A full MAC layer that is situated on top of the HAL requires a
   defined access to specific radio functionalities in order to meet timing
   constraints or energy requirements. That means, varying properties between
   implementations and partly implemented MAC features within the device driver
