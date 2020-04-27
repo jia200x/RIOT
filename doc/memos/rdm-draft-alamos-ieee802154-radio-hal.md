@@ -227,7 +227,7 @@ of a radio and its hardware acceleration features, if available.
 Examples for Upper Layers:
 - A MAC layer can use the Radio HAL to implement parts of a PHY layer (data
   communication, set/get parameters, perform CCA, etc.) .
-- A network stack that requires direct access to the radio (OpenWSN,
+- A network stack that requires low level access to the radio (OpenWSN,
   OpenThread) can use the Radio HAL to implement the integration code.
 - A developer who implements a simple application to send and receive data
   between 802.15.4 radios (relying on hardware accelerated MAC features, if
