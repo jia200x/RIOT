@@ -201,17 +201,12 @@ static int set_trx_state(ieee802154_dev_t *dev, ieee802154_trx_state_t state)
     return 0;
 }
 
-static int _set_sleep(ieee802154_dev_t *dev, bool sleep)
+static int _off(ieee802154_dev_t *dev)
 {
     at86rf2xx_t *_dev = (at86rf2xx_t*) dev;
 
-    if(sleep) {
-        at86rf2xx_sleep((at86rf2xx_t*) dev);
-    }
-    else {
-        at86rf2xx_assert_awake((at86rf2xx_t*) dev);
-    }
-    _dev->is_sleep = sleep;
+    at86rf2xx_sleep((at86rf2xx_t*) dev);
+    _dev->is_sleep = true;
     return 0;
 }
 
@@ -330,7 +325,7 @@ int at86rf2xx_init(at86rf2xx_t *dev, const at86rf2xx_params_t *params, void (*is
     return 0;
 }
 
-void at86rf2xx_init_int(at86rf2xx_t *dev)
+void at86rf2xx_on(at86rf2xx_t *dev)
 {
     /* `at86rf2xx_init` puts the device in sleep mode. We wake the radio up
      * again */
@@ -413,11 +408,9 @@ int get_tx_status(ieee802154_dev_t *dev, ieee802154_tx_info_t *info)
     return -EINVAL;
 }
 
-static int _start(ieee802154_dev_t *dev)
+static int _on(ieee802154_dev_t *dev)
 {
-    /* Put the radio in a state that can be used by the upper layer.
-     * The transceiver state will be TRX_OFF */
-    at86rf2xx_init_int((at86rf2xx_t*) dev);
+    at86rf2xx_on((at86rf2xx_t*) dev);
     return 0;
 }
 
@@ -430,7 +423,8 @@ static const ieee802154_radio_ops_t at86rf2xx_ops = {
     .set_cca_threshold = set_cca_threshold,
     .config_phy = _config_phy,
     .set_trx_state = set_trx_state,
-    .set_sleep = _set_sleep,
+    .on = _on,
+    .off = _off,
     .get_cap = _get_cap,
     .set_hw_addr_filter = set_hw_addr_filter,
     .set_frame_retries = set_frame_retries,
@@ -438,5 +432,4 @@ static const ieee802154_radio_ops_t at86rf2xx_ops = {
     .set_promiscuous = set_promiscuous,
     .irq_handler = _irq_handler,
     .get_tx_status = get_tx_status,
-    .start = _start,
 };

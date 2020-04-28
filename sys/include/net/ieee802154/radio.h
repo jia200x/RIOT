@@ -324,18 +324,30 @@ struct ieee802154_radio_ops {
     int (*set_trx_state)(ieee802154_dev_t *dev, ieee802154_trx_state_t state);
 
     /**
-     * @brief Set the sleep state of the device (sleep or awake)
+     * @brief Turn on the device
+     *
+     * @pre the init function of the radio succeeded.
      *
      * @param[in] dev IEEE802.15.4 device descriptor
-     * @param[in] sleep whether the device should sleep or not.
      *
-     * @post the transceiver state is @ref IEEE802154_TRX_STATE_TRX_OFF,
-     *       regardless of the value of @p sleep
+     * @post the transceiver state ins @ref IEEE802154_TRX_STATE_TRX_OFF
      *
      * @return 0 on success
      * @return negative errno on error
      */
-    int (*set_sleep)(ieee802154_dev_t *dev, bool sleep);
+    int (*on)(ieee802154_dev_t *dev);
+
+    /**
+     * @brief Turn off the device
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     *
+     * @post the transceiver state is @ref IEEE802154_TRX_STATE_TRX_OFF
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
+    int (*off)(ieee802154_dev_t *dev);
 
     /**
      * @brief Get a cap from the radio
@@ -359,22 +371,6 @@ struct ieee802154_radio_ops {
      * @param[in] dev IEEE802.15.4 device descriptor
      */
     void (*irq_handler)(ieee802154_dev_t *dev);
-
-    /**
-     * @brief Start the device
-     *
-     * @pre the init function of the radio succeeded.
-     *
-     * This function puts the radio in a state where it can be operated. It
-     * should enable interrupts and set the transceiver state to
-     * @ref IEEE802154_TRX_STATE_TRX_OFF
-     *
-     * @param[in] dev IEEE802.15.4 device descriptor
-     *
-     * @return 0 on success
-     * @return negative errno on error
-     */
-    int (*start)(ieee802154_dev_t *dev);
 
     /**
      * @brief Set IEEE802.15.4 promiscuous mode
@@ -642,20 +638,18 @@ static inline int ieee802154_radio_set_trx_state(ieee802154_dev_t *dev,
 }
 
 /**
- * @brief Set the sleep state of the radio
+ * @brief Turn off the transceiver
  *
  * @param[in] dev IEEE802.15.4 device descriptor
- * @param[in] sleep whether the device should sleep or not
  *
- * @post the transceiver state is @ref IEEE802154_TRX_STATE_TRX_OFF, regardless
- * of the value of @p sleep
+ * @post the transceiver state is @ref IEEE802154_TRX_STATE_TRX_OFF
  *
  * @return 0 on success
  * @return negative errno on error
  */
-static inline int ieee802154_radio_set_sleep(ieee802154_dev_t *dev, bool sleep)
+static inline int ieee802154_radio_off(ieee802154_dev_t *dev)
 {
-    return dev->driver->set_sleep(dev, sleep);
+    return dev->driver->off(dev);
 }
 
 /**
@@ -771,11 +765,7 @@ static inline int ieee802154_radio_set_promiscuous(ieee802154_dev_t *dev, bool e
 }
 
 /**
- * @brief Start the device
- *
- * This function puts the radio in a state where it can be operated. It
- * should enable interrupts and set the transceiver state to
- * @ref IEEE802154_TRX_STATE_TRX_OFF
+ * @brief Turn on the device
  *
  * @pre the device driver init function was already called
  *
@@ -786,9 +776,9 @@ static inline int ieee802154_radio_set_promiscuous(ieee802154_dev_t *dev, bool e
  * @return 0 on success
  * @return negative errno on error
  */
-static inline int ieee802154_radio_start(ieee802154_dev_t *dev)
+static inline int ieee802154_radio_on(ieee802154_dev_t *dev)
 {
-    return dev->driver->start(dev);
+    return dev->driver->on(dev);
 }
 
 /**

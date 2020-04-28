@@ -156,7 +156,7 @@ int ieee802154_submac_init(ieee802154_submac_t *submac)
         assert(false);
     }*/
 
-    ieee802154_radio_start(submac->dev);
+    ieee802154_radio_on(submac->dev);
     return 0;
 }
 

@@ -315,7 +315,7 @@ void _irq_handler(ieee802154_dev_t *dev)
     }
 }
 
-void nrf802154_init_int(void)
+void nrf802154_on(void)
 {
     NRF_RADIO->POWER = 1;
     /* make sure the radio is disabled/stopped */
@@ -403,10 +403,10 @@ void isr_radio(void)
     cortexm_isr_end();
 }
 
-static int _start(ieee802154_dev_t *dev)
+static int _on(ieee802154_dev_t *dev)
 {
     (void) dev;
-    nrf802154_init_int();
+    nrf802154_on();
     return 0;
 }
 
@@ -419,11 +419,10 @@ static int _config_phy(ieee802154_dev_t *dev, ieee802154_phy_conf_t *conf)
     return 0;
 }
 
-static int _set_sleep(ieee802154_dev_t *dev, bool sleep)
+static int _off(ieee802154_dev_t *dev)
 {
     /* TODO: implement */
     (void) dev;
-    (void) sleep;
     return 0;
 }
 
@@ -461,8 +460,8 @@ static const ieee802154_radio_ops_t nrf802154_ops = {
     .set_cca_mode = _set_cca_mode,
     .config_phy = _config_phy,
     .set_trx_state = set_trx_state,
-    .set_sleep = _set_sleep,
+    .on = _on,
+    .off = _off,
     .get_cap = _get_cap,
     .irq_handler = _irq_handler,
-    .start = _start,
 };
