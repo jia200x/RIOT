@@ -239,7 +239,7 @@ by an event notification mechanism, described below.
 
 ## 4.2 Bottom-Half Processor
 The Bottom-Half (BH) processor is a component to offload the IRQ processing to
-thread context.  The component registers an IRQ handler during initialization
+thread context. The component registers an IRQ handler during initialization
 which is executed when the device triggers and interrupt. This handler uses
 internal mechanisms to call the Radio API IRQ handler from a safe context.
 
