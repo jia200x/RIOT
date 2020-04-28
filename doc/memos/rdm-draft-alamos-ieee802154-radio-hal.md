@@ -473,7 +473,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      *
      * @pre the radio already received a packet (e.g
      *      @ref ieee802154_dev_t::cb with @ref IEEE802154_RADIO_RX_DONE).
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @post the frame buffer is still protected against new packet arrivals.
      *      
@@ -492,7 +492,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      *
      * @pre the radio already received a packet (e.g
      *      @ref ieee802154_dev_t::cb with @ref IEEE802154_RADIO_RX_DONE).
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @post the PHY state is @ref IEEE802154_TRX_STATE_RX_ON and the radio is
      *       in a state where it can receive more packets, regardless of the
@@ -529,7 +529,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
     /**
      * @brief Set the threshold for the Energy Detection (first mode of CCA)
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] threshold the threshold in dBm.
@@ -544,7 +544,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      *
      * All radios MUST at least implement the first CCA mode (ED Threshold).
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] mode the CCA mode
@@ -562,7 +562,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      * it is specific to the device. The upper layer is responsible of all kind
      * of validations.
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] conf the PHY configuration
@@ -575,7 +575,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
     /**
      * @brief Set the transceiver PHY state
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note the implementation MUST block until the state change occurs.
      *
@@ -597,7 +597,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      * This function calls the @ref ieee802154_cb_t::cb function with
      * the corresponding event type.
      *
-     * @note if the device is sleeping, this function should do nothing
+     * @note if the device is off, this function should do nothing
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      */
@@ -646,7 +646,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
     /**
      * @brief Set IEEE802.15.4 promiscuous mode
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note this function pointer can be NULL if the device doesn't support
      *       hardware address filtering.
@@ -663,7 +663,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
      * @brief Get the SubMAC TX information (number of retransmissions,
      *        frame pending bit, status, etc).
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note this function pointer can be NULL if the device doesn't support
      *       frame retransmissions
@@ -679,7 +679,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
     /**
      * @brief Set IEEE802.15.4 address in hardware address filter
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note this function pointer can be NULL if the device doesn't support
      *       hardware address filtering.
@@ -698,7 +698,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
     /**
      * @brief Set number of frame retransmissions
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note this function pointer can be NULL if the device doesn't support
      *       frame retransmissions
@@ -714,7 +714,7 @@ Base (such as address, TX power, channel number) are already stored in RAM.
     /**
      * @brief Set IEEE802.15.4 CSMA configuration parameters
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note this function pointer can be NULL if the device doesn't support
      *       frame retransmissions
