@@ -313,21 +313,19 @@ without the Radio HAL on top, for testing purposes or device specific
 applications.
 
 # 5 Implementation Details
-## 5.1 Initialization and Start of Device Drivers
+## 5.1 Initialization of device drivers
 In order to implement the 802.15.4 abstraction on top of a device driver, it
-is required to separate the initialization process of the device in two
-stages:
-- Init: This stage sets up the device driver (analogue to the current
-  `xxx_setup` functions) and puts it in a state that minimizes power
-  consumption.
-- Start: This stage is intended to be triggered during network interface
-  initialization (e.g. via `ifconfig up`) to put the device in a state where it
-  is ready to operate (enable IRQ lines, turn on the transceiver, etc).
+is required an initialization procedure that performs the following tasks:
 
-Explicitly separating the Init and Start process is more efficient in terms of
-power consumption, because a network stack might take some time to set an
-interface up. The `radio_ops` interface provides a "start" function that should
-be mapped to the devices Start function proposed above.
+1. Set up IRQ callback
+2. Reset the device
+3. Confirm connectivity and perform self tests
+4. Bring device into a low power state
+5. Set up IRQs and disable them to use less power.
+
+The `radio_ops` interface provides an "on" function that turns on the device
+and enables interrupts. It is expected that the upper layer will call this
+function to enable the radio device, if the initialization procedure succeeded.
 
 ## 5.2 Transceiver States
 Following the IEEE802.15.4 PHY definition, there are three generic transceiver
@@ -594,20 +592,6 @@ Base (such as address, TX power, channel number) are already stored in RAM.
 ### Device State Management
 ```c
     /**
-     * @brief Set the sleep state of the device (sleep or awake)
-     *
-     * @param[in] dev IEEE802.15.4 device descriptor
-     * @param[in] sleep whether the device should sleep or not.
-     *
-     * @post the transceiver state is @ref IEEE802154_TRX_STATE_TRX_OFF,
-     *       regardless of the value of @p sleep
-     *
-     * @return 0 on success
-     * @return negative errno on error
-     */
-    int (*set_sleep)(ieee802154_dev_t *dev, bool sleep);
-
-    /**
      * @brief Process radio IRQ.
      *
      * This function calls the @ref ieee802154_cb_t::cb function with
@@ -620,20 +604,30 @@ Base (such as address, TX power, channel number) are already stored in RAM.
     void (*irq_handler)(ieee802154_dev_t *dev);
 
     /**
-     * @brief Start the device
+     * @brief Turn on the device
      *
      * @pre the init function of the radio succeeded.
      *
-     * This function puts the radio in a state where it can be operated. It
-     * should enable interrupts and set the transceiver state to
-     * @ref IEEE802154_TRX_STATE_TRX_OFF
-     *
      * @param[in] dev IEEE802.15.4 device descriptor
+     *
+     * @post the transceiver state ins @ref IEEE802154_TRX_STATE_TRX_OFF
      *
      * @return 0 on success
      * @return negative errno on error
      */
-    int (*start)(ieee802154_dev_t *dev);
+    int (*on)(ieee802154_dev_t *dev);
+
+    /**
+     * @brief Turn off the device
+     *
+     * @param[in] dev IEEE802.15.4 device descriptor
+     *
+     * @post the transceiver state is @ref IEEE802154_TRX_STATE_TRX_OFF
+     *
+     * @return 0 on success
+     * @return negative errno on error
+     */
+    int (*off)(ieee802154_dev_t *dev);
 ```
 
 ### Caps and Optional Functions
