@@ -212,7 +212,7 @@ struct ieee802154_radio_ops {
      *
      * @pre the radio already received a packet (e.g
      *      @ref ieee802154_dev_t::cb with @ref IEEE802154_RADIO_RX_DONE).
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @post the frame buffer is still protected against new packet arrivals.
      *      
@@ -231,7 +231,7 @@ struct ieee802154_radio_ops {
      *
      * @pre the radio already received a packet (e.g
      *      @ref ieee802154_dev_t::cb with @ref IEEE802154_RADIO_RX_DONE).
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @post the PHY state is @ref IEEE802154_TRX_STATE_RX_ON and the radio is
      *       in a state where it can receive more packets, regardless of the
@@ -265,7 +265,7 @@ struct ieee802154_radio_ops {
     /**
      * @brief Set the threshold for the Energy Detection (first mode of CCA)
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] threshold the threshold in dBm.
@@ -280,7 +280,7 @@ struct ieee802154_radio_ops {
      *
      * All radios MUST at least implement the first CCA mode (ED Threshold).
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] mode the CCA mode
@@ -298,7 +298,7 @@ struct ieee802154_radio_ops {
      * it's specific to the device. The upper layer is responsible of all kind
      * of validations.
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      * @param[in] conf the PHY configuration
@@ -311,7 +311,7 @@ struct ieee802154_radio_ops {
     /**
      * @brief Set the transceiver PHY state
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note the implementation MUST block until the state change occurs.
      *
@@ -366,7 +366,7 @@ struct ieee802154_radio_ops {
      * This function calls the @ref ieee802154_cb_t::cb function with all
      * the corresponding events.
      *
-     * @note if the device is sleeping, this function should do nothing
+     * @note if the device is off, this function should do nothing
      *
      * @param[in] dev IEEE802.15.4 device descriptor
      */
@@ -375,7 +375,7 @@ struct ieee802154_radio_ops {
     /**
      * @brief Set IEEE802.15.4 promiscuous mode
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note this function pointer can be NULL if the device doesn't support
      *       hardware address filtering.
@@ -392,7 +392,7 @@ struct ieee802154_radio_ops {
      * @brief Get the SubMAC TX information (number of retransmissions,
      *        pending bit, status, etc).
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note this function pointer can be NULL if the device doesn't support
      *       frame retransmissions
@@ -408,7 +408,7 @@ struct ieee802154_radio_ops {
     /**
      * @brief Set IEEE802.15.4 addresses in hardware address filter
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note this function pointer can be NULL if the device doesn't support
      *       hardware address filtering.
@@ -427,7 +427,7 @@ struct ieee802154_radio_ops {
     /**
      * @brief Set number of frame retransmissions
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note this function pointer can be NULL if the device doesn't support
      *       frame retransmissions
@@ -443,7 +443,7 @@ struct ieee802154_radio_ops {
     /**
      * @brief 
      *
-     * @pre the device is not sleeping
+     * @pre the device is on
      *
      * @note this function pointer can be NULL if the device doesn't support
      *       frame retransmissions
@@ -464,7 +464,7 @@ struct ieee802154_radio_ops {
 /**
  * @brief Load a packet in the internal framebuffer of the device.
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  *
  * This function assumes @p pkt is valid and doesn't exceed the maximum PHY
  * length. Also, it should block until is safe to write a packet.
@@ -485,7 +485,7 @@ static inline int ieee802154_radio_prepare(ieee802154_dev_t *dev, iolist_t *pkt)
  * @brief Transmit a preloaded packet in the framebuffer.
  *
  * @pre the PHY state is @ref IEEE802154_TRX_STATE_TX_ON.
- * @pre the device is not sleeping
+ * @pre the device is on
  *
  * @param[in] dev IEEE802.15.4 device descriptor
  *
@@ -505,7 +505,7 @@ static inline int ieee802154_radio_transmit(ieee802154_dev_t *dev, ieee802154_tx
  * before the @ref ieee802154_radio_read function, otherwise the behavior is
  * undefined.
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  *
  * @param[in] dev IEEE802.15.4 device descriptor
  *
@@ -522,7 +522,7 @@ static inline int ieee802154_radio_len(ieee802154_dev_t *dev)
  * 
  * @pre the radio already received a packet (e.g
  *      @ref ieee802154_dev_t::cb with @ref IEEE802154_RADIO_RX_DONE).
- * @pre the device is not sleeping
+ * @pre the device is on
  *
  * @param[in] dev IEEE802.15.4 device descriptor
  * @param[out] buf buffer to write the received packet into. If NULL, the
@@ -547,7 +547,7 @@ static inline int ieee802154_radio_read(ieee802154_dev_t *dev, void *buf,
 /**
  * @brief Perform CCA to check if the channel is clear
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  *
  * @param[in] dev IEEE802.15.4 device descriptor
  *
@@ -562,7 +562,7 @@ static inline bool ieee802154_radio_cca(ieee802154_dev_t *dev)
 /**
  * @brief Set the threshold for the CCA (first mode)
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  *
  * @param[in] dev IEEE802.15.4 device descriptor
  * @param[in] threshold the threshold in dBm
@@ -581,7 +581,7 @@ static inline int ieee802154_radio_set_cca_threshold(ieee802154_dev_t *dev,
  *
  * @note It's guaranteed that CCA with ED Threshold is supported in all radios.
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  *
  * @param[in] dev IEEE802.15.4 device descriptor
  * @param[in] mode the CCA mode
@@ -604,7 +604,7 @@ static inline int ieee802154_radio_set_cca_mode(ieee802154_dev_t *dev,
  * it's specific to the device. The upper layer is responsible of all kind
  * of validations.
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  *
  * @param[in] dev IEEE802.15.4 device descriptor
  * @param[in] conf the PHY configuration
@@ -623,7 +623,7 @@ static inline int ieee802154_radio_config_phy(ieee802154_dev_t *dev,
  *
  * This function blocks until the state change occurs.
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  *
  * @param[in] dev IEEE802.15.4 device descriptor
  * @param[in] state the transceiver state to change to
@@ -655,7 +655,7 @@ static inline int ieee802154_radio_off(ieee802154_dev_t *dev)
 /**
  * @brief Process the transceiver IRQ
  *
- * @note It's safe to call this function when the transceiver is sleeping. In
+ * @note It's safe to call this function when the transceiver is off. In
  *       that case it does nothing.
  *
  * @param[in] dev IEEE802.15.4 device descriptor
@@ -668,7 +668,7 @@ static inline void ieee802154_radio_irq_handler(ieee802154_dev_t *dev)
 /**
  * @brief Get the SubMAC TX information
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  * @pre the device finished the TX procedure
  * @pre the device supports frame retransmissions
  *      (@ref ieee802154_radio_has_frame_retries() == true)
@@ -688,7 +688,7 @@ static inline int ieee802154_radio_get_tx_status(ieee802154_dev_t *dev,
 /**
  * @brief Write IEEE802.15.4 addresses into the hardware address filter
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  * @pre the device supports address filtering
  *      (@ref ieee802154_radio_has_addr_filter() == true)
  *
@@ -711,7 +711,7 @@ static inline int ieee802154_radio_set_hw_addr_filter(ieee802154_dev_t *dev,
 /**
  * @brief Set the number of retransmissions
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  * @pre the device supports frame retransmissions
  *      (@ref ieee802154_radio_has_frame_retries() == true)
  *
@@ -729,7 +729,7 @@ static inline int ieee802154_radio_set_frame_retries(ieee802154_dev_t *dev, int 
 /**
  * @brief Set the CSMA-CA parameters
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  * @pre the device supports frame retransmissions
  *      (@ref ieee802154_radio_has_frame_retries() == true)
  *
@@ -749,7 +749,7 @@ static inline int ieee802154_radio_set_csma_params(ieee802154_dev_t *dev, ieee80
 /**
  * @brief Set IEEE802.15.4 promiscuous mode
  *
- * @pre the device is not sleeping
+ * @pre the device is on
  * @pre the device supports address filtering
  *      (@ref ieee802154_radio_has_addr_filter() == true)
  *
