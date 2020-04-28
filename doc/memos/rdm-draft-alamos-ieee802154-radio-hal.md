@@ -294,7 +294,7 @@ The full list of events and implications are defined in the Interface
 Definition section.
 
 ### 4.3.3 Device Specific IEEE802.15.4 HAL Implementation
-The Device Specific IEEE802.15.4 HAL implementation is part of the IEEE802.15.4
+The Device Specific IEEE 802.15.4 HAL implementation is part of the IEEE 802.15.4
 Radio HAL component in the above figure. It implements the hardware-dependent
 part of the IEEE 802.15.4 Radio HAL by wrapping the `radio_ops` interface around
 the device specific code by using the Device Driver API which grants access to
