@@ -30,17 +30,16 @@
 #define _16_UPPER_BITMASK 0xFFFF0000
 #define _16_LOWER_BITMASK 0xFFFF
 
-int gnrc_lorawan_mic_is_valid(gnrc_pktsnip_t *mic, uint8_t *nwkskey)
+static int gnrc_lorawan_mic_is_valid(uint8_t *buf, size_t len, uint8_t *nwkskey)
 {
     le_uint32_t calc_mic;
 
-    assert(mic->size == MIC_SIZE);
-    assert(mic->next->data);
-    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t *) mic->next->data;
+    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t *) buf;
 
     uint32_t fcnt = byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt));
-    gnrc_lorawan_calculate_mic(&lw_hdr->addr, fcnt, GNRC_LORAWAN_DIR_DOWNLINK, (iolist_t *) mic->next, nwkskey, &calc_mic);
-    return calc_mic.u32 == ((le_uint32_t *) mic->data)->u32;
+    gnrc_lorawan_calculate_mic(&lw_hdr->addr, fcnt, GNRC_LORAWAN_DIR_DOWNLINK,
+                               buf, len - MIC_SIZE, nwkskey, &calc_mic);
+    return calc_mic.u32 == ((le_uint32_t *) (buf+len-MIC_SIZE))->u32;
 }
 
 uint32_t gnrc_lorawan_fcnt_stol(uint32_t fcnt_down, uint16_t s_fcnt)
@@ -54,120 +53,129 @@ uint32_t gnrc_lorawan_fcnt_stol(uint32_t fcnt_down, uint16_t s_fcnt)
     return u32_fcnt;
 }
 
-void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
-{
-    gnrc_pktsnip_t *hdr, *data, *fopts = NULL, *fport = NULL;
-    int release = true;
-    int error = true;
+struct parsed_packet {
+    uint32_t fcnt_down;
+    lorawan_hdr_t *hdr;
+    int ack_req;
+    iolist_t fopts;
+    iolist_t enc_payload;
+    uint8_t port;
+    uint8_t ack;
+    uint8_t frame_pending;
+};
 
-    /* mark MIC */
-    if (!(data = gnrc_pktbuf_mark(pkt, (pkt->size - MIC_SIZE > 0) ? pkt->size - MIC_SIZE : 0, GNRC_NETTYPE_UNDEF))) {
-        DEBUG("gnrc_lorawan: failed to mark MIC\n");
-        goto out;
+int gnrc_lorawan_parse_dl(gnrc_lorawan_t *mac, uint8_t *buf, size_t len,
+        struct parsed_packet *pkt)
+{
+    memset(pkt, 0, sizeof(struct parsed_packet));
+
+    lorawan_hdr_t *_hdr = (lorawan_hdr_t*) buf;
+    uint8_t *p_mic = buf + len - MIC_SIZE;
+
+    pkt->hdr = _hdr;
+    buf += sizeof(lorawan_hdr_t);
+
+    /* Validate header */
+    if (_hdr->addr.u32 != mac->dev_addr.u32) {
+        DEBUG("gnrc_lorawan: received packet with wrong dev addr. Drop\n");
+        return -1;
     }
+
+    uint32_t _fcnt = gnrc_lorawan_fcnt_stol(mac->mcps.fcnt_down, _hdr->fcnt.u16);
+    if (mac->mcps.fcnt_down > _fcnt || mac->mcps.fcnt_down +
+        LORAMAC_DEFAULT_MAX_FCNT_GAP < _fcnt) {
+        DEBUG("gnrc_lorawan: wrong frame counter\n");
+        return -1;
+    }
+
+    pkt->fcnt_down = _fcnt;
+
+    int fopts_length = lorawan_hdr_get_frame_opts_len(_hdr);
+    if(fopts_length) {
+        pkt->fopts.iol_base = buf;
+        pkt->fopts.iol_len = fopts_length;
+        buf += fopts_length;
+    }
+
+    if(buf < p_mic) {
+        pkt->port = *(buf++);
+        if (buf < p_mic) {
+            pkt->enc_payload.iol_base = buf;
+            pkt->enc_payload.iol_len = p_mic - buf;
+            if(!pkt->port && fopts_length) {
+                DEBUG("gnrc_lorawan: packet with fopts and port == 0. Drop\n");
+                return -1;
+            }
+        }
+    }
+
+    pkt->ack_req = lorawan_hdr_get_mtype(_hdr) == MTYPE_CNF_DOWNLINK;
+    pkt->ack = lorawan_hdr_get_ack(_hdr);
+    pkt->frame_pending = lorawan_hdr_get_frame_pending(_hdr);
+
+    return 0;
+}
+
+void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size)
+{
+    struct parsed_packet _pkt;
 
     /* NOTE: MIC is in pkt */
-    if (!gnrc_lorawan_mic_is_valid(pkt, mac->nwkskey)) {
+    if (!gnrc_lorawan_mic_is_valid(psdu, size, mac->nwkskey)) {
         DEBUG("gnrc_lorawan: invalid MIC\n");
-        goto out;
+        gnrc_lorawan_mcps_event(mac, MCPS_EVENT_NO_RX, 0);
+        return;
     }
 
-    /* remove snip */
-    pkt = gnrc_pktbuf_remove_snip(pkt, pkt);
-
-    if (!(hdr = gnrc_pktbuf_mark(pkt, sizeof(lorawan_hdr_t), GNRC_NETTYPE_UNDEF))) {
-        DEBUG("gnrc_lorawan: failed to allocate hdr\n");
-        goto out;
+    if (gnrc_lorawan_parse_dl(mac, psdu, size, &_pkt) < 0) {
+        DEBUG("gnrc_lorawan: couldn't parse packet\n");
+        gnrc_lorawan_mcps_event(mac, MCPS_EVENT_NO_RX, 0);
+        return;
     }
 
-    int _fopts_length = lorawan_hdr_get_frame_opts_len((lorawan_hdr_t *) hdr->data);
-    if (_fopts_length && !(fopts = gnrc_pktbuf_mark(pkt, _fopts_length, GNRC_NETTYPE_UNDEF))) {
-        DEBUG("gnrc_lorawan: failed to allocate fopts\n");
-        goto out;
+    iolist_t *fopts = NULL;
+    if(_pkt.fopts.iol_base) {
+        fopts = &_pkt.fopts;
     }
 
-    assert(pkt != NULL);
-
-    int fopts_in_payload = 0;
-    /* only for download frames with payload the FPort must be present */
-    if (pkt->size) {
-        if ((fport = gnrc_pktbuf_mark(pkt, 1, GNRC_NETTYPE_UNDEF)) == NULL) {
-            DEBUG("gnrc_lorawan: failed to allocate fport\n");
-            goto out;
+    if(_pkt.enc_payload.iol_base) {
+        uint8_t *key;
+        if(_pkt.port) {
+            key = mac->appskey;
         }
-
-        assert(fport->data);
-
-        fopts_in_payload = *((uint8_t *) fport->data) == 0;
-        if (fopts && fopts_in_payload) {
-            DEBUG("gnrc_lorawan: packet with fopts and port == 0. Drop\n");
-            goto out;
+        else {
+            key = mac->nwkskey;
+            fopts = &_pkt.enc_payload;
         }
+        gnrc_lorawan_encrypt_payload(_pkt.enc_payload.iol_base, _pkt.enc_payload.iol_len, &_pkt.hdr->addr, byteorder_ntohs(byteorder_ltobs(_pkt.hdr->fcnt)), GNRC_LORAWAN_DIR_DOWNLINK, key);
     }
 
-    lorawan_hdr_t *lw_hdr = hdr->data;
+    mac->mcps.fcnt_down = _pkt.fcnt_down;
 
-    if (lw_hdr->addr.u32 != mac->dev_addr.u32) {
-        DEBUG("gnrc_lorawan: received packet with wrong dev addr. Drop\n");
-        goto out;
-    }
-
-    uint32_t fcnt = gnrc_lorawan_fcnt_stol(mac->mcps.fcnt_down, lw_hdr->fcnt.u16);
-    if (mac->mcps.fcnt_down > fcnt || mac->mcps.fcnt_down +
-        LORAMAC_DEFAULT_MAX_FCNT_GAP < fcnt) {
-        goto out;
-    }
-
-    mac->mcps.fcnt_down = fcnt;
-    error = false;
-
-    int ack_req = lorawan_hdr_get_mtype(lw_hdr) == MTYPE_CNF_DOWNLINK;
-    if (ack_req) {
+    if (_pkt.ack_req) {
         mac->mcps.ack_requested = true;
-    }
-
-    iolist_t payload = { .iol_base = pkt->data, .iol_len = pkt->size };
-    if (pkt->data) {
-        gnrc_lorawan_encrypt_payload(&payload, &lw_hdr->addr,
-                                     byteorder_ntohs(byteorder_ltobs(lw_hdr->fcnt)),
-                                     GNRC_LORAWAN_DIR_DOWNLINK,
-                                     fopts_in_payload ? mac->nwkskey : mac->appskey);
     }
 
     /* if there are fopts, it's either an empty packet or application payload */
     if (fopts) {
-        gnrc_lorawan_process_fopts(mac, fopts->data, fopts->size);
-    }
-    else if (fopts_in_payload) {
-        gnrc_lorawan_process_fopts(mac, pkt->data, pkt->size);
+        DEBUG("gnrc_lorawan: processing fopts\n");
+        gnrc_lorawan_process_fopts(mac, fopts->iol_base, fopts->iol_len);
     }
 
-    gnrc_lorawan_mcps_event(mac, MCPS_EVENT_RX, lorawan_hdr_get_ack(lw_hdr));
-    if (pkt->data && fport && *((uint8_t *) fport->data) != 0) {
-        pkt->type = GNRC_NETTYPE_LORAWAN;
-        release = false;
+    gnrc_lorawan_mcps_event(mac, MCPS_EVENT_RX, _pkt.ack);
 
-        mcps_indication_t mcps_indication;
-        mcps_indication.type = ack_req;
-        mcps_indication.data.pkt = pkt;
-        mcps_indication.data.port = *((uint8_t *) fport->data);
-        gnrc_lorawan_mcps_indication(mac, &mcps_indication);
-    }
-
-    if (lorawan_hdr_get_frame_pending(lw_hdr)) {
+    if (_pkt.frame_pending) {
         mlme_indication_t mlme_indication;
         mlme_indication.type = MLME_SCHEDULE_UPLINK;
         gnrc_lorawan_mlme_indication(mac, &mlme_indication);
     }
 
-out:
-    if (error) {
-        gnrc_lorawan_mcps_event(mac, MCPS_EVENT_NO_RX, 0);
-    }
-
-    if (release) {
-        DEBUG("gnrc_lorawan: release packet\n");
-        gnrc_pktbuf_release(pkt);
+    if (_pkt.port) {
+        mcps_indication_t mcps_indication;
+        mcps_indication.type = _pkt.ack_req;
+        mcps_indication.data.pkt = &_pkt.enc_payload;
+        mcps_indication.data.port = _pkt.port;
+        gnrc_lorawan_mcps_indication(mac, &mcps_indication);
     }
 }
 
@@ -193,48 +201,51 @@ size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint32_t fcn
     return sizeof(lorawan_hdr_t);
 }
 
-gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *payload, int confirmed_data, uint8_t port)
+size_t gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, iolist_t *payload, int confirmed_data, uint8_t port, uint8_t *out)
 {
-    /* Encrypt payload (it's block encryption so we can use the same buffer!) */
-    gnrc_lorawan_encrypt_payload((iolist_t *) payload, &mac->dev_addr, mac->mcps.fcnt, GNRC_LORAWAN_DIR_UPLINK, port ? mac->appskey : mac->nwkskey);
-
-    /* We try to allocate the whole header with fopts at once */
-    uint8_t fopts_length = gnrc_lorawan_build_options(mac, NULL);
-
-    gnrc_pktsnip_t *mac_hdr = gnrc_pktbuf_add(payload, NULL, sizeof(lorawan_hdr_t) + fopts_length + 1, GNRC_NETTYPE_UNDEF);
-
-    if (!mac_hdr) {
-        gnrc_pktbuf_release_error(payload, -ENOBUFS);
-        return NULL;
-    }
-
-    gnrc_pktsnip_t *mic = gnrc_pktbuf_add(NULL, NULL, MIC_SIZE, GNRC_NETTYPE_UNDEF);
-    if (!mic) {
-        gnrc_pktbuf_release_error(mac_hdr, -ENOBUFS);
-        return NULL;
-    }
-
     lorawan_buffer_t buf = {
-        .data = (uint8_t *) mac_hdr->data,
-        .size = mac_hdr->size,
+        .data = (uint8_t *) out,
+        .size = 250,
         .index = 0
     };
 
-    gnrc_lorawan_build_hdr(confirmed_data ? MTYPE_CNF_UPLINK : MTYPE_UNCNF_UPLINK,
-                           &mac->dev_addr, mac->mcps.fcnt, mac->mcps.ack_requested, fopts_length, &buf);
+    lorawan_hdr_t *lw_hdr = (lorawan_hdr_t *) out;
 
-    gnrc_lorawan_build_options(mac, &buf);
+    lw_hdr->mt_maj = 0;
+    lorawan_hdr_set_mtype(lw_hdr, confirmed_data ? MTYPE_CNF_UPLINK : MTYPE_UNCNF_UPLINK);
+    lorawan_hdr_set_maj(lw_hdr, MAJOR_LRWAN_R1);
 
-    assert(buf.index == mac_hdr->size - 1);
+    lw_hdr->addr = mac->dev_addr;
+    lw_hdr->fctrl = 0;
+
+    lorawan_hdr_set_ack(lw_hdr, mac->mcps.ack_requested);
+
+    lw_hdr->fcnt = byteorder_btols(byteorder_htons(mac->mcps.fcnt));
+
+    buf.index += sizeof(lorawan_hdr_t);
+
+    int fopts_length = gnrc_lorawan_build_options(mac, &buf);
+    assert(fopts_length < 16);
+    lorawan_hdr_set_frame_opts_len(lw_hdr, fopts_length);
 
     buf.data[buf.index++] = port;
 
+    size_t psize = 0;
+    uint8_t *pl = &buf.data[buf.index];
+    /* Copy raw payload into tx_buf */
+    for(iolist_t *io = (iolist_t*) payload; io != NULL; io = io->iol_next) {
+        memcpy(&buf.data[buf.index], io->iol_base, io->iol_len);
+        psize += io->iol_len;
+        buf.index += io->iol_len;
+    }
+
+    gnrc_lorawan_encrypt_payload(pl, psize, &mac->dev_addr, mac->mcps.fcnt, GNRC_LORAWAN_DIR_UPLINK, port ? mac->appskey : mac->nwkskey);
+
     gnrc_lorawan_calculate_mic(&mac->dev_addr, mac->mcps.fcnt, GNRC_LORAWAN_DIR_UPLINK,
-                               (iolist_t *) mac_hdr, mac->nwkskey, mic->data);
+                               out, buf.index, mac->nwkskey, (le_uint32_t*) &buf.data[buf.index]);
+    buf.index += MIC_SIZE;
 
-    LL_APPEND(payload, mic);
-
-    return mac_hdr;
+    return buf.index;
 }
 
 static void _end_of_tx(gnrc_lorawan_t *mac, int type, int status)
@@ -246,6 +257,7 @@ static void _end_of_tx(gnrc_lorawan_t *mac, int type, int status)
     mcps_confirm.type = type;
     mcps_confirm.status = status;
     gnrc_lorawan_mcps_confirm(mac, &mcps_confirm);
+    mac->mcps.tx_buf = NULL;
 
     mac->mcps.fcnt += 1;
 }
@@ -257,7 +269,8 @@ void gnrc_lorawan_mcps_event(gnrc_lorawan_t *mac, int event, int data)
     }
 
     if (event == MCPS_EVENT_ACK_TIMEOUT) {
-        gnrc_lorawan_send_pkt(mac, mac->mcps.outgoing_pkt, mac->last_dr);
+        iolist_t __pkt = {.iol_base = mac->mcps.tx_buf, .iol_len = mac->mcps.tx_len, .iol_next = NULL};
+        gnrc_lorawan_send_pkt(mac, &__pkt, mac->last_dr);
     }
     else {
         int state = mac->mcps.waiting_for_ack ? MCPS_CONFIRMED : MCPS_UNCONFIRMED;
@@ -272,7 +285,7 @@ void gnrc_lorawan_mcps_event(gnrc_lorawan_t *mac, int event, int data)
         }
 
         mac->msg.type = MSG_TYPE_MCPS_ACK_TIMEOUT;
-        if (mac->mcps.outgoing_pkt) {
+        if (mac->mcps.tx_buf) {
             xtimer_set_msg(&mac->rx, 1000000 + random_uint32_range(0, 2000000), &mac->msg, thread_getpid());
         }
     }
@@ -280,8 +293,7 @@ void gnrc_lorawan_mcps_event(gnrc_lorawan_t *mac, int event, int data)
 
 void gnrc_lorawan_mcps_request(gnrc_lorawan_t *mac, const mcps_request_t *mcps_request, mcps_confirm_t *mcps_confirm)
 {
-    int release = true;
-    gnrc_pktsnip_t *pkt = mcps_request->data.pkt;
+    iolist_t *pkt = mcps_request->data.pkt;
 
     if (mac->mlme.activation == MLME_ACTIVATION_NONE) {
         DEBUG("gnrc_lorawan_mcps: LoRaWAN not activated\n");
@@ -305,38 +317,41 @@ void gnrc_lorawan_mcps_request(gnrc_lorawan_t *mac, const mcps_request_t *mcps_r
         goto out;
     }
 
-    int waiting_for_ack = mcps_request->type == MCPS_CONFIRMED;
-    if (!(pkt = gnrc_lorawan_build_uplink(mac, pkt, waiting_for_ack, mcps_request->data.port))) {
-        /* This function releases the pkt if fails */
-        release = false;
-        mcps_confirm->status = -ENOBUFS;
-        goto out;
-    }
+    uint8_t fopts_length = gnrc_lorawan_build_options(mac, NULL);
+    /* We don't include the port because `MACPayload` doesn't consider
+     * the MHDR...*/
+    size_t mac_payload_size = sizeof(lorawan_hdr_t) + fopts_length +
+        iolist_size(pkt);
 
-    if ((gnrc_pkt_len(pkt) - MIC_SIZE - 1) > gnrc_lorawan_region_mac_payload_max(mcps_request->data.dr)) {
+    if (mac_payload_size > gnrc_lorawan_region_mac_payload_max(mcps_request->data.dr)) {
         mcps_confirm->status = -EMSGSIZE;
         goto out;
     }
 
-    release = false;
+    uint8_t frame_size = mac_payload_size + MIC_SIZE + 1;
+
+    int waiting_for_ack = mcps_request->type == MCPS_CONFIRMED;
+    mac->mcps.tx_buf = gnrc_lorawan_get_transmit_buffer(mac, frame_size);
+    if(mac->mcps.tx_buf == NULL) {
+        mcps_confirm->status = -ENOMEM;
+        goto out;
+    }
+
+    mac->mcps.tx_len = gnrc_lorawan_build_uplink(mac, pkt, waiting_for_ack, mcps_request->data.port, mac->mcps.tx_buf);
+
+    assert(frame_size == mac->mcps.tx_len);
     mac->mcps.waiting_for_ack = waiting_for_ack;
     mac->mcps.ack_requested = false;
 
     mac->mcps.nb_trials = LORAMAC_DEFAULT_RETX;
 
-    assert(mac->mcps.outgoing_pkt == NULL);
-    mac->mcps.outgoing_pkt = pkt;
-
-    gnrc_lorawan_send_pkt(mac, pkt, mcps_request->data.dr);
+    iolist_t __pkt = {.iol_base = mac->mcps.tx_buf, .iol_len = mac->mcps.tx_len, .iol_next = NULL};
+    gnrc_lorawan_send_pkt(mac, &__pkt, mcps_request->data.dr);
     mcps_confirm->status = GNRC_LORAWAN_REQ_STATUS_DEFERRED;
 out:
 
     if (mcps_confirm->status != GNRC_LORAWAN_REQ_STATUS_DEFERRED) {
         gnrc_lorawan_mac_release(mac);
-    }
-
-    if (release) {
-        gnrc_pktbuf_release_error(pkt, mcps_confirm->status);
     }
 }
 

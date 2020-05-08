@@ -40,6 +40,8 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt);
 static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt);
 static void _init(gnrc_netif_t *netif);
 
+static gnrc_pktsnip_t *_tx_buf;
+
 static const gnrc_netif_ops_t lorawan_ops = {
     .init = _init,
     .send = _send,
@@ -82,12 +84,21 @@ static inline void _set_be_addr(gnrc_lorawan_t *mac, uint8_t *be_addr)
     gnrc_lorawan_mlme_request(mac, &mlme_request, &mlme_confirm);
 }
 
+void *gnrc_lorawan_get_transmit_buffer(gnrc_lorawan_t *mac, size_t len)
+{
+    (void) mac;
+    assert(_tx_buf == NULL);
+    _tx_buf = gnrc_pktbuf_add(NULL, NULL, len, GNRC_NETTYPE_UNDEF);
+    return _tx_buf ? _tx_buf->data : NULL;
+}
+
 void gnrc_lorawan_mcps_indication(gnrc_lorawan_t *mac, mcps_indication_t *ind)
 {
     (void) mac;
+    gnrc_pktsnip_t *pkt = gnrc_pktbuf_add(NULL, ind->data.pkt->iol_base, ind->data.pkt->iol_len, GNRC_NETTYPE_LORAWAN);
     if (!gnrc_netapi_dispatch_receive(GNRC_NETTYPE_LORAWAN, ind->data.port,
-                ind->data.pkt)) {
-        gnrc_pktbuf_release(ind->data.pkt);
+                pkt)) {
+        gnrc_pktbuf_release(pkt);
     }
 }
 
@@ -99,13 +110,12 @@ void gnrc_lorawan_mlme_indication(gnrc_lorawan_t *mac, mlme_indication_t *ind)
 
 void gnrc_lorawan_mcps_confirm(gnrc_lorawan_t *mac, mcps_confirm_t *confirm)
 {
-    if (confirm->status == 0) {
-        gnrc_pktbuf_release(mac->mcps.outgoing_pkt);
-    }
-    else {
-        gnrc_pktbuf_release_error(mac->mcps.outgoing_pkt, 1);
-    }
-    mac->mcps.outgoing_pkt = NULL;
+    (void) mac;
+    (void) confirm;
+    assert(_tx_buf);
+    gnrc_pktbuf_release(_tx_buf);
+    _tx_buf = NULL;
+    DEBUG("gnrc_lorawan: transmission finished with status %i\n", confirm->status);
 }
 
 static void _rx_done(gnrc_lorawan_t *mac)
@@ -119,17 +129,18 @@ static void _rx_done(gnrc_lorawan_t *mac)
         DEBUG("_recv_ieee802154: cannot allocate pktsnip.\n");
         /* Discard packet on netdev device */
         dev->driver->recv(dev, NULL, bytes_expected, NULL);
-        gnrc_lorawan_radio_rx_done_cb(mac, NULL);
+        gnrc_lorawan_radio_rx_done_cb(mac, NULL, 0);
         return;
     }
     nread = dev->driver->recv(dev, pkt->data, bytes_expected, &rx_info);
     if (nread <= 0) {
         gnrc_pktbuf_release(pkt);
-        gnrc_lorawan_radio_rx_done_cb(mac, NULL);
+        gnrc_lorawan_radio_rx_done_cb(mac, NULL, 0);
         return;
     }
 
-    gnrc_lorawan_radio_rx_done_cb(mac, pkt);
+    gnrc_lorawan_radio_rx_done_cb(mac, pkt->data, pkt->size);
+    gnrc_pktbuf_release(pkt);
 }
 
 static void _driver_cb(netdev_t *dev, netdev_event_t event)
@@ -229,10 +240,11 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
         gnrc_lorawan_mlme_request(&netif->lorawan.mac, &mlme_request, &mlme_confirm);
     }
     mcps_request_t req = { .type = netif->lorawan.ack_req ? MCPS_CONFIRMED : MCPS_UNCONFIRMED,
-                           .data = { .pkt = payload, .port = netif->lorawan.port,
+                           .data = { .pkt = (iolist_t*) payload, .port = netif->lorawan.port,
                            .dr = netif->lorawan.datarate } };
     mcps_confirm_t conf;
     gnrc_lorawan_mcps_request(&netif->lorawan.mac, &req, &conf);
+    gnrc_pktbuf_release(payload);
     return conf.status;
 }
 

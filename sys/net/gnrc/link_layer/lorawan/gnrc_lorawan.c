@@ -222,16 +222,10 @@ static uint32_t lora_time_on_air(size_t payload_size, uint8_t dr, uint8_t cr)
     return t_preamble + t_payload;
 }
 
-void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt, uint8_t dr)
+void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, iolist_t *psdu, uint8_t dr)
 {
     netdev_t *dev = gnrc_lorawan_get_netdev(mac);
     mac->state = LORAWAN_STATE_TX;
-
-    iolist_t iolist = {
-        .iol_base = pkt->data,
-        .iol_len = pkt->size,
-        .iol_next = (iolist_t *) pkt->next
-    };
 
     uint32_t chan = gnrc_lorawan_pick_channel(mac);
     _config_radio(mac, chan, dr, false);
@@ -241,36 +235,33 @@ void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt, uint8_t dr)
     uint8_t cr;
     dev->driver->get(dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
 
-    mac->toa = lora_time_on_air(gnrc_pkt_len(pkt), dr, cr + 4);
+    mac->toa = lora_time_on_air(iolist_size(psdu), dr, cr + 4);
 
-    if (dev->driver->send(dev, &iolist) == -ENOTSUP) {
+    if (dev->driver->send(dev, psdu) == -ENOTSUP) {
         DEBUG("gnrc_lorawan: Cannot send: radio is still transmitting");
     }
 
 }
 
-void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt)
+void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size)
 {
     _sleep_radio(mac);
-    if (pkt == NULL) {
+    if (psdu == NULL) {
         return;
     }
     mac->state = LORAWAN_STATE_IDLE;
     xtimer_remove(&mac->rx);
 
-    uint8_t *p = pkt->data;
-
-    uint8_t mtype = (*p & MTYPE_MASK) >> 5;
+    uint8_t mtype = (*psdu & MTYPE_MASK) >> 5;
     switch (mtype) {
         case MTYPE_JOIN_ACCEPT:
-            gnrc_lorawan_mlme_process_join(mac, pkt);
+            gnrc_lorawan_mlme_process_join(mac, psdu, size);
             break;
         case MTYPE_CNF_DOWNLINK:
         case MTYPE_UNCNF_DOWNLINK:
-            gnrc_lorawan_mcps_process_downlink(mac, pkt);
+            gnrc_lorawan_mcps_process_downlink(mac, psdu, size);
             break;
         default:
-            gnrc_pktbuf_release(pkt);
             break;
     }
 

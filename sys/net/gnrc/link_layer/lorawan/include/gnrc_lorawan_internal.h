@@ -130,7 +130,7 @@ typedef struct {
  * @brief MCPS data
  */
 typedef struct {
-    gnrc_pktsnip_t *pkt;    /**< packet of the request */
+    iolist_t *pkt;    /**< packet of the request */
     uint8_t port;           /**< port of the request */
     uint8_t dr;             /**< datarate of the request */
 } mcps_data_t;
@@ -141,10 +141,11 @@ typedef struct {
 typedef struct {
     uint32_t fcnt;                  /**< uplink framecounter */
     uint32_t fcnt_down;             /**< downlink frame counter */
-    gnrc_pktsnip_t *outgoing_pkt;   /**< holds the outgoing packet in case of retransmissions */
+    void *tx_buf;
     int nb_trials;              /**< holds the remaining number of retransmissions */
     int ack_requested;          /**< whether the network server requested an ACK */
     int waiting_for_ack;        /**< true if the MAC layer is waiting for an ACK */
+    uint8_t tx_len;
 } gnrc_lorawan_mcps_t;
 
 /**
@@ -189,13 +190,14 @@ typedef struct {
  *
  * @note This function is also used for decrypting a LoRaWAN packet. The LoRaWAN server encrypts the packet using decryption, so the end device only needs to implement encryption
  *
- * @param[in] iolist packet iolist representation
+ * @param[in] buf pointer to the frame
+ * @param[in] len length of the frame
  * @param[in] dev_addr device address
  * @param[in] fcnt frame counter
  * @param[in] dir direction of the packet (0 if uplink, 1 if downlink)
  * @param[in] appskey pointer to the Application Session Key
  */
-void gnrc_lorawan_encrypt_payload(iolist_t *iolist, const le_uint32_t *dev_addr, uint32_t fcnt, uint8_t dir, const uint8_t *appskey);
+void gnrc_lorawan_encrypt_payload(uint8_t *buf, size_t len, const le_uint32_t *dev_addr, uint32_t fcnt, uint8_t dir, const uint8_t *appskey);
 
 /**
  * @brief Decrypts join accept message
@@ -243,7 +245,7 @@ int gnrc_lorawan_set_dr(gnrc_lorawan_t *mac, uint8_t datarate);
  * @return full LoRaWAN frame including payload
  * @return NULL if packet buffer is full. `payload` is released
  */
-gnrc_pktsnip_t *gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *payload, int confirmed_data, uint8_t port);
+size_t gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, iolist_t *payload, int confirmed_data, uint8_t port, uint8_t *out);
 
 /**
  * @brief pick a random available LoRaWAN channel
@@ -277,11 +279,12 @@ void gnrc_lorawan_process_fopts(gnrc_lorawan_t *mac, uint8_t *fopts, size_t size
 /**
  * @brief calculate join Message Integrity Code
  *
- * @param[in] io iolist representation of the packet
+ * @param[in] buf pointer to the frame
+ * @param[in] len length of the frame
  * @param[in] key key used to calculate the MIC
  * @param[out] out calculated MIC
  */
-void  gnrc_lorawan_calculate_join_mic(const iolist_t *io, const uint8_t *key, le_uint32_t *out);
+void gnrc_lorawan_calculate_join_mic(const uint8_t *buf, size_t len, const uint8_t *key, le_uint32_t *out);
 
 /**
  * @brief Calculate Message Integrity Code for a MCPS message
@@ -289,12 +292,13 @@ void  gnrc_lorawan_calculate_join_mic(const iolist_t *io, const uint8_t *key, le
  * @param[in] dev_addr the Device Address
  * @param[in] fcnt frame counter
  * @param[in] dir direction of the packet (0 is uplink, 1 is downlink)
- * @param[in] pkt the pkt
+ * @param[in] buf pointer to the frame
+ * @param[in] len length of the frame
  * @param[in] nwkskey pointer to the Network Session Key
  * @param[out] out calculated MIC
  */
 void gnrc_lorawan_calculate_mic(const le_uint32_t *dev_addr, uint32_t fcnt,
-                                uint8_t dir, iolist_t *pkt, const uint8_t *nwkskey, le_uint32_t *out);
+                                uint8_t dir, uint8_t *buf, size_t len, const uint8_t *nwkskey, le_uint32_t *out);
 
 /**
  * @brief Build a MCPS LoRaWAN header
@@ -314,9 +318,10 @@ size_t gnrc_lorawan_build_hdr(uint8_t mtype, le_uint32_t *dev_addr, uint32_t fcn
  * @brief Process an MCPS downlink message (confirmable or non comfirmable)
  *
  * @param[in] mac pointer to the MAC descriptor
- * @param[in] pkt pointer to the downlink message
+ * @param[in] psdu pointer to the downlink PSDU
+ * @param[in] size size of the PSDU
  */
-void  gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt);
+void  gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size);
 
 /**
  * @brief Init regional channel settings.
@@ -340,18 +345,19 @@ void gnrc_lorawan_reset(gnrc_lorawan_t *mac);
  * @brief Send a LoRaWAN packet
  *
  * @param[in] mac pointer to the MAC descriptor
- * @param[in] pkt the packet to be sent
+ * @param[in] psdu the psdu frame to be sent
  * @param[in] dr the datarate used for the transmission
  */
-void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt, uint8_t dr);
+void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, iolist_t *psdu, uint8_t dr);
 
 /**
  * @brief Process join accept message
  *
  * @param[in] mac pointer to the MAC descriptor
- * @param[in] pkt the Join Accept packet
+ * @param[in] data the Join Accept packet
+ * @param[in] size size of the Join Accept packet
  */
-void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt);
+void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, uint8_t *data, size_t size);
 
 /**
  * @brief Inform the MAC layer that no packet was received during reception.
@@ -400,7 +406,7 @@ void gnrc_lorawan_mlme_backoff_expire(gnrc_lorawan_t *mac);
  * @param[in] mac pointer to the MAC descriptor
  * @param[in] pkt the received packet
  */
-void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, gnrc_pktsnip_t *pkt);
+void gnrc_lorawan_process_pkt(gnrc_lorawan_t *mac, iolist_t *pkt);
 
 /**
  * @brief Open a reception window
