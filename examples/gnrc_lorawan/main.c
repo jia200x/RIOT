@@ -66,25 +66,10 @@ int tx_cmd(int argc, char **argv)
 
     pkt = gnrc_pktbuf_add(NULL, argv[2], strlen(argv[2]), GNRC_NETTYPE_UNDEF);
 
-    /* register for returned packet status */
-    if (gnrc_neterr_reg(pkt) != 0) {
-        puts("Can not register for error reporting");
-        return 0;
-    }
-
     gnrc_netapi_set(interface, NETOPT_LORAWAN_TX_PORT, 0, &port, sizeof(port));
     gnrc_netif_send(gnrc_netif_get_by_pid(interface), pkt);
 
-    msg_t msg;
-    /* wait for packet status and check */
-    msg_receive(&msg);
-    if ((msg.type != GNRC_NETERR_MSG_TYPE) ||
-        (msg.content.value != GNRC_NETERR_SUCCESS)) {
-        puts("Error sending packet (not joined?)");
-    }
-    else {
-        puts("Successfully sent packet");
-    }
+    puts("Done!");
     return 0;
 }
 
