@@ -69,7 +69,8 @@ void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm)
 
 static inline void _set_be_addr(gnrc_lorawan_t *mac, uint8_t *be_addr)
 {
-    uint32_t tmp = *((uint32_t*) be_addr);
+    uint32_t tmp;
+    memcpy(&tmp, be_addr, sizeof(uint32_t));
     tmp = byteorder_swapl(tmp);
     mlme_request_t mlme_request;
     mlme_confirm_t mlme_confirm;
