@@ -69,17 +69,16 @@ addresses deficits of using `netdev` as a Hardware Abstraction Layer:
   specific implementation, and integration of new devices is more complex than
   need be. Furthermore, duplication and unspecified device access complicate
   code maintenance.
-- `netdev` does not expose primitive operations (set transceiver state) and
-  hardcodes MAC layer functionalities, which is likely the consequence of
-  hardware MAC acceleration on certain devices. These capabilities are currently
-  only available if the hardware provides integrated support. An indication
-  mechanism which MAC features are provided within a `netdev` implementation is
-  missing. A full MAC layer that is situated on top of the HAL requires a
-  defined access to specific radio functionalities in order to meet timing
-  constraints or energy requirements. That means, varying properties between
-  implementations and partly implemented MAC features within the device driver
-  interfere with the concept of transparent hardware access by one MAC layer
-  implementation.
+- `netdev` hardcodes MAC layer functionalities, which is likely the consequence
+  of hardware MAC acceleration on certain devices. These capabilities are
+  currently only available if the hardware provides integrated support. An
+  indication mechanism which MAC features are provided within a `netdev`
+  implementation is missing. A full MAC layer that is situated on top of the HAL
+  requires a defined access to specific radio functionalities in order to meet
+  timing constraints or energy requirements. That means, varying properties
+  between implementations and partly implemented MAC features within the device
+  driver interfere with the concept of transparent hardware access by one MAC
+  layer implementation.
 
 
 Other components of the 802.15.4 MAC are present in the GNRC Netif
@@ -141,34 +140,26 @@ specific Radio HAL which prevents to run a hardware-agnostic MAC on top.
 +---------------------+  |  +---------------------+             |              
           ^              |            ^                         |              
           |              |            |                         |              
-    netdev_driver_t      |     802.15.4 MAC API           Radio HAL API
+          |              |     802.15.4 MAC API           Radio HAL API
           |              |            |                         |              
-          v              |            v                         |              
-+---------------------+  |  +---------------------+             |              
-|                     |  |  |                     |             |              
-|       netdev        |  |  |    802.15.4 MAC     |             |              
-|                     |  |  |                     |             |              
-+---------------------+  |  +---------------------+             |              
-          ^              |            ^                         |              
+          |              |            v                         |              
+          |              |  +---------------------+             |              
+          |              |  |                     |             |              
+    netdev_driver_t      |  |    802.15.4 MAC     |             |              
+          |              |  |                     |             |              
+          |              |  +---------------------+             |              
+          |              |            ^                         |              
           |              |            |                         |              
-          |              |      Radio HAL API                   |
-          |              |            |                         |              
-          |              |            v                         v              
-          |              |  +-----------------------------------------------+           
-          |              |  |                                               |           
-   netdev_driver_t       |  |               802.15.4 Radio HAL              |
-          |              |  |                                               |           
-          |              |  +-----------------------------------------------+           
-          |              |                         ^                                               
-          |              |                         |                                               
-          |              |                   Device Driver API                                       
-          |              |                         |                                               
-          v              |                         v                                               
-+---------------------+  |  +-----------------------------------------------+
-|                     |  |  |                                               |
-|    Device Driver    |  |  |                  Device Driver                |
-|                     |  |  |                                               |
-+---------------------+  |  +-----------------------------------------------+
+          |              |      Radio HAL API   ----------------+
+          |              |            |         |                             
+          v              |            v         v                             
++---------------------+  |  +---------------------+-------------------------+           
+|          |          |  |  |                     |                         |           
+|  netdev  |  Device  |  |  |  802.15.4 Radio HAL |                         |
+|          |  Driver  |  |  |                     |       Device Driver     |
+|----------+          |  |  +---------------------+                         |
+|                     |  |  |                                               |           
++---------------------+  |  +-----------------------------------------------+           
 ```
 
 
@@ -179,44 +170,39 @@ specific Radio HAL which prevents to run a hardware-agnostic MAC on top.
 |                               Upper layer                                   |
 |                                                                             |
 +-----------------------------------------------------------------------------+
-      ^
-      |
-      |
-      |
-  Radio HAL API                                  +----------------------------+
-      |                         Radio HAL API    |                            |
-      |                   +----------------------|    Bottom-Half processor   |
-      |                   |     (Process IRQ)    |                            |
-      |                   |                      +----------------------------+
-      |                   |                                   ^
-      |                   |                                   |
-      v                   v                                  IRQ
+      |         ^
+      |         |
+      |         |
+      |         |
+ Radio Ops  Event Notification                   +----------------------------+
+      |         |                  IRQ Handler   |                            |
+      |         |         +----------------------|    Bottom-Half processor   |
+      |         |         |                      |                            |
+      |         |         |                      +----------------------------+
+      |         |         |                                   ^
+      |         |         |                                   |
+      v         |         v                                  IRQ
 +-----------------------------+                               |
-|                             |               HW independent  |
-|   IEEE802.15.4 Radio HAL    |------------------------------------------------
+|  802.15.4 Radio HAL         |               HW independent  |
+|-----------------------------|-------------------------------|----------------
 |                             |               HW dependent    |
-+-----------------------------+                               |
-                |                                             |
-       Device Specific API                                    | 
-                |                                             |
-                v                                             |
-+-----------------------------+                               |
 |                             |                               |
-|       Device Driver         |-------------------------------+
-|       implementation        |
+|         Device Driver       |                               |
+|                             |-------------------------------+
+|                             |
 +-----------------------------+
 ```
 
 As shown in the above figure, the IEEE802.15.4 Radio HAL is a central component
 that provides any upper layer a technology-dependent and unified access to the
-hardware-specific device driver, by implementing the Radio HAL API.  Since
-devices drivers do not depend on the Radio HAL, it is still possible to use a
-the raw driver of a specific device, for testing purposes or accessing device
-specific features.
+hardware-specific device driver, by implementing the Radio HAL API.
 
-Similar to the preceding approach based on `netdev` , the Radio HAL requires an
+Contrary to the preceding approach based on `netdev` , the Radio HAL only requires an
 upper layer to take over the Bottom-Half processing which means, offloading the
-ISR to thread context.  This allows for different event processing mechanisms
+ISR to thread context, if the device cannot resolve events during ISR
+(e.g SPI devices).
+
+This allows for different event processing mechanisms
 such as `msg`, `thread flags`, `event threads`, etc. The Bottom-Half processor
 should use the Radio HAL API to process the IRQ.
 
