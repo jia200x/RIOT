@@ -197,12 +197,12 @@ As shown in the above figure, the IEEE802.15.4 Radio HAL is a central component
 that provides any upper layer a technology-dependent and unified access to the
 device driver, by implementing the Radio HAL API.
 
-The HAL uses an Event Notification mechanism to inform the upper layer about radio
-events (`TX_DONE`, `RX_DONE`, `CCA_DONE`, etc). This mechanism can either run in
-interrupt context or thread context, if the device is not able to resolve events
-during ISR (e.g SPI devices). For the latter, the radio HAL requires an upper
-layer to take over the Bottom-Half processing which means, offloading the ISR to
-thread context.
+The HAL uses an Event Notification mechanism to inform the upper layer about
+radio events (`TX_DONE`, `RX_DONE`, `CCA_DONE`, etc). This mechanism can either
+run in interrupt context or thread context, if the device is not able to
+resolve events during ISR (e.g SPI devices). For the latter, the radio HAL
+requires an upper layer to take over the Bottom-Half processing which means,
+offloading the ISR to thread context.
 
 ## 4.1 Upper Layer
 Upper layers are users that requires direct access to the primitive operations
@@ -218,8 +218,8 @@ Examples for Upper Layers:
 available).
 
 The upper layer accesses the radio using the Radio HAL API. Events that are
-triggered by the device (packet received, transmission finished) are indicated
-by the event notification mechanism, described below.
+triggered by the device (packet received, transmission finished, PLL locked)
+are indicated by the event notification mechanism, described below.
 
 ## 4.2 Bottom-Half Processor
 The Bottom-Half (BH) processor is a component to offload the IRQ processing to
@@ -265,6 +265,10 @@ These functions include:
 - Set address filter addresses (extended, short, PAN ID)
 - Set CSMA-CA backoff parameters.
 
+All `radio_ops` functions are non-blocking and some of them follow a
+Request-Confirm scheme which means, an event is generated when the request
+finished.
+
 The full list of functions can be found in the Interface Definition section.
 
 ### 4.3.2 Event Notification
@@ -280,7 +284,8 @@ update statistics.
 As described before, the Event Notification mechanism can be called during ISR
 or thread context (BH processor). Thus, this must be taken into consideration
 for the implementation of the Event Notification callback (e.g the `RX_DONE`
-event might post an event to an event queue in order to fetch the packet).
+event might post an event to an event queue in order to fetch the packet or
+`PLL_LOCK` might unlock a mutex).
 
 The full list of events and implications are defined in the Interface
 Definition section.
@@ -313,55 +318,128 @@ The `radio_ops` interface provides an "on" function that turns on the device
 and enables interrupts. It is expected that the upper layer will call this
 function to enable the radio device, if the initialization procedure succeeded.
 
-## 5.2 Transceiver States
-Following the IEEE802.15.4 PHY definition, there are three generic transceiver
-states:
+## 5.2 Abstract State Machine
 
-```c
-typedef enum {
-    IEEE802154_TRX_STATE_TRX_OFF, /**< the transceiver state if off */
-    IEEE802154_TRX_STATE_RX_ON, /**< the transceiver is ready to receive */
-    IEEE802154_TRX_STATE_TX_ON, /**< the transceiver is ready to send  */
-} ieee802154_trx_state_t;
+The Radio HAL defines an Abstract State Machine. In order to ensure a uniform
+behavior in all devices, all Radio HAL device drivers should be implemented
+against this.
+
+```
+                                          +---------+
+                                          |         |
+                                          |   Off   |
+                                          |         |
+                                          +---------+
+                                            |     ^
+                                     on()   |     | 
+                                    +-------+     |
+                                    |             |
+                                    v             |
+                              +---------+         |
+                              |         |         |
+                              | WU_BUSY |         |
+                              |  *[2]   |         |
+                              +---------+         |
+                                   |              |
+                                   +--------+     |
+                                            |     |
+                               RF_AWAKE_END |     | off() *[1]
+                                            v     |
+                                          +---------+
+                                          |         |
+                                          | TRX_OFF |
+                                          |         |
+                                          +---------+
+                                            |     ^
+                        set_trx_state(IDLE) |     | RF_PLL_UNLOCK
+                                            v     |
+          +---------+                     +---------+
+          |         |                     |         |
+          | CCA_BUSY|                     | PLL_BUSY|
+          |         |                     |         |
+          +---------+                     +---------+
+            |      ^                        |     ^
+RF_CCA_DONE/|      |            RF_PLL_LOCK |     | set_trx_state(TRX_OFF)
+RF_CCA_FAIL |      |                        |     |
+            |      |                        |     |
+            | cca()|                        v     |
+            |      +----------------------+---------+  transmit()   +---------+
+            +---------------------------->|         |-------------->|         |
+                                          |   IDLE  |               | TX_BUSY |
+                +------------------------>|         |<--------------|         |
+                |       *[2]              +---------+  RF_TX_DONE /   +---------+
+                |                           ^    |     RF_CCA_FAIL
+                |                           |    |
+      RF_RX_DONE|       set_trx_state(IDLE) |    | set_trx_state(RX_ON)
+                |                           |    |
+                |                           |    |
+                |                           |    v
+         +---------+                     +---------+
+         |         |                     |         |
+         | RX_BUSY |<--------------------|  RX_ON  |
+         |         |      SFD detected   |         |
+         +---------+                     +---------+
+
+*[1]: The `off` function can be called from any state.
+*[2]: If the device has a neglectable wake up time, the `on` function
+      return 0 and the `RF_AWAKE_END` is not generated.
 ```
 
-Unlike the `netdev` interface, the 802.15.4 Radio HAL requires only these three
-states to drive the radio. This is due to the fact that the radio is either in
-a state for sending data (`TX_ON`), receiving data (`RX_ON`) or the
-transceiver circuit is off (`TRX_OFF`). Using only these three PHY states
-simplify the operation and implementation of the abstraction layer.
+The behavior is undefined if functions are called from the wrong state (for
+example, calling `transmit()` from `RX_ON` or `TX_BUSY`).
 
-It is extremely important not to confuse between transceiver states and device
-internal states. Although in some cases both states are equivalent, the device
-internal states are usually more fine-grained and can be mapped to exactly one
-transceiver state.
+A specification for each state is described in the following sub sections.
 
-As an example, a radio device may be in a state where the transceiver circuit
-is off but the device can still operate as a crypto accelerator (only if the
-hardware supports that capability). A device might also be in a deep sleep
-state where the device cannot operate but the energy consumption is very low.
-These internal states are different, but in both cases the transceiver is off
-(`TRX_OFF`).
+### 5.2.1 Off
 
-Some functions of the 802.15.4 Radio HAL API require that the transceiver is in
-a specific state. This differs from the `netdev` approach where most functions
-handle transceiver states internally. As an example, the "send" function of the
-`netdev` interface changes the transceiver state to `TX_ON` and then the TX
-done event returns the transceiver to `RX_ON` state. The 802.15.4 Radio HAL
-requires that the transceiver is in `TX_ON` state before transmitting the
-packet and will not go back to `RX_ON` state unless the upper layer explicitly
-requests it. This is desired because the 802.15.4 MAC layer requires full
-control of the transceiver states.
+If radio initialization succeeds, the Abstract State Machine begins in `Off`
+state. During this state the device consumes the least power and all hardware
+components (transceiver, crypto acceleration) are disabled.
 
-Also, this approach presents some advantages:
-- It makes network stack integration easier if the network stack requires direct
-  access to the radio (OpenWSN)
-- It avoids unnecesary state changes. It is possible to set the `TX_ON` state
-  once and sequentially send packets. When the upper layer finishes sending
-  the batch of packets, it can manually request the radio to set the `RX_ON`
-  state.
+Calling the `on` function request a state change to `TRX_OFF` state. The
+transition finishes when the `on` function returns 0 or the Event Notification
+reports `RF_AWAKE_END`.
+
+### 5.2.2 TRX OFF
+
+During this state the device is on but the transceiver is off (PLL not locked).
+The power consumption is higher than the `Off` state but the device is able
+to operate the transceiver and other hardware components (e.g crypto
+accelerator).
+
+Setting the transceiver state to IDLE (`set_trx_state`) leaves the `TRX_OFF`
+state. The transition finishes when the Event Notification reports
+`RF_PLL_LOCK`.
+
+### 5.2.3 Idle
+
+This state is device specific and represents a state where the device is ready
+to transmit, fetch a received frame or perform Stand-Alone CCA.
+
+Assuming a frame is already loaded in the framebuffer, calling `transmit()` will
+set the state to `TX_BUSY` and begin the transmission of a frame. The Abstract
+State Machine will go back to Idle state on either `RF_TX_DONE` event or
+`RF_CCA_FAIL`, if using Auto-CCA and the channel was busy.
+
+A Stand-Alone CCA can be requested with `cca()`. The Abstract State Machine
+will change state to `CCA_BUSY` and go back to Idle state on `RF_CCA_IDLE` or
+`RF_CCA_FAIL` events.
+
+Finally, setting the transceiver state to `TRX_OFF` or `RX_ON` will leave the
+Idle state (this will generate an `PLL_UNLOCK` event in the former).
+
+### 5.2.4 RX ON
+
+During RX ON state the radio is able to detect Start Frame Delimiter (SFD) and
+thus, receive frames.
+
+The state is left when an SFD is detected or the transceiver state is set to
+Idle. The former will set the Abstract State Machine state to the transient
+state RX BUSY and then to Idle on `RF_RX_DONE` event. The latter will change
+the state to Idle only if the radio is currently not receiving a frame.
 
 ## 5.3 Prepare and Transmit
+
 The Radio HAL doesn't define an explicit send function. Unlike the `netdev`
 approach, it bases on separation of the send procedure into frame loading
 and triggering the transmissions start.
@@ -385,6 +463,7 @@ and triggers a send operation at a scheduled time slot. Alternatively, this
 could be a helper function for non MAC users.
 
 ## 5.4 TX and RX Information
+
 Sometimes upper layers require information associated to the transmission
 or reception of a packet. The TSCH mode of the 802.15.4 MAC may require
 LQI and RSSI data from a received packet to schedule new cells.
