@@ -30,6 +30,8 @@
 #define _16_UPPER_BITMASK 0xFFFF0000
 #define _16_LOWER_BITMASK 0xFFFF
 
+static void _end_of_tx(gnrc_lorawan_t *mac, int type, int status);
+
 static int gnrc_lorawan_mic_is_valid(uint8_t *buf, size_t len, uint8_t *nwkskey)
 {
     le_uint32_t calc_mic;
@@ -123,13 +125,13 @@ void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, uint8_t *psdu, size
     /* NOTE: MIC is in pkt */
     if (!gnrc_lorawan_mic_is_valid(psdu, size, mac->nwkskey)) {
         DEBUG("gnrc_lorawan: invalid MIC\n");
-        gnrc_lorawan_mcps_event(mac, MCPS_EVENT_NO_RX, 0);
+        gnrc_lorawan_event_no_rx(mac);
         return;
     }
 
     if (gnrc_lorawan_parse_dl(mac, psdu, size, &_pkt) < 0) {
         DEBUG("gnrc_lorawan: couldn't parse packet\n");
-        gnrc_lorawan_mcps_event(mac, MCPS_EVENT_NO_RX, 0);
+        gnrc_lorawan_event_no_rx(mac);
         return;
     }
 
@@ -151,6 +153,11 @@ void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, uint8_t *psdu, size
     }
 
     mac->mcps.fcnt_down = _pkt.fcnt_down;
+    if (mac->mcps.waiting_for_ack && !_pkt.ack) {
+        DEBUG("gnrc_lorawan: expected ACK packet\n");
+        gnrc_lorawan_event_no_rx(mac);
+        return;
+    }
 
     if (_pkt.ack_req) {
         mac->mcps.ack_requested = true;
@@ -162,7 +169,7 @@ void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, uint8_t *psdu, size
         gnrc_lorawan_process_fopts(mac, fopts->iol_base, fopts->iol_len);
     }
 
-    gnrc_lorawan_mcps_event(mac, MCPS_EVENT_RX, _pkt.ack);
+    _end_of_tx(mac, MCPS_CONFIRMED, GNRC_LORAWAN_REQ_STATUS_SUCCESS);
 
     if (_pkt.frame_pending) {
         mlme_indication_t mlme_indication;
@@ -250,44 +257,65 @@ size_t gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, iolist_t *payload, int con
 
 static void _end_of_tx(gnrc_lorawan_t *mac, int type, int status)
 {
+    mlme_confirm_t mlme_confirm;
+    mcps_confirm_t mcps_confirm;
+
     mac->mcps.waiting_for_ack = false;
 
-    mcps_confirm_t mcps_confirm;
+    mac->mcps.tx_buf = NULL;
+
+    mac->mcps.fcnt++;
+
+    gnrc_lorawan_mac_release(mac);
+
+    if (mac->mlme.pending_mlme_opts & GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ) {
+        mlme_confirm.type = MLME_LINK_CHECK;
+        mlme_confirm.status = -ETIMEDOUT;
+        mac->mlme.pending_mlme_opts &= ~GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ;
+        gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
+    }
 
     mcps_confirm.type = type;
     mcps_confirm.status = status;
     gnrc_lorawan_mcps_confirm(mac, &mcps_confirm);
-    mac->mcps.tx_buf = NULL;
-
-    mac->mcps.fcnt += 1;
 }
 
-void gnrc_lorawan_mcps_event(gnrc_lorawan_t *mac, int event, int data)
+void gnrc_lorawan_event_ack_timeout(gnrc_lorawan_t *mac)
 {
+    iolist_t __pkt = {.iol_base = mac->mcps.tx_buf, .iol_len = mac->mcps.tx_len, .iol_next = NULL};
+    gnrc_lorawan_send_pkt(mac, &__pkt, mac->last_dr);
+}
+
+static void _handle_retransmissions(gnrc_lorawan_t *mac)
+{
+    if (mac->mcps.nb_trials-- == 0) {
+        _end_of_tx(mac, MCPS_CONFIRMED, -ETIMEDOUT);
+    } else {
+        mac->msg.type = MSG_TYPE_MCPS_ACK_TIMEOUT;
+        xtimer_set_msg(&mac->rx, 1000000 + random_uint32_range(0, 2000000), &mac->msg, thread_getpid());
+    }
+}
+
+void gnrc_lorawan_event_no_rx(gnrc_lorawan_t *mac)
+{
+    mlme_confirm_t mlme_confirm;
+
     if (mac->mlme.activation == MLME_ACTIVATION_NONE) {
+        /* This was a Join Request */
+        mlme_confirm.type = MLME_JOIN;
+        mlme_confirm.status = -ETIMEDOUT;
+        gnrc_lorawan_mac_release(mac);
+        gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
         return;
     }
 
-    if (event == MCPS_EVENT_ACK_TIMEOUT) {
-        iolist_t __pkt = {.iol_base = mac->mcps.tx_buf, .iol_len = mac->mcps.tx_len, .iol_next = NULL};
-        gnrc_lorawan_send_pkt(mac, &__pkt, mac->last_dr);
+    /* Otherwise check if retransmission should be handled */
+
+    if (mac->mcps.waiting_for_ack) {
+        _handle_retransmissions(mac);
     }
     else {
-        int state = mac->mcps.waiting_for_ack ? MCPS_CONFIRMED : MCPS_UNCONFIRMED;
-        if (state == MCPS_CONFIRMED && ((event == MCPS_EVENT_RX && !data) ||
-                                        event == MCPS_EVENT_NO_RX)) {
-            if (mac->mcps.nb_trials-- == 0) {
-                _end_of_tx(mac, MCPS_CONFIRMED, -ETIMEDOUT);
-            }
-        }
-        else {
-            _end_of_tx(mac, state, GNRC_LORAWAN_REQ_STATUS_SUCCESS);
-        }
-
-        mac->msg.type = MSG_TYPE_MCPS_ACK_TIMEOUT;
-        if (mac->mcps.tx_buf) {
-            xtimer_set_msg(&mac->rx, 1000000 + random_uint32_range(0, 2000000), &mac->msg, thread_getpid());
-        }
+        _end_of_tx(mac, MCPS_UNCONFIRMED, GNRC_LORAWAN_REQ_STATUS_SUCCESS);
     }
 }
 

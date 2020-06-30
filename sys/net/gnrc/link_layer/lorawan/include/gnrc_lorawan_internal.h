@@ -370,13 +370,18 @@ void gnrc_lorawan_mlme_process_join(gnrc_lorawan_t *mac, uint8_t *data, size_t s
 void gnrc_lorawan_mlme_no_rx(gnrc_lorawan_t *mac);
 
 /**
- * @brief Trigger a MCPS event
+ * @brief Mac callback for no RX
  *
  * @param[in] mac pointer to the MAC descriptor
- * @param[in] event the event to be processed.
- * @param[in] data set to true if the packet contains payload
  */
-void gnrc_lorawan_mcps_event(gnrc_lorawan_t *mac, int event, int data);
+void gnrc_lorawan_event_no_rx(gnrc_lorawan_t *mac);
+
+/**
+ * @brief Mac callback for ACK timeout event
+ *
+ * @param[in] mac pointer to the MAC descriptor
+ */
+void gnrc_lorawan_event_ack_timeout(gnrc_lorawan_t *mac);
 
 /**
  * @brief Get the maximum MAC payload (M value) for a given datarate.

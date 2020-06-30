@@ -131,6 +131,7 @@ out:
     mlme_confirm.type = MLME_JOIN;
     mlme_confirm.status = status;
 
+    gnrc_lorawan_mac_release(mac);
     gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
 }
 
@@ -308,21 +309,4 @@ uint8_t gnrc_lorawan_build_options(gnrc_lorawan_t *mac, lorawan_buffer_t *buf)
     }
 
     return size;
-}
-
-void gnrc_lorawan_mlme_no_rx(gnrc_lorawan_t *mac)
-{
-    mlme_confirm_t mlme_confirm;
-
-    mlme_confirm.status = -ETIMEDOUT;
-
-    if (mac->mlme.activation == MLME_ACTIVATION_NONE) {
-        mlme_confirm.type = MLME_JOIN;
-        gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
-    }
-    else if (mac->mlme.pending_mlme_opts & GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ) {
-        mlme_confirm.type = MLME_LINK_CHECK;
-        gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
-        mac->mlme.pending_mlme_opts &= ~GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ;
-    }
 }

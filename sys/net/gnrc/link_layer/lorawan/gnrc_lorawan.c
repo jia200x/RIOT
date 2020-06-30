@@ -175,10 +175,8 @@ void gnrc_lorawan_radio_rx_timeout_cb(gnrc_lorawan_t *mac)
             mac->state = LORAWAN_STATE_RX_2;
             break;
         case LORAWAN_STATE_RX_2:
-            gnrc_lorawan_mlme_no_rx(mac);
-            gnrc_lorawan_mcps_event(mac, MCPS_EVENT_NO_RX, 0);
+            gnrc_lorawan_event_no_rx(mac);
             mac->state = LORAWAN_STATE_IDLE;
-            gnrc_lorawan_mac_release(mac);
             break;
         default:
             assert(false);
@@ -264,6 +262,4 @@ void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *psdu, size_t si
         default:
             break;
     }
-
-    gnrc_lorawan_mac_release(mac);
 }

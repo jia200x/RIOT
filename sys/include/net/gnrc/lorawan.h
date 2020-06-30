@@ -63,7 +63,6 @@ extern "C" {
 typedef enum {
     MCPS_EVENT_RX,            /**< MCPS RX event */
     MCPS_EVENT_NO_RX,         /**< MCPS no RX event */
-    MCPS_EVENT_ACK_TIMEOUT    /**< MCPS retrans event */
 } mcps_event_t;
 
 /**
