@@ -40,8 +40,6 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt);
 static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt);
 static void _init(gnrc_netif_t *netif);
 
-static gnrc_pktsnip_t *_tx_buf;
-
 static const gnrc_netif_ops_t lorawan_ops = {
     .init = _init,
     .send = _send,
@@ -84,14 +82,6 @@ static inline void _set_be_addr(gnrc_lorawan_t *mac, uint8_t *be_addr)
     gnrc_lorawan_mlme_request(mac, &mlme_request, &mlme_confirm);
 }
 
-void *gnrc_lorawan_get_transmit_buffer(gnrc_lorawan_t *mac, size_t len)
-{
-    (void) mac;
-    assert(_tx_buf == NULL);
-    _tx_buf = gnrc_pktbuf_add(NULL, NULL, len, GNRC_NETTYPE_UNDEF);
-    return _tx_buf ? _tx_buf->data : NULL;
-}
-
 void gnrc_lorawan_mcps_indication(gnrc_lorawan_t *mac, mcps_indication_t *ind)
 {
     (void) mac;
@@ -111,10 +101,7 @@ void gnrc_lorawan_mlme_indication(gnrc_lorawan_t *mac, mlme_indication_t *ind)
 void gnrc_lorawan_mcps_confirm(gnrc_lorawan_t *mac, mcps_confirm_t *confirm)
 {
     (void) mac;
-    (void) confirm;
-    assert(_tx_buf);
-    gnrc_pktbuf_release(_tx_buf);
-    _tx_buf = NULL;
+    gnrc_pktbuf_release((gnrc_pktsnip_t*) confirm->msdu);
     DEBUG("gnrc_lorawan: transmission finished with status %i\n", confirm->status);
 }
 
@@ -244,7 +231,6 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
                            .dr = netif->lorawan.datarate } };
     mcps_confirm_t conf;
     gnrc_lorawan_mcps_request(&netif->lorawan.mac, &req, &conf);
-    gnrc_pktbuf_release(payload);
     return conf.status;
 }
 

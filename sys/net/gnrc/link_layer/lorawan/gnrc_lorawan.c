@@ -228,8 +228,6 @@ void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, iolist_t *psdu, uint8_t dr)
     uint32_t chan = gnrc_lorawan_pick_channel(mac);
     _config_radio(mac, chan, dr, false);
 
-    mac->last_dr = dr;
-
     uint8_t cr;
     dev->driver->get(dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
 

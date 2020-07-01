@@ -141,11 +141,11 @@ typedef struct {
 typedef struct {
     uint32_t fcnt;                  /**< uplink framecounter */
     uint32_t fcnt_down;             /**< downlink frame counter */
-    void *tx_buf;
+    iolist_t *msdu;             /**< current MSDU */
     int nb_trials;              /**< holds the remaining number of retransmissions */
     int ack_requested;          /**< whether the network server requested an ACK */
     int waiting_for_ack;        /**< true if the MAC layer is waiting for an ACK */
-    uint8_t tx_len;
+    char mhdr_mic[sizeof(lorawan_hdr_t) + 15 + 1 + 4];
 } gnrc_lorawan_mcps_t;
 
 /**
@@ -190,14 +190,13 @@ typedef struct {
  *
  * @note This function is also used for decrypting a LoRaWAN packet. The LoRaWAN server encrypts the packet using decryption, so the end device only needs to implement encryption
  *
- * @param[in] buf pointer to the frame
- * @param[in] len length of the frame
+ * @param[in] iolist pointer to the MSDU frame
  * @param[in] dev_addr device address
  * @param[in] fcnt frame counter
  * @param[in] dir direction of the packet (0 if uplink, 1 if downlink)
  * @param[in] appskey pointer to the Application Session Key
  */
-void gnrc_lorawan_encrypt_payload(uint8_t *buf, size_t len, const le_uint32_t *dev_addr, uint32_t fcnt, uint8_t dir, const uint8_t *appskey);
+void gnrc_lorawan_encrypt_payload(iolist_t *iolist, const le_uint32_t *dev_addr, uint32_t fcnt, uint8_t dir, const uint8_t *appskey);
 
 /**
  * @brief Decrypts join accept message
@@ -245,7 +244,7 @@ int gnrc_lorawan_set_dr(gnrc_lorawan_t *mac, uint8_t datarate);
  * @return full LoRaWAN frame including payload
  * @return NULL if packet buffer is full. `payload` is released
  */
-size_t gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, iolist_t *payload, int confirmed_data, uint8_t port, uint8_t *out);
+size_t gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, iolist_t *payload, int confirmed_data, uint8_t port);
 
 /**
  * @brief pick a random available LoRaWAN channel
@@ -292,14 +291,12 @@ void gnrc_lorawan_calculate_join_mic(const uint8_t *buf, size_t len, const uint8
  * @param[in] dev_addr the Device Address
  * @param[in] fcnt frame counter
  * @param[in] dir direction of the packet (0 is uplink, 1 is downlink)
- * @param[in] buf pointer to the frame
- * @param[in] len length of the frame
+ * @param[in] frame pointer to the PSDU frame (witout MIC)
  * @param[in] nwkskey pointer to the Network Session Key
  * @param[out] out calculated MIC
  */
 void gnrc_lorawan_calculate_mic(const le_uint32_t *dev_addr, uint32_t fcnt,
-                                uint8_t dir, uint8_t *buf, size_t len, const uint8_t *nwkskey, le_uint32_t *out);
-
+                                uint8_t dir, iolist_t *frame, const uint8_t *nwkskey, le_uint32_t *out);
 /**
  * @brief Build a MCPS LoRaWAN header
  *

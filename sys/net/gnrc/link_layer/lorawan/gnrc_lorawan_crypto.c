@@ -55,7 +55,7 @@ void gnrc_lorawan_calculate_join_mic(const uint8_t *buf, size_t len, const uint8
 }
 
 void gnrc_lorawan_calculate_mic(const le_uint32_t *dev_addr, uint32_t fcnt,
-                                uint8_t dir, uint8_t *buf, size_t len, const uint8_t *nwkskey, le_uint32_t *out)
+                                uint8_t dir, iolist_t *frame, const uint8_t *nwkskey, le_uint32_t *out)
 {
     lorawan_block_t block;
 
@@ -69,17 +69,19 @@ void gnrc_lorawan_calculate_mic(const le_uint32_t *dev_addr, uint32_t fcnt,
 
     block.u32_pad = 0;
 
-    block.len = len;
+    block.len = iolist_size(frame);
 
     cmac_init(&CmacContext, nwkskey, LORAMAC_APPKEY_LEN);
     cmac_update(&CmacContext, &block, sizeof(block));
-    cmac_update(&CmacContext, buf, len);
+    for (iolist_t *io = frame; io != NULL; io = io->iol_next) {
+        cmac_update(&CmacContext, io->iol_base, io->iol_len);
+    }
     cmac_final(&CmacContext, digest);
 
     memcpy(out, digest, sizeof(le_uint32_t));
 }
 
-void gnrc_lorawan_encrypt_payload(uint8_t *buf, size_t len, const le_uint32_t *dev_addr, uint32_t fcnt, uint8_t dir, const uint8_t *appskey)
+void gnrc_lorawan_encrypt_payload(iolist_t *iolist, const le_uint32_t *dev_addr, uint32_t fcnt, uint8_t dir, const uint8_t *appskey)
 {
     uint8_t s_block[16];
     uint8_t a_block[16];
@@ -102,14 +104,18 @@ void gnrc_lorawan_encrypt_payload(uint8_t *buf, size_t len, const le_uint32_t *d
     block->u32_pad = 0;
 
     int c = 0;
-    for (unsigned i = 0; i < len; i++) {
-        if ((c & SBIT_MASK) == 0) {
-            block->len = (c >> 4) + 1;
-            cipher_encrypt(&AesContext, a_block, s_block);
-        }
+    for (iolist_t *io = iolist; io != NULL; io = io->iol_next) {
+        for (unsigned i = 0; i < io->iol_len; i++) {
+            uint8_t *v = io->iol_base;
 
-        buf[i] = buf[i] ^ s_block[c & SBIT_MASK];
-        c++;
+            if ((c & SBIT_MASK) == 0) {
+                block->len = (c >> 4) + 1;
+                cipher_encrypt(&AesContext, a_block, s_block);
+            }
+
+            v[i] = v[i] ^ s_block[c & SBIT_MASK];
+            c++;
+        }
     }
 }
 

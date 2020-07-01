@@ -154,6 +154,7 @@ typedef struct {
 typedef struct {
     int16_t status; /**< status of the MCPS confirm */
     mcps_type_t type;   /**< type of the MCPS confirm */
+    iolist_t *msdu;     /**< pointer to the msdu */
 } mcps_confirm_t;
 
 /**
@@ -279,17 +280,6 @@ void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm);
  * @return pointer to the @ref netdev_t structure
  */
 netdev_t *gnrc_lorawan_get_netdev(gnrc_lorawan_t *mac);
-
-/**
- * @brief Get a transmit buffer
- *
- * @param mac pointer to the MAC descriptor
- * @param len length of the transmit buffer
- *
- * @return pointer to the buffer
- * @return NULL on error
- */
-void *gnrc_lorawan_get_transmit_buffer(gnrc_lorawan_t *mac, size_t len);
 
 #ifdef __cplusplus
 }
