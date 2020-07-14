@@ -196,6 +196,12 @@ typedef enum {
      */
     NETOPT_MAX_PDU_SIZE,
     /**
+     * @brief   (uint16_t) protocol data unit
+     *
+     * Get/Set the PDU size on link layers with implicit header (e.g LoRaWAN).
+     */
+    NETOPT_PDU_SIZE,
+    /**
      * @brief   (@ref netopt_enable_t) frame preloading
      *
      * Preload frame data using gnrc_netdev_driver_t::send_data() or gnrc_netapi_send(),
