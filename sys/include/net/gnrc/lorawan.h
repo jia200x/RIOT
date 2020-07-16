@@ -189,6 +189,13 @@ void gnrc_lorawan_radio_rx_timeout_cb(gnrc_lorawan_t *mac);
 void gnrc_lorawan_radio_tx_done_cb(gnrc_lorawan_t *mac);
 
 /**
+ * @brief Indicate the MAC layer that the timer was fired
+ *
+ * @param[in] mac pointer to the MAC descriptor
+ */
+void gnrc_lorawan_timeout_cb(gnrc_lorawan_t *mac);
+
+/**
  * @brief Init GNRC LoRaWAN
  *
  * @param[in] mac pointer to the MAC descriptor
@@ -280,6 +287,23 @@ void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm);
  * @return pointer to the @ref netdev_t structure
  */
 netdev_t *gnrc_lorawan_get_netdev(gnrc_lorawan_t *mac);
+
+/**
+ * @brief Set a timer with the given time
+ * @note Supposed to be implemented by the user of GNRC LoRaWAN
+ *
+ * @param[in] mac pointer to the MAC descriptor
+ * @param us timeout microseconds
+ */
+void gnrc_lorawan_set_timer(gnrc_lorawan_t *mac, uint32_t us);
+
+/**
+ * @brief Remove the current timer
+ * @note Supposed to be implemented by the user of GNRC LoRaWAN
+ *
+ * @param[in] mac pointer to the MAC descriptor
+ */
+void gnrc_lorawan_remove_timer(gnrc_lorawan_t *mac);
 
 #ifdef __cplusplus
 }
