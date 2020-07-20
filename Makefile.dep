@@ -73,6 +73,11 @@ ifneq (,$(filter gnrc_gomach,$(USEMODULE)))
 endif
 
 ifneq (,$(filter gnrc_lorawan,$(USEMODULE)))
+  ifneq (,$(filter gnrc_lorawan_rtt,$(USEMODULE)))
+	USEMODULE += ztimer
+	USEMODULE += ztimer_periph_rtt
+	USEMODULE += ztimer_msec
+  endif
   USEMODULE += xtimer
   USEMODULE += random
   USEMODULE += hashes

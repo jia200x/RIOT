@@ -81,13 +81,21 @@ void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm)
 void gnrc_lorawan_set_timer(gnrc_lorawan_t *mac, uint32_t us)
 {
     gnrc_netif_lorawan_t *lw_netif = container_of(mac, gnrc_netif_lorawan_t, mac);
-    xtimer_set_msg(&lw_netif->timer, ADJUST_DRIFT(us), &timeout_msg, thread_getpid());
+#if IS_USED(MODULE_GNRC_LORAWAN_RTT)
+        ztimer_set_msg(ZTIMER_MSEC, &lw_netif->timer, us/1000, &timeout_msg, thread_getpid());
+#else
+        xtimer_set_msg(&lw_netif->timer, ADJUST_DRIFT(us), &timeout_msg, thread_getpid());
+#endif
 }
 
 void gnrc_lorawan_remove_timer(gnrc_lorawan_t *mac)
 {
     gnrc_netif_lorawan_t *lw_netif = container_of(mac, gnrc_netif_lorawan_t, mac);
-    xtimer_remove(&lw_netif->timer);
+#if IS_USED(MODULE_GNRC_LORAWAN_RTT)
+        ztimer_remove(ZTIMER_MSEC, &lw_netif->timer);
+#else
+        xtimer_remove(&lw_netif->timer);
+#endif
 }
 
 static inline void _set_be_addr(gnrc_lorawan_t *mac, uint8_t *be_addr)
@@ -225,9 +233,15 @@ static void _init(gnrc_netif_t *netif)
     _set_be_addr(&netif->lorawan.mac, _devaddr);
     gnrc_lorawan_init(&netif->lorawan.mac, netif->lorawan.nwkskey, netif->lorawan.appskey);
 
-    xtimer_set_msg(&netif->lorawan.backoff_timer,
-                   GNRC_LORAWAN_BACKOFF_WINDOW_TICK,
-                   &backoff_msg, thread_getpid());
+#if IS_USED(MODULE_GNRC_LORAWAN_RTT)
+        ztimer_set_msg(ZTIMER_MSEC, &netif->lorawan.backoff_timer,
+                       GNRC_LORAWAN_BACKOFF_WINDOW_TICK / 1000,
+                       &backoff_msg, thread_getpid());
+#else
+        xtimer_set_msg(&netif->lorawan.backoff_timer,
+                       GNRC_LORAWAN_BACKOFF_WINDOW_TICK,
+                       &backoff_msg, thread_getpid());
+#endif
 }
 
 int gnrc_netif_lorawan_create(gnrc_netif_t *netif, char *stack, int stacksize,
@@ -271,9 +285,15 @@ static void _msg_handler(gnrc_netif_t *netif, msg_t *msg)
             break;
         case MSG_TYPE_MLME_BACKOFF_EXPIRE:
             gnrc_lorawan_mlme_backoff_expire_cb(&netif->lorawan.mac);
-            xtimer_set_msg(&netif->lorawan.backoff_timer,
-                           GNRC_LORAWAN_BACKOFF_WINDOW_TICK,
-                           &backoff_msg, thread_getpid());
+#if IS_USED(MODULE_GNRC_LORAWAN_RTT)
+                ztimer_set_msg(ZTIMER_MSEC, &netif->lorawan.backoff_timer,
+                               GNRC_LORAWAN_BACKOFF_WINDOW_TICK / 1000,
+                               &backoff_msg, thread_getpid());
+#else
+                xtimer_set_msg(&netif->lorawan.backoff_timer,
+                               GNRC_LORAWAN_BACKOFF_WINDOW_TICK,
+                               &backoff_msg, thread_getpid());
+#endif
         default:
             break;
     }

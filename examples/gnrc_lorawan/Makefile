@@ -8,6 +8,8 @@ USEMODULE += auto_init_gnrc_netif
 USEMODULE += gnrc_lorawan
 USEMODULE += gnrc_pktdump
 
+FEATURES_OPTIONAL += periph_rtt
+
 BOARD ?= b-l072z-lrwan1
 RIOTBASE ?= ../../
 

@@ -1,0 +1,3 @@
+ifneq (,$(filter periph_rtt,$(FEATURES_USED)))
+  USEMODULE += gnrc_lorawan_rtt
+endif

@@ -20,7 +20,11 @@
 
 #include "net/gnrc/lorawan.h"
 
+#if IS_USED(MODULE_GNRC_LORAWAN_RTT)
+#include "ztimer.h"
+#else
 #include "xtimer.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,6 +34,12 @@ extern "C" {
  * @brief   A Link Check request was scheduled
  */
 #define GNRC_NETIF_LORAWAN_FLAGS_LINK_CHECK                (0x1U)
+
+#if IS_USED(MODULE_GNRC_LORAWAN_RTT)
+#define LW_TIMER ztimer_t   /**< Use Ztimer with RTT backend */
+#else
+#define LW_TIMER xtimer_t   /**< Use xtimer */
+#endif
 
 /**
  * @brief   GNRC LoRaWAN interface descriptor
@@ -41,8 +51,8 @@ typedef struct {
     uint8_t deveui[LORAMAC_DEVEUI_LEN];     /**< Device EUI buffer */
     uint8_t appeui[LORAMAC_APPEUI_LEN];     /**< App EUI buffer */
     gnrc_lorawan_t mac;                     /**< gnrc lorawan mac descriptor */
-    xtimer_t timer;                         /**< General purpose timer */
-    xtimer_t backoff_timer;                 /**< Backoff timer */
+    LW_TIMER timer;                         /**< General purpose timer */
+    LW_TIMER backoff_timer;                 /**< Backoff timer */
     uint8_t flags;                          /**< flags for the LoRaWAN interface */
     uint8_t demod_margin;                   /**< value of last demodulation margin */
     uint8_t num_gateways;                   /**< number of gateways of last link check */
