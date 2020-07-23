@@ -92,7 +92,10 @@ typedef enum {
     MLME_RESET,                /**< reset the MAC layer */
     MLME_SET,                  /**< set the MIB */
     MLME_GET,                  /**< get the MIB */
-    MLME_SCHEDULE_UPLINK       /**< schedule uplink indication */
+    MLME_SCHEDULE_UPLINK,      /**< schedule uplink indication */
+    MLME_SYNC,                 /**< request synchronization to gateway beacons */
+    MLME_BEACON_NOTIFY,        /**< device received a valid beacon */
+    MLME_BEACON_LOSS,          /**< device couldn't synchronize to beacons */
 } mlme_type_t;
 
 /**
@@ -122,6 +125,7 @@ typedef struct {
     union {
         mlme_lorawan_join_t join; /**< Join Data holder */
         mlme_mib_t mib;           /**< MIB holder */
+        bool enabled;             /**< enabled status holder */
     };
     mlme_type_t type;   /**< type of the MLME request */
 } mlme_request_t;
@@ -304,6 +308,8 @@ void gnrc_lorawan_set_timer(gnrc_lorawan_t *mac, uint32_t us);
  * @param[in] mac pointer to the MAC descriptor
  */
 void gnrc_lorawan_remove_timer(gnrc_lorawan_t *mac);
+
+uint32_t gnrc_lorawan_timer_now(gnrc_lorawan_t *mac);
 
 #ifdef __cplusplus
 }

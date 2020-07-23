@@ -7,6 +7,9 @@ USEMODULE += gnrc_netdev_default
 USEMODULE += auto_init_gnrc_netif
 USEMODULE += gnrc_lorawan
 USEMODULE += gnrc_pktdump
+FEATURES_REQUIRED += periph_rtt
+
+CFLAGS += -DRIOT_EPOCH=1980
 
 FEATURES_OPTIONAL += periph_rtt
 

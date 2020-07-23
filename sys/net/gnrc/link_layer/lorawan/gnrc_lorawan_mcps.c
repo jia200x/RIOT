@@ -223,7 +223,9 @@ size_t gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, iolist_t *payload, int con
     lorawan_hdr_set_maj(lw_hdr, MAJOR_LRWAN_R1);
 
     lw_hdr->addr = mac->dev_addr;
-    lw_hdr->fctrl = 0;
+    /* REMOVE_ME */
+    //lw_hdr->fctrl = 0;
+    lw_hdr->fctrl = 0x10;
 
     lorawan_hdr_set_ack(lw_hdr, mac->mcps.ack_requested);
 
@@ -269,6 +271,20 @@ static void _end_of_tx(gnrc_lorawan_t *mac, int type, int status)
     mcps_confirm.msdu = mac->mcps.msdu;
     mac->mcps.msdu = NULL;
     gnrc_lorawan_mcps_confirm(mac, &mcps_confirm);
+}
+
+void gnrc_lorawan_class_b_finish(gnrc_lorawan_t *mac)
+{
+    mcps_confirm_t mcps_confirm;
+    mac->mcps.fcnt++;
+    if (mac->mcps.waiting_for_ack == false) {
+        mcps_confirm.status = GNRC_LORAWAN_REQ_STATUS_SUCCESS;
+        mcps_confirm.msdu = mac->mcps.msdu;
+        mac->mcps.msdu = NULL;
+        gnrc_lorawan_mcps_confirm(mac, &mcps_confirm);
+    }
+
+    gnrc_lorawan_mac_release(mac);
 }
 
 static void _transmit_pkt(gnrc_lorawan_t *mac)
