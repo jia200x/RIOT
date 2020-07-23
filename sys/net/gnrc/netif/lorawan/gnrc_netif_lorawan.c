@@ -310,7 +310,7 @@ static void _msg_handler(gnrc_netif_t *netif, msg_t *msg)
 uint32_t gnrc_lorawan_timer_now(gnrc_lorawan_t *mac)
 {
     (void) mac;
-    return ztimer_now(ZTIMER_MSEC)*1000; 
+    return ztimer_now(ZTIMER_MSEC); 
 }
 
 static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)

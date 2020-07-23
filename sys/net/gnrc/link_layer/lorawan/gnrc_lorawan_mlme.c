@@ -26,8 +26,8 @@
 #include "net/lorawan/hdr.h"
 
 #define ENABLE_DEBUG    (0)
-#define BEACON_TOA_US   (152576)
-#define BEACON_RESERVED (2120000)
+#define BEACON_TOA_US   (153)
+#define BEACON_RESERVED (2120)
 
 #include "debug.h"
 
@@ -296,7 +296,7 @@ uint16_t next_slot;
 
 static uint32_t get_slot_timestamp(int slot)
 {
-    return beacon_window_start + slot * 30000;
+    return beacon_window_start + slot * 30;
 }
 
 void gnrc_lorawan_schedule_next_pingslot(gnrc_lorawan_t *mac)
@@ -309,7 +309,7 @@ void gnrc_lorawan_schedule_next_pingslot(gnrc_lorawan_t *mac)
     }
 
     if (next_slot < 4096) {
-        gnrc_lorawan_set_timer(mac, get_slot_timestamp(next_slot) - 1000 - gnrc_lorawan_timer_now(mac));
+        gnrc_lorawan_set_timer(mac, (get_slot_timestamp(next_slot) - 1 - gnrc_lorawan_timer_now(mac))*1000);
         printf("%i\n", next_slot);
     }
     else {
@@ -341,7 +341,7 @@ void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t
 
     mac->state = LORAWAN_STATE_PING_SLOT;
     _config_pingslot_rx_window(mac);
-    gnrc_lorawan_set_timer(mac, get_slot_timestamp(next_slot) - 1000 - gnrc_lorawan_timer_now(mac));
+    gnrc_lorawan_set_timer(mac, (get_slot_timestamp(next_slot) - 1 - gnrc_lorawan_timer_now(mac))*1000);
 
     netopt_state_t state = NETOPT_STATE_SLEEP;
     dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
