@@ -54,6 +54,13 @@ extern "C" {
 #endif
 /** @} */
 
+/**
+ * @brief power of 2 exponent of the number of ping slots (only for class B)
+ */
+#ifndef CONFIG_GNRC_LORAWAN_PING_NB_EXP
+#define CONFIG_GNRC_LORAWAN_PING_NB_EXP (7U)
+#endif
+
 #define GNRC_LORAWAN_REQ_STATUS_SUCCESS (0)     /**< MLME or MCPS request successful status */
 #define GNRC_LORAWAN_REQ_STATUS_DEFERRED (1)    /**< the MLME or MCPS confirm message is asynchronous */
 

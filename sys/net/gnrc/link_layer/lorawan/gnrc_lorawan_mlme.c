@@ -290,7 +290,6 @@ void gnrc_lorawan_beacon_lost(gnrc_lorawan_t *mac)
     gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
 }
 
-uint8_t ping_period = 1<<7;
 uint32_t beacon_window_start;
 uint16_t next_slot;
 
@@ -305,7 +304,7 @@ void gnrc_lorawan_schedule_next_pingslot(gnrc_lorawan_t *mac)
     /* TODO: Add backoff? */
     while (get_slot_timestamp(next_slot) < now) {
         /* TODO: Check */
-        next_slot += ping_period;
+        next_slot += mac->mlme.ping_period;
     }
 
     if (next_slot < 4096) {
@@ -334,7 +333,7 @@ void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t
     mac->mlme.sync = true;
 
     (void) size;
-    int slot_offset = gnrc_lorawan_calculate_slot(psdu+2, &mac->dev_addr, ping_period);
+    int slot_offset = gnrc_lorawan_calculate_slot(psdu+2, &mac->dev_addr, mac->mlme.ping_period);
 
     beacon_window_start = gnrc_lorawan_timer_now(mac) + BEACON_RESERVED - BEACON_TOA_US;
     next_slot = slot_offset;

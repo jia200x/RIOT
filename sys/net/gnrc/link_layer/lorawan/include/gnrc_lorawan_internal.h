@@ -157,6 +157,7 @@ typedef struct {
     int pending_mlme_opts;  /**< holds pending mlme opts */
     uint32_t nid;               /**< current Network ID */
     int32_t backoff_budget;     /**< remaining Time On Air budget */
+    uint16_t ping_period;        /**< ping slot period */
     uint8_t dev_nonce[2];       /**< Device Nonce */
     uint8_t backoff_state;      /**< state in the backoff state machine */
     bool sync;
