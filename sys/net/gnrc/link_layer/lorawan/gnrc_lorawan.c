@@ -158,6 +158,7 @@ void _config_pingslot_rx_window(gnrc_lorawan_t *mac)
 
 static void gnrc_lorawan_ping_slot_rx(gnrc_lorawan_t *mac)
 {
+    mac->state = LORAWAN_STATE_PING_SLOT;
     netdev_t *dev = gnrc_lorawan_get_netdev(mac);
     netopt_state_t state = NETOPT_STATE_RX;
     dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
@@ -181,6 +182,9 @@ void gnrc_lorawan_timeout_cb(gnrc_lorawan_t *mac)
             gnrc_lorawan_enable_beacon_rx(mac);
             break;
         case LORAWAN_STATE_PING_SLOT:
+            assert(false);
+            break;
+        case LORAWAN_STATE_IDLE:
             puts("OPEN_PING_SLOT");
             gnrc_lorawan_ping_slot_rx(mac);
             break;
@@ -195,7 +199,7 @@ void gnrc_lorawan_timeout_cb(gnrc_lorawan_t *mac)
 void gnrc_lorawan_radio_tx_done_cb(gnrc_lorawan_t *mac)
 {
     if (mac->mlme.sync) {
-        mac->state = LORAWAN_STATE_PING_SLOT;
+        mac->state = LORAWAN_STATE_IDLE;
         _config_pingslot_rx_window(mac);
         gnrc_lorawan_schedule_next_pingslot(mac);
         gnrc_lorawan_class_b_finish(mac);
@@ -233,7 +237,11 @@ void gnrc_lorawan_radio_rx_timeout_cb(gnrc_lorawan_t *mac)
             break;
         case LORAWAN_STATE_PING_SLOT:
             puts("BIEN WN");
+            mac->state = LORAWAN_STATE_IDLE;
             gnrc_lorawan_schedule_next_pingslot(mac);
+            break;
+        case LORAWAN_STATE_IDLE:
+            assert(false);
             break;
         default:
             assert(false);
@@ -340,8 +348,8 @@ void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *psdu, size_t si
     }
 
     if (mac->state != LORAWAN_STATE_BEACON_ACQUISITION) {
+        mac->state = LORAWAN_STATE_IDLE;
         if (mac->mlme.sync == false) {
-            mac->state = LORAWAN_STATE_IDLE;
             gnrc_lorawan_remove_timer(mac);
         }
         else {

@@ -339,7 +339,6 @@ void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t
     beacon_window_start = gnrc_lorawan_timer_now(mac) + BEACON_RESERVED - BEACON_TOA_US;
     next_slot = slot_offset;
 
-    mac->state = LORAWAN_STATE_PING_SLOT;
     _config_pingslot_rx_window(mac);
     gnrc_lorawan_set_timer(mac, (get_slot_timestamp(next_slot) - 1 - gnrc_lorawan_timer_now(mac))*1000);
 
