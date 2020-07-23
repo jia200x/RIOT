@@ -223,9 +223,13 @@ size_t gnrc_lorawan_build_uplink(gnrc_lorawan_t *mac, iolist_t *payload, int con
     lorawan_hdr_set_maj(lw_hdr, MAJOR_LRWAN_R1);
 
     lw_hdr->addr = mac->dev_addr;
-    /* REMOVE_ME */
-    //lw_hdr->fctrl = 0;
-    lw_hdr->fctrl = 0x10;
+
+    lw_hdr->fctrl = 0;
+
+    if (mac->mlme.sync) {
+        /* The pending bit is used to indicate class B frames */
+        lorawan_hdr_set_frame_pending(lw_hdr, true);
+    }
 
     lorawan_hdr_set_ack(lw_hdr, mac->mcps.ack_requested);
 
