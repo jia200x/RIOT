@@ -50,7 +50,7 @@ extern "C" {
  * @brief the minimum symbols to detect a LoRa preamble
  */
 #ifndef CONFIG_GNRC_LORAWAN_MIN_SYMBOLS_TIMEOUT
-#define CONFIG_GNRC_LORAWAN_MIN_SYMBOLS_TIMEOUT 30
+#define CONFIG_GNRC_LORAWAN_MIN_SYMBOLS_TIMEOUT 10
 #endif
 /** @} */
 
