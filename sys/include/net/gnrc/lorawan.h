@@ -61,6 +61,14 @@ extern "C" {
 #define CONFIG_GNRC_LORAWAN_PING_NB_EXP (7U)
 #endif
 
+#ifndef CONFIG_GNRC_LORAWAN_DEFAULT_PING_SLOT_DR
+#define CONFIG_GNRC_LORAWAN_DEFAULT_PING_SLOT_DR (3)
+#endif
+
+#ifndef CONFIG_GNRC_LORAWAN_DEFAULT_PING_SLOT_CHANNEL
+#define CONFIG_GNRC_LORAWAN_DEFAULT_PING_SLOT_CHANNEL (869525000)
+#endif
+
 #define GNRC_LORAWAN_REQ_STATUS_SUCCESS (0)     /**< MLME or MCPS request successful status */
 #define GNRC_LORAWAN_REQ_STATUS_DEFERRED (1)    /**< the MLME or MCPS confirm message is asynchronous */
 

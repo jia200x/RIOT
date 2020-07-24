@@ -81,6 +81,8 @@ void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *nwkskey, uint8_t *appskey)
     mac->appskey = appskey;
     mac->busy = false;
     mac->mlme.ping_period = 1<<(12 - CONFIG_GNRC_LORAWAN_PING_NB_EXP);
+    mac->mlme.ps_dr = CONFIG_GNRC_LORAWAN_DEFAULT_PING_SLOT_DR;
+    mac->mlme.ps_channel = CONFIG_GNRC_LORAWAN_DEFAULT_PING_SLOT_CHANNEL;
     gnrc_lorawan_mlme_backoff_init(mac);
     gnrc_lorawan_reset(mac);
 }
@@ -154,7 +156,7 @@ void gnrc_lorawan_open_rx_window(gnrc_lorawan_t *mac)
 
 void _config_pingslot_rx_window(gnrc_lorawan_t *mac)
 {
-    _config_radio(mac, 868500000, 3, true);
+    _config_radio(mac, mac->mlme.ps_channel, mac->mlme.ps_dr , true);
 }
 
 static void gnrc_lorawan_ping_slot_rx(gnrc_lorawan_t *mac)

@@ -362,6 +362,17 @@ int _fopts_mlme_link_check_req(lorawan_buffer_t *buf)
     return GNRC_LORAWAN_CID_SIZE;
 }
 
+static int _fopts_mlme_ping_slot_ans(gnrc_lorawan_t *mac, lorawan_buffer_t *buf)
+{
+    if (buf) {
+        assert(buf->index + GNRC_LORAWAN_CID_PING_SLOT_CHANNEL_ANS_SIZE <= buf->size);
+        buf->data[buf->index++] = GNRC_LORAWAN_CID_PING_SLOT_CHANNEL_REQ;
+        buf->data[buf->index++] = mac->mlme.ps_chan_ans;
+    }
+    mac->mlme.pending_mlme_opts &= ~GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ;
+    return GNRC_LORAWAN_CID_PING_SLOT_CHANNEL_ANS_SIZE;
+}
+
 static void _mlme_link_check_ans(gnrc_lorawan_t *mac, uint8_t *p)
 {
     mlme_confirm_t mlme_confirm;
@@ -373,6 +384,27 @@ static void _mlme_link_check_ans(gnrc_lorawan_t *mac, uint8_t *p)
     gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
 
     mac->mlme.pending_mlme_opts &= ~GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ;
+}
+static void _mlme_ping_slot_channel_req(gnrc_lorawan_t *mac, uint8_t *p)
+{
+    uint32_t channel = (p[1] + (p[2] << 8) + ((uint32_t) p[3] << 16)) * 100;
+    uint8_t tmp = 0;
+    for (unsigned i=0; i<GNRC_LORAWAN_MAX_CHANNELS; i++) {
+        if (mac->channel[i] == channel) {
+            tmp = 1;
+        }
+    }
+    if (gnrc_lorawan_validate_dr(p[4])) {
+        tmp |= 1<<1;
+    }
+
+    if ((tmp & 0x3) == 0x3) {
+        mac->mlme.ps_channel = channel ? channel : CONFIG_GNRC_LORAWAN_DEFAULT_PING_SLOT_CHANNEL;
+        mac->mlme.ps_dr = p[4];
+    }
+
+    mac->mlme.ps_chan_ans = tmp;
+    mac->mlme.pending_mlme_opts |= GNRC_LORAWAN_MLME_OPTS_PING_SLOT_CHANNEL_ANS;
 }
 
 void gnrc_lorawan_process_fopts(gnrc_lorawan_t *mac, uint8_t *fopts, size_t size)
@@ -389,6 +421,10 @@ void gnrc_lorawan_process_fopts(gnrc_lorawan_t *mac, uint8_t *fopts, size_t size
             case GNRC_LORAWAN_CID_LINK_CHECK_ANS:
                 ret += GNRC_LORAWAN_FOPT_LINK_CHECK_ANS_SIZE;
                 cb = _mlme_link_check_ans;
+                break;
+            case GNRC_LORAWAN_CID_PING_SLOT_CHANNEL_REQ:
+                ret += GNRC_LORAWAN_CID_PING_SLOT_CHANNEL_REQ_SIZE;
+                cb = _mlme_ping_slot_channel_req;
                 break;
             default:
                 return;
@@ -408,6 +444,10 @@ uint8_t gnrc_lorawan_build_options(gnrc_lorawan_t *mac, lorawan_buffer_t *buf)
 
     if(mac->mlme.pending_mlme_opts & GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ) {
         size += _fopts_mlme_link_check_req(buf);
+    }
+
+    if (mac->mlme.pending_mlme_opts & GNRC_LORAWAN_MLME_OPTS_PING_SLOT_CHANNEL_ANS) {
+        size += _fopts_mlme_ping_slot_ans(mac, buf);
     }
 
     return size;

@@ -73,11 +73,18 @@ extern "C" {
 #define GNRC_LORAWAN_BACKOFF_BUDGET_3   (8700000LL)     /**< budget of time on air every 24 hours */
 
 #define GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ  (1 << 0) /**< Internal Link Check request flag */
+#define GNRC_LORAWAN_MLME_OPTS_PING_SLOT_CHANNEL_ANS  (1 << 1) /**< Internal Link Check request flag */
 
 #define GNRC_LORAWAN_CID_SIZE (1U)                      /**< size of Command ID in FOps */
 #define GNRC_LORAWAN_CID_LINK_CHECK_ANS (0x02)          /**< Link Check CID */
 
 #define GNRC_LORAWAN_FOPT_LINK_CHECK_ANS_SIZE (3U)      /**< size of Link check answer */
+
+#define GNRC_LORAWAN_CID_PING_SLOT_CHANNEL_REQ (0x11)
+
+#define GNRC_LORAWAN_CID_PING_SLOT_CHANNEL_REQ_SIZE (5)
+
+#define GNRC_LORAWAN_CID_PING_SLOT_CHANNEL_ANS_SIZE (2)
 
 #define GNRC_LORAWAN_JOIN_DELAY_U32_MASK (0x1FFFFF)     /**< mask for detecting overflow in frame counter */
 
@@ -157,9 +164,12 @@ typedef struct {
     int pending_mlme_opts;  /**< holds pending mlme opts */
     uint32_t nid;               /**< current Network ID */
     int32_t backoff_budget;     /**< remaining Time On Air budget */
+    uint32_t ps_channel;
     uint16_t ping_period;        /**< ping slot period */
     uint8_t dev_nonce[2];       /**< Device Nonce */
     uint8_t backoff_state;      /**< state in the backoff state machine */
+    uint8_t ps_chan_ans;
+    uint8_t ps_dr;
     bool sync;
 } gnrc_lorawan_mlme_t;
 
