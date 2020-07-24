@@ -292,6 +292,11 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
                            .dr = netif->lorawan.datarate } };
     mcps_confirm_t conf;
     gnrc_lorawan_mcps_request(&netif->lorawan.mac, &req, &conf);
+
+    if (conf.status < 0) {
+        gnrc_pktbuf_release(payload);
+    }
+
     return conf.status;
 }
 
