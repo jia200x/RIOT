@@ -283,6 +283,11 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
     mlme_request_t mlme_request;
     mlme_confirm_t mlme_confirm;
 
+    if (!payload) {
+        DEBUG("gnrc_lorawan_netif: pkt was NULL");
+        return -EINVAL;
+    }
+
     if (netif->lorawan.flags & GNRC_NETIF_LORAWAN_FLAGS_LINK_CHECK) {
         mlme_request.type = MLME_LINK_CHECK;
         gnrc_lorawan_mlme_request(&netif->lorawan.mac, &mlme_request, &mlme_confirm);
