@@ -134,7 +134,19 @@ void gnrc_lorawan_mcps_indication(gnrc_lorawan_t *mac, mcps_indication_t *ind)
 void gnrc_lorawan_mlme_indication(gnrc_lorawan_t *mac, mlme_indication_t *ind)
 {
     (void) mac;
-    (void) ind;
+    switch(ind->type) {
+        case MLME_BEACON_NOTIFY:
+            puts("RX_BEACON!");
+            for (unsigned i=0;i<ind->beacon.len;i++) {
+                printf("%02x ", ind->beacon.psdu[i]);
+            }
+            puts("");
+            printf("RSSI: %i\n", ind->beacon.info->rssi);
+            printf("SNR: %i\n", ind->beacon.info->snr);
+            break;
+        default:
+            break;
+    }
 }
 
 void gnrc_lorawan_mcps_confirm(gnrc_lorawan_t *mac, mcps_confirm_t *confirm)
@@ -155,17 +167,17 @@ static void _rx_done(gnrc_lorawan_t *mac)
         DEBUG("_recv_ieee802154: cannot allocate pktsnip.\n");
         /* Discard packet on netdev device */
         dev->driver->recv(dev, NULL, bytes_expected, NULL);
-        gnrc_lorawan_radio_rx_done_cb(mac, NULL, 0);
+        gnrc_lorawan_radio_rx_done_cb(mac, NULL, 0, NULL);
         return;
     }
     nread = dev->driver->recv(dev, pkt->data, bytes_expected, &rx_info);
     if (nread <= 0) {
         gnrc_pktbuf_release(pkt);
-        gnrc_lorawan_radio_rx_done_cb(mac, NULL, 0);
+        gnrc_lorawan_radio_rx_done_cb(mac, NULL, 0, NULL);
         return;
     }
 
-    gnrc_lorawan_radio_rx_done_cb(mac, pkt->data, pkt->size);
+    gnrc_lorawan_radio_rx_done_cb(mac, pkt->data, pkt->size, (lora_rx_info_t*) &rx_info);
     gnrc_pktbuf_release(pkt);
 }
 

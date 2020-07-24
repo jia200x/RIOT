@@ -340,7 +340,7 @@ void gnrc_lorawan_enable_beacon_rx(gnrc_lorawan_t *mac)
     //gnrc_lorawan_set_timer(mac, 5000000);
 }
 
-void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size)
+void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size, lora_rx_info_t *info)
 {
     puts("rx_done");
     _sleep_radio(mac);
@@ -371,6 +371,6 @@ void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *psdu, size_t si
         }
     }
     else {
-        gnrc_lorawan_mlme_process_beacon(mac, psdu, size);
+        gnrc_lorawan_mlme_process_beacon(mac, psdu, size, info);
     }
 }

@@ -178,11 +178,19 @@ typedef struct {
     };
 } mcps_indication_t;
 
+typedef struct {
+    lora_rx_info_t *info;
+    uint8_t *psdu;
+    uint8_t len;
+} mlme_beacon_t;
 /**
  * @brief MAC (sub) Layer Management Entity (MLME) indication representation
  */
 typedef struct {
     mlme_type_t type; /**< type of the MLME indication */
+    union {
+        mlme_beacon_t beacon;
+    };
 } mlme_indication_t;
 
 /**
@@ -250,8 +258,9 @@ void gnrc_lorawan_mcps_request(gnrc_lorawan_t *mac, const mcps_request_t *mcps_r
  * @param[in] data pointer to the psdu. Pass NULL if the packet was wrong (or
  * allocation failed)
  * @param[in] size size of the PSDU
+ * @param[in] info packet info
  */
-void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *data, size_t size);
+void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *data, size_t size, lora_rx_info_t *info);
 
 /**
  * @brief MCPS indication callback

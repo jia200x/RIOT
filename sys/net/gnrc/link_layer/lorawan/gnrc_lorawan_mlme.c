@@ -321,18 +321,17 @@ void gnrc_lorawan_schedule_next_pingslot(gnrc_lorawan_t *mac)
 
 void _config_pingslot_rx_window(gnrc_lorawan_t *mac);
 
-void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size)
+void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size, lora_rx_info_t *info)
 {
-    puts("RX_BEACON");
     netdev_t *dev = gnrc_lorawan_get_netdev(mac);
 
+    mlme_indication_t mlme_indication;
     mlme_confirm_t mlme_confirm;
     mlme_confirm.type = MLME_SYNC;
     mlme_confirm.status = 0;
     mac->state = LORAWAN_STATE_IDLE;
     mac->mlme.sync = true;
 
-    (void) size;
     int slot_offset = gnrc_lorawan_calculate_slot(psdu+2, &mac->dev_addr, mac->mlme.ping_period);
 
     beacon_window_start = gnrc_lorawan_timer_now(mac) + BEACON_RESERVED - BEACON_TOA_US;
@@ -346,7 +345,11 @@ void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t
 
     gnrc_lorawan_mac_release(mac);
     gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
-    /* TODO: Add MLME-IND with beacon */
+    mlme_indication.type = MLME_BEACON_NOTIFY;
+    mlme_indication.beacon.psdu = psdu;
+    mlme_indication.beacon.len = (uint8_t) size;
+    mlme_indication.beacon.info = info;
+    gnrc_lorawan_mlme_indication(mac, &mlme_indication);
 }
 
 int _fopts_mlme_link_check_req(lorawan_buffer_t *buf)

@@ -163,6 +163,11 @@ typedef struct {
     bool sync;
 } gnrc_lorawan_mlme_t;
 
+typedef struct {
+    uint8_t rssi;
+    int8_t snr;
+} lora_rx_info_t;
+
 /**
  * @brief GNRC LoRaWAN mac descriptor */
 typedef struct {
@@ -470,7 +475,7 @@ void gnrc_lorawan_trigger_join(gnrc_lorawan_t *mac);
 
 void gnrc_lorawan_enable_beacon_rx(gnrc_lorawan_t *mac);
 void gnrc_lorawan_beacon_lost(gnrc_lorawan_t *mac);
-void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size);
+void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size, lora_rx_info_t *info);
 int gnrc_lorawan_calculate_slot(const void *beacon_time, const void *dev_addr, int ping_period);
 void gnrc_lorawan_class_b_finish(gnrc_lorawan_t *mac);
 
