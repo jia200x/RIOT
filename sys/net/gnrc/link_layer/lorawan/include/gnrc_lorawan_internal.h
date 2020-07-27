@@ -175,6 +175,7 @@ typedef struct {
  */
 typedef struct {
     uint32_t timestamp;         /**< timestamp of uplink */
+    uint32_t rx_ref;
     le_uint32_t beacon_time;
     uint8_t beacon_counter;
     uint8_t activation;         /**< Activation mechanism of the MAC layer */

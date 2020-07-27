@@ -147,7 +147,7 @@ void gnrc_lorawan_open_rx_window(gnrc_lorawan_t *mac)
     netdev_t *dev = gnrc_lorawan_get_netdev(mac);
     /* Switch to RX state */
     if (mac->state == LORAWAN_STATE_RX_1) {
-        gnrc_lorawan_set_timer(mac, MS_PER_SEC);
+        gnrc_lorawan_set_timer(mac, mac->mlme.rx_ref + MS_PER_SEC - gnrc_lorawan_timer_now(mac));
     }
     netopt_state_t state = NETOPT_STATE_RX;
     dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
@@ -197,9 +197,7 @@ void gnrc_lorawan_timeout_cb(gnrc_lorawan_t *mac)
 
 void gnrc_lorawan_radio_tx_done_cb(gnrc_lorawan_t *mac)
 {
-    if (mac->mlme.pending_mlme_opts & GNRC_LORAWAN_MLME_OPTS_DEVICE_TIME_REQ) {
-        mac->mlme.timestamp = gnrc_lorawan_timer_now(mac);
-    }
+    mac->mlme.timestamp = gnrc_lorawan_timer_now(mac);
 
     if (mac->mlme.sync) {
         mac->state = LORAWAN_STATE_IDLE;
@@ -215,7 +213,8 @@ void gnrc_lorawan_radio_tx_done_cb(gnrc_lorawan_t *mac)
         rx_1 = mac->mlme.activation == MLME_ACTIVATION_NONE ?
                LORAMAC_DEFAULT_JOIN_DELAY1 : mac->rx_delay;
 
-        gnrc_lorawan_set_timer(mac, rx_1 * MS_PER_SEC);
+        mac->mlme.rx_ref = mac->mlme.timestamp + rx_1 * MS_PER_SEC;
+        gnrc_lorawan_set_timer(mac, mac->mlme.rx_ref - mac->mlme.timestamp);
 
         uint8_t dr_offset = (mac->dl_settings & GNRC_LORAWAN_DL_DR_OFFSET_MASK) >>
             GNRC_LORAWAN_DL_DR_OFFSET_POS;

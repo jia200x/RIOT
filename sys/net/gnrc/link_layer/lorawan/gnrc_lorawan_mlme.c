@@ -305,30 +305,29 @@ void gnrc_lorawan_beacon_lost(gnrc_lorawan_t *mac)
     */
 }
 
-uint32_t beacon_window_start;
 uint16_t next_slot;
 
-static uint32_t get_slot_timestamp(int slot)
+static uint32_t get_slot_timestamp(gnrc_lorawan_t *mac, int slot)
 {
-    return beacon_window_start + BEACON_RESERVED + slot * 30;
+    return mac->mlme.rx_ref + BEACON_RESERVED + slot * 30;
 }
 
 void gnrc_lorawan_schedule_next_pingslot(gnrc_lorawan_t *mac)
 {
     uint32_t now = gnrc_lorawan_timer_now(mac);
     /* TODO: Add backoff? */
-    while (get_slot_timestamp(next_slot) < now) {
+    while (get_slot_timestamp(mac, next_slot) < now) {
         /* TODO: Check */
         next_slot += mac->mlme.ping_period;
     }
 
     if (next_slot < 4096) {
-        gnrc_lorawan_set_timer(mac, get_slot_timestamp(next_slot) - 1 - gnrc_lorawan_timer_now(mac));
+        gnrc_lorawan_set_timer(mac, get_slot_timestamp(mac, next_slot) - 1 - gnrc_lorawan_timer_now(mac));
         printf("%i\n", next_slot);
     }
     else {
-        beacon_window_start += 128000;
-        gnrc_lorawan_set_timer(mac, beacon_window_start - now);
+        mac->mlme.rx_ref += 128000;
+        gnrc_lorawan_set_timer(mac, mac->mlme.rx_ref - now);
         mac->state = LORAWAN_STATE_BEACON_ACQUIRE;
         puts("BEACON");
     }
@@ -349,7 +348,7 @@ static void _resolve_slot_offset(gnrc_lorawan_t *mac, bool beacon)
     next_slot = slot_offset;
 
     _config_pingslot_rx_window(mac);
-    gnrc_lorawan_set_timer(mac, get_slot_timestamp(next_slot) - 1 - gnrc_lorawan_timer_now(mac));
+    gnrc_lorawan_set_timer(mac, get_slot_timestamp(mac, next_slot) - 1 - gnrc_lorawan_timer_now(mac));
 
     netopt_state_t state = NETOPT_STATE_SLEEP;
     dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
@@ -369,7 +368,7 @@ void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t
 {
 
     memcpy(&mac->mlme.beacon_time, psdu+2, sizeof(le_uint32_t));
-    beacon_window_start = gnrc_lorawan_timer_now(mac) - BEACON_TOA_US;
+    mac->mlme.rx_ref = gnrc_lorawan_timer_now(mac) - BEACON_TOA_US;
     _resolve_slot_offset(mac, true);
     mlme_indication_t mlme_indication;
     mlme_indication.type = MLME_BEACON_NOTIFY;
