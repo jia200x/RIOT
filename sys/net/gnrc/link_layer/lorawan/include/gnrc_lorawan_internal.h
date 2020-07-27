@@ -175,6 +175,7 @@ typedef struct {
  */
 typedef struct {
     uint32_t timestamp;         /**< timestamp of uplink */
+    le_uint32_t beacon_time;
     uint8_t activation;         /**< Activation mechanism of the MAC layer */
     int pending_mlme_opts;  /**< holds pending mlme opts */
     uint32_t nid;               /**< current Network ID */

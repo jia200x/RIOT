@@ -176,9 +176,6 @@ void gnrc_lorawan_timeout_cb(gnrc_lorawan_t *mac)
         case LORAWAN_STATE_JOIN:
             gnrc_lorawan_trigger_join(mac);
             break;
-        case LORAWAN_STATE_BEACON_ACQUISITION:
-            gnrc_lorawan_beacon_lost(mac);
-            break;
         case LORAWAN_STATE_BEACON_ACQUIRE:
             puts("OPEN_BEACON");
             gnrc_lorawan_enable_beacon_rx(mac);
@@ -250,7 +247,7 @@ void gnrc_lorawan_radio_rx_timeout_cb(gnrc_lorawan_t *mac)
             assert(false);
             break;
         case LORAWAN_STATE_BEACON_ACQUISITION:
-            puts("Beacon lost :(");
+            gnrc_lorawan_beacon_lost(mac);
             break;
         default:
             assert(false);

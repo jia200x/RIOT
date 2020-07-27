@@ -31,6 +31,8 @@
 
 #include "debug.h"
 
+static void _resolve_slot_offset(gnrc_lorawan_t *mac, bool beacon);
+
 static void _build_join_req_pkt(uint8_t *appeui, uint8_t *deveui, uint8_t *appkey, uint8_t *dev_nonce, uint8_t *psdu)
 {
     lorawan_join_request_t *hdr = (lorawan_join_request_t *) psdu;
@@ -282,7 +284,14 @@ void gnrc_lorawan_mlme_request(gnrc_lorawan_t *mac, const mlme_request_t *mlme_r
 
 void gnrc_lorawan_beacon_lost(gnrc_lorawan_t *mac)
 {
-    netdev_t *dev = gnrc_lorawan_get_netdev(mac);
+    puts("Beacon lost :(");
+
+    uint32_t exp_beacon_time = byteorder_ntohl(byteorder_ltobl(mac->mlme.beacon_time)) + 0x80;
+
+    mac->mlme.beacon_time = byteorder_btoll(byteorder_htonl(exp_beacon_time));
+
+    _resolve_slot_offset(mac, false);
+    /*
     mlme_confirm_t mlme_confirm;
     mlme_confirm.type = MLME_SYNC;
     mlme_confirm.status = -ENOLINK;
@@ -291,6 +300,7 @@ void gnrc_lorawan_beacon_lost(gnrc_lorawan_t *mac)
     netopt_state_t state = NETOPT_STATE_SLEEP;
     dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
     gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
+    */
 }
 
 uint32_t beacon_window_start;
@@ -315,29 +325,25 @@ void gnrc_lorawan_schedule_next_pingslot(gnrc_lorawan_t *mac)
         printf("%i\n", next_slot);
     }
     else {
-        gnrc_lorawan_set_timer(mac, (beacon_window_start + 128000 - now) * 1000);
+        beacon_window_start += 128000;
+        gnrc_lorawan_set_timer(mac, (beacon_window_start - now) * 1000);
         mac->state = LORAWAN_STATE_BEACON_ACQUIRE;
         puts("BEACON");
-        /* TODO: Set timer for beacon! */
     }
 }
 
 void _config_pingslot_rx_window(gnrc_lorawan_t *mac);
 
-void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size, lora_rx_info_t *info)
+static void _resolve_slot_offset(gnrc_lorawan_t *mac, bool beacon)
 {
-    netdev_t *dev = gnrc_lorawan_get_netdev(mac);
-
-    mlme_indication_t mlme_indication;
     mlme_confirm_t mlme_confirm;
     mlme_confirm.type = MLME_SYNC;
     mlme_confirm.status = 0;
     mac->state = LORAWAN_STATE_IDLE;
-    mac->mlme.sync = true;
 
-    int slot_offset = gnrc_lorawan_calculate_slot(psdu+2, &mac->dev_addr, mac->mlme.ping_period);
+    netdev_t *dev = gnrc_lorawan_get_netdev(mac);
+    int slot_offset = gnrc_lorawan_calculate_slot(&mac->mlme.beacon_time, &mac->dev_addr, mac->mlme.ping_period);
 
-    beacon_window_start = gnrc_lorawan_timer_now(mac) - BEACON_TOA_US;
     next_slot = slot_offset;
 
     _config_pingslot_rx_window(mac);
@@ -346,7 +352,19 @@ void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t
     netopt_state_t state = NETOPT_STATE_SLEEP;
     dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
 
-    gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
+    if (beacon) {
+        mac->mlme.sync = true;
+        gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
+    }
+}
+
+void gnrc_lorawan_mlme_process_beacon(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size, lora_rx_info_t *info)
+{
+
+    memcpy(&mac->mlme.beacon_time, psdu+2, sizeof(le_uint32_t));
+    beacon_window_start = gnrc_lorawan_timer_now(mac) - BEACON_TOA_US;
+    _resolve_slot_offset(mac, true);
+    mlme_indication_t mlme_indication;
     mlme_indication.type = MLME_BEACON_NOTIFY;
     mlme_indication.beacon.psdu = psdu;
     mlme_indication.beacon.len = (uint8_t) size;
