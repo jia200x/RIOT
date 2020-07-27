@@ -29,6 +29,8 @@
 #define BEACON_TOA_US   (153)
 #define BEACON_RESERVED (2120)
 
+#define BEACON_COUNTER_DEFAULT (56U)
+
 #include "debug.h"
 
 static void _resolve_slot_offset(gnrc_lorawan_t *mac, bool beacon);
@@ -354,7 +356,12 @@ static void _resolve_slot_offset(gnrc_lorawan_t *mac, bool beacon)
 
     if (beacon) {
         mac->mlme.sync = true;
+        mac->mlme.beacon_counter = BEACON_COUNTER_DEFAULT;
         gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
+    }
+    else if ((--mac->mlme.beacon_counter) == 0) {
+        /* TODO: Go to class A and generate indication */
+        puts("Beacon lost");
     }
 }
 
