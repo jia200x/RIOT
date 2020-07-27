@@ -424,6 +424,11 @@ static void _mlme_link_check_ans(gnrc_lorawan_t *mac, uint8_t *p)
 }
 static void _mlme_ping_slot_channel_req(gnrc_lorawan_t *mac, uint8_t *p)
 {
+    if (mac->mlme.sync) {
+        /* Ignore if class B */
+        return;
+    }
+
     uint32_t channel = (p[1] + (p[2] << 8) + ((uint32_t) p[3] << 16)) * 100;
     uint8_t tmp = 0;
     for (unsigned i=0; i<GNRC_LORAWAN_MAX_CHANNELS; i++) {
