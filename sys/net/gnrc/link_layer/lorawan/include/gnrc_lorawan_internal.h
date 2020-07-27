@@ -73,7 +73,10 @@ extern "C" {
 #define GNRC_LORAWAN_BACKOFF_BUDGET_3   (8700000LL)     /**< budget of time on air every 24 hours */
 
 #define GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ  (1 << 0) /**< Internal Link Check request flag */
+
 #define GNRC_LORAWAN_MLME_OPTS_PING_SLOT_CHANNEL_ANS  (1 << 1) /**< Internal Link Check request flag */
+
+#define GNRC_LORAWAN_MLME_OPTS_DEVICE_TIME_REQ  (1 << 2) /**< Device Time request flag */
 
 #define GNRC_LORAWAN_CID_SIZE (1U)                      /**< size of Command ID in FOps */
 #define GNRC_LORAWAN_CID_LINK_CHECK_ANS (0x02)          /**< Link Check CID */
@@ -85,6 +88,9 @@ extern "C" {
 #define GNRC_LORAWAN_CID_PING_SLOT_CHANNEL_REQ_SIZE (5)
 
 #define GNRC_LORAWAN_CID_PING_SLOT_CHANNEL_ANS_SIZE (2)
+
+#define GNRC_LORAWAN_CID_DEVICE_TIME    (0x0D)          /**< Device Time CID */
+#define GNRC_LORAWAN_FOPT_DEVICE_TIME_ANS_SIZE (6U)      /**< size of Device Time answer */
 
 #define GNRC_LORAWAN_JOIN_DELAY_U32_MASK (0x1FFFFF)     /**< mask for detecting overflow in frame counter */
 
@@ -135,6 +141,14 @@ typedef struct {
 } mlme_link_req_confirm_t;
 
 /**
+ * @brief MLME Device Time confirmation data
+ */
+typedef struct __attribute__((packed)) {
+    le_uint32_t seconds;    /**< Seconds since epoch */
+    uint8_t frac;           /**< fraction of second */
+} mlme_dt_opt_t;
+
+/**
  * @brief MCPS data
  */
 typedef struct {
@@ -160,6 +174,7 @@ typedef struct {
  * @brief MLME service access point descriptor
  */
 typedef struct {
+    uint32_t timestamp;         /**< timestamp of uplink */
     uint8_t activation;         /**< Activation mechanism of the MAC layer */
     int pending_mlme_opts;  /**< holds pending mlme opts */
     uint32_t nid;               /**< current Network ID */

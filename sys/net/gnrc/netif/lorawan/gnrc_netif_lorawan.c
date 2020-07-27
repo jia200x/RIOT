@@ -62,6 +62,7 @@ static const gnrc_netif_ops_t lorawan_ops = {
 
 void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm)
 {
+    mlme_request_t mlme_request;
     gnrc_netif_lorawan_t *lw_netif = container_of(mac, gnrc_netif_lorawan_t, mac);
     if (confirm->type == MLME_JOIN) {
         if (confirm->status == 0) {
@@ -75,6 +76,17 @@ void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm)
         lw_netif->flags &= ~GNRC_NETIF_LORAWAN_FLAGS_LINK_CHECK;
         lw_netif->demod_margin = confirm->link_req.margin;
         lw_netif->num_gateways = confirm->link_req.num_gateways;
+    }
+    else if (confirm->type == MLME_DEVICE_TIME) {
+        if (confirm->status == GNRC_LORAWAN_REQ_STATUS_SUCCESS) {
+            printf("seconds to next beacon: %li\n", 0x80 - (confirm->device_time.seconds & 0x7F));
+            mlme_request.type = MLME_SYNC;
+            mlme_request.device_time = &confirm->device_time;
+            gnrc_lorawan_mlme_request(mac, &mlme_request, confirm);
+        }
+        else {
+            puts (":(");
+        }
     }
     else if (confirm->type == MLME_SYNC) {
         if (confirm->status == 0) {
@@ -430,11 +442,6 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
             assert(opt->data_len >= LORAMAC_NWKSKEY_LEN);
             memcpy(netif->lorawan.nwkskey, opt->data, LORAMAC_NWKSKEY_LEN);
             break;
-        case NETOPT_LORAWAN_DEVICE_CLASS:
-            mlme_request.type = MLME_SYNC;
-            mlme_request.enabled = true;
-            gnrc_lorawan_mlme_request(&netif->lorawan.mac, &mlme_request, &mlme_confirm);
-            break;
         case NETOPT_LINK:
         {
             netopt_enable_t en = *((netopt_enable_t *) opt->data);
@@ -472,6 +479,11 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
         case NETOPT_LINK_CHECK:
             netif->lorawan.flags |= GNRC_NETIF_LORAWAN_FLAGS_LINK_CHECK;
             break;
+        case NETOPT_LORAWAN_DEVICE_CLASS:
+            mlme_request.type = MLME_DEVICE_TIME;
+            gnrc_lorawan_mlme_request(&netif->lorawan.mac, &mlme_request, &mlme_confirm);
+            break;
+
         case NETOPT_LORAWAN_RX2_DR:
             assert(opt->data_len == sizeof(uint8_t));
             mlme_request.type = MLME_SET;

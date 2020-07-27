@@ -111,6 +111,7 @@ typedef enum {
     MLME_SYNC,                 /**< request synchronization to gateway beacons */
     MLME_BEACON_NOTIFY,        /**< device received a valid beacon */
     MLME_BEACON_LOSS,          /**< device couldn't synchronize to beacons */
+    MLME_DEVICE_TIME,          /**< request device time */
 } mlme_type_t;
 
 /**
@@ -133,6 +134,12 @@ typedef struct {
     };
 } mlme_mib_t;
 
+typedef struct {
+    uint32_t seconds;
+    uint32_t reference;
+    uint16_t msecs;
+} mlme_device_time_t;
+
 /**
  * @brief MAC (sub) Layer Management Entity (MLME) request representation
  */
@@ -140,7 +147,7 @@ typedef struct {
     union {
         mlme_lorawan_join_t join; /**< Join Data holder */
         mlme_mib_t mib;           /**< MIB holder */
-        bool enabled;             /**< enabled status holder */
+        mlme_device_time_t *device_time; /**< enabled status holder */
     };
     mlme_type_t type;   /**< type of the MLME request */
 } mlme_request_t;
@@ -164,6 +171,7 @@ typedef struct {
     union {
         mlme_link_req_confirm_t link_req; /**< Link Check confirmation data */
         mlme_mib_t mib;                   /**< MIB confirmation data */
+        mlme_device_time_t device_time;
     };
 } mlme_confirm_t;
 
