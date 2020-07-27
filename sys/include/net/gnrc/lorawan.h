@@ -329,9 +329,9 @@ netdev_t *gnrc_lorawan_get_netdev(gnrc_lorawan_t *mac);
  * @note Supposed to be implemented by the user of GNRC LoRaWAN
  *
  * @param[in] mac pointer to the MAC descriptor
- * @param us timeout microseconds
+ * @param us timeout milliseconds
  */
-void gnrc_lorawan_set_timer(gnrc_lorawan_t *mac, uint32_t us);
+void gnrc_lorawan_set_timer(gnrc_lorawan_t *mac, uint32_t ms);
 
 /**
  * @brief Remove the current timer

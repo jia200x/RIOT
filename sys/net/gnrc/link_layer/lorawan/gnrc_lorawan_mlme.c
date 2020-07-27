@@ -254,7 +254,7 @@ void gnrc_lorawan_mlme_request(gnrc_lorawan_t *mac, const mlme_request_t *mlme_r
                 uint32_t target = mlme_request->device_time->reference + 
                     (0x80 - (mlme_request->device_time->seconds & 0x7F))*1000 - (mlme_request->device_time->msecs);
                 uint32_t diff = target - gnrc_lorawan_timer_now(mac); 
-                gnrc_lorawan_set_timer(mac, diff * 1000);
+                gnrc_lorawan_set_timer(mac, diff);
             }
             else {
                 /* TODO: Disable beacons */
@@ -323,12 +323,12 @@ void gnrc_lorawan_schedule_next_pingslot(gnrc_lorawan_t *mac)
     }
 
     if (next_slot < 4096) {
-        gnrc_lorawan_set_timer(mac, (get_slot_timestamp(next_slot) - 1 - gnrc_lorawan_timer_now(mac))*1000);
+        gnrc_lorawan_set_timer(mac, get_slot_timestamp(next_slot) - 1 - gnrc_lorawan_timer_now(mac));
         printf("%i\n", next_slot);
     }
     else {
         beacon_window_start += 128000;
-        gnrc_lorawan_set_timer(mac, (beacon_window_start - now) * 1000);
+        gnrc_lorawan_set_timer(mac, beacon_window_start - now);
         mac->state = LORAWAN_STATE_BEACON_ACQUIRE;
         puts("BEACON");
     }
@@ -349,7 +349,7 @@ static void _resolve_slot_offset(gnrc_lorawan_t *mac, bool beacon)
     next_slot = slot_offset;
 
     _config_pingslot_rx_window(mac);
-    gnrc_lorawan_set_timer(mac, (get_slot_timestamp(next_slot) - 1 - gnrc_lorawan_timer_now(mac))*1000);
+    gnrc_lorawan_set_timer(mac, get_slot_timestamp(next_slot) - 1 - gnrc_lorawan_timer_now(mac));
 
     netopt_state_t state = NETOPT_STATE_SLEEP;
     dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));

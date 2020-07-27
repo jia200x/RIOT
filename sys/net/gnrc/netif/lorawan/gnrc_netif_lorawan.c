@@ -98,13 +98,13 @@ void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm)
     }
 }
 
-void gnrc_lorawan_set_timer(gnrc_lorawan_t *mac, uint32_t us)
+void gnrc_lorawan_set_timer(gnrc_lorawan_t *mac, uint32_t ms)
 {
     gnrc_netif_lorawan_t *lw_netif = container_of(mac, gnrc_netif_lorawan_t, mac);
 #if IS_USED(MODULE_GNRC_LORAWAN_RTT)
-        ztimer_set_msg(ZTIMER_MSEC, &lw_netif->timer, us/1000, &timeout_msg, thread_getpid());
+        ztimer_set_msg(ZTIMER_MSEC, &lw_netif->timer, ms, &timeout_msg, thread_getpid());
 #else
-        xtimer_set_msg(&lw_netif->timer, ADJUST_DRIFT(us), &timeout_msg, thread_getpid());
+        xtimer_set_msg(&lw_netif->timer, ADJUST_DRIFT(ms*1000), &timeout_msg, thread_getpid());
 #endif
 }
 

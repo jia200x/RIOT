@@ -92,7 +92,7 @@ extern "C" {
 #define GNRC_LORAWAN_CID_DEVICE_TIME    (0x0D)          /**< Device Time CID */
 #define GNRC_LORAWAN_FOPT_DEVICE_TIME_ANS_SIZE (6U)      /**< size of Device Time answer */
 
-#define GNRC_LORAWAN_JOIN_DELAY_U32_MASK (0x1FFFFF)     /**< mask for detecting overflow in frame counter */
+#define GNRC_LORAWAN_JOIN_DELAY_U32_MASK (0x7ff)     /**< mask for detecting overflow in frame counter */
 
 #define GNRC_LORAWAN_MAX_PAYLOAD_1 (59U)                /**< max MAC payload in DR0, DR1 and DR2 */
 #define GNRC_LORAWAN_MAX_PAYLOAD_2 (123U)               /**< max MAC payload in DR3 */

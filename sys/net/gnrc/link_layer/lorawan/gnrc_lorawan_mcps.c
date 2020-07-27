@@ -320,7 +320,7 @@ static void _handle_retransmissions(gnrc_lorawan_t *mac)
     if (mac->mcps.nb_trials-- == 0) {
         _end_of_tx(mac, MCPS_CONFIRMED, -ETIMEDOUT);
     } else {
-        gnrc_lorawan_set_timer(mac, 1000000 + random_uint32_range(0, 2000000));
+        gnrc_lorawan_set_timer(mac, 1000 + random_uint32_range(0, 2000));
     }
 }
 
