@@ -133,7 +133,6 @@ ifneq (,$(filter netdev_ieee802154,$(USEMODULE)))
 endif
 
 ifneq (,$(filter netdev_ieee802154_submac,$(USEMODULE)))
-  USEMODULE += ieee802154_radio_hal
   USEMODULE += ieee802154_submac
 endif
 
@@ -469,6 +468,7 @@ ifneq (,$(filter gnrc_pktdump,$(USEMODULE)))
 endif
 
 ifneq (,$(filter ieee802154_submac,$(USEMODULE)))
+  USEMODULE += ieee802154_radio_hal
   USEMODULE += xtimer
 endif
 
