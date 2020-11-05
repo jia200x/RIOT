@@ -9,7 +9,7 @@ ifneq (,$(filter ieee802154_submac,$(USEMODULE)))
 endif
 
 ifneq (,$(filter ieee802154_mac,$(USEMODULE)))
-	SRC += mac.c
+	SRC += mac.c scan.c
 endif
 
 include $(RIOTBASE)/Makefile.base
