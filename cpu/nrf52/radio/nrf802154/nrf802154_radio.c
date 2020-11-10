@@ -110,7 +110,11 @@ static bool _l2filter(uint8_t *mhr)
     /* filter PAN ID */
     /* Will only work on little endian platform (all?) */
 
-    if ((memcmp(pan_bcast, dst_pan.u8, 2) != 0) &&
+    if ((mhr[0] & 0x3) == 0) {
+        /* Pass beacon frames */
+        return true;
+    }
+    else if ((memcmp(pan_bcast, dst_pan.u8, 2) != 0) &&
         (memcmp(&nrf802154_pan_id, dst_pan.u8, 2) != 0)) {
         return false;
     }

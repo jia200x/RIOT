@@ -106,6 +106,8 @@ extern "C" {
 #define CC2538_RF_SENSITIVITY       (-97)  /**< dBm typical, normal conditions */
 
 #define CC2538_ACCEPT_FT_2_ACK           (1 << 5) /**< enable or disable the ACK filter */
+#define CC2538_ACCEPT_FT_2_BEACON           (1 << 3) /**< enable or disable the Beacon filter */
+#define CC2538_ACCEPT_FT_2_CMD           (1 << 6) /**< enable or disable the Beacon filter */
 #define CC2538_STATE_SFD_WAIT_RANGE_MIN  (0x03U)  /**< min range value of SFD wait state */
 #define CC2538_STATE_SFD_WAIT_RANGE_MAX  (0x06U)  /**< max range value of SFD wait state */
 #define CC2538_FRMCTRL1_PENDING_OR_MASK  (0x04)   /**< mask for enabling or disabling the

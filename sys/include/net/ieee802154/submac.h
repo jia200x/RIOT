@@ -111,6 +111,7 @@ struct ieee802154_submac {
     ieee802154_csma_be_t be;            /**< CSMA-CA backoff exponent params */
     bool wait_for_ack;                  /**< SubMAC is waiting for an ACK frame */
     bool tx;                            /**< SubMAC is currently transmitting a frame */
+    bool disable_retrans;               /** If true, retransmissions are disabled */
     uint16_t panid;                     /**< IEEE 802.15.4 PAN ID */
     uint16_t channel_num;               /**< IEEE 802.15.4 channel number */
     uint8_t channel_page;               /**< IEEE 802.15.4 channel page */
@@ -326,6 +327,29 @@ static inline int ieee802154_read_frame(ieee802154_submac_t *submac, void *buf,
                                         size_t len, ieee802154_rx_info_t *info)
 {
     return ieee802154_radio_read(submac->dev, buf, len, info);
+}
+
+/**
+ * @brief Enable or disable frame retransmissions
+ *
+ * @param[in] submac pointer to the SubMAC descriptor
+ * @param[in] en whether the frame retransmissions should be enabled or not
+ *
+ * @return 0 on success
+ * @return negative errno on error
+ */
+static inline int ieee802154_set_frame_retrans(ieee802154_submac_t *submac, bool en)
+{
+    int res;
+    if (ieee802154_radio_has_frame_retrans(submac->dev)) {
+        res = ieee802154_radio_set_frame_retrans(submac->dev, en ? IEEE802154_SUBMAC_MAX_RETRANSMISSIONS : 0);
+    }
+
+    if (res >= 0) {
+        submac->disable_retrans = !en;
+    }
+
+    return res;
 }
 
 /**

@@ -2,7 +2,6 @@
 #include "net/ieee802154/mac.h"
 #include "ztimer.h"
 
-#define SUPERFRAME_BASE_US (60 * 60 * 16U)
 #define ENABLE_DEBUG (0)
 #include "debug.h"
 

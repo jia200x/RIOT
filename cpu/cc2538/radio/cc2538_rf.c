@@ -159,6 +159,7 @@ void cc2538_init(void)
     /* Flush the receive and transmit FIFOs */
     RFCORE_SFR_RFST = ISFLUSHTX;
     RFCORE_SFR_RFST = ISFLUSHRX;
+
 }
 
 bool cc2538_is_on(void)

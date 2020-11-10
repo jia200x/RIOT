@@ -121,7 +121,7 @@ int ieee802154_csma_ca_transmit(ieee802154_submac_t *submac)
 
 static bool _has_retrans_left(ieee802154_submac_t *submac)
 {
-    return submac->retrans < IEEE802154_SUBMAC_MAX_RETRANSMISSIONS;
+    return submac->disable_retrans == false && submac->retrans < IEEE802154_SUBMAC_MAX_RETRANSMISSIONS;
 }
 
 static void _perform_retrans(ieee802154_submac_t *submac)
@@ -296,6 +296,7 @@ int ieee802154_submac_init(ieee802154_submac_t *submac, const network_uint16_t *
     ieee802154_dev_t *dev = submac->dev;
 
     submac->tx = false;
+    submac->disable_retrans = false;
     submac->state = IEEE802154_STATE_LISTEN;
 
     ieee802154_radio_request_on(dev);
