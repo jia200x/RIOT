@@ -32,6 +32,12 @@
 #define AT_EVENT_PRIO EVENT_PRIO_HIGH
 #endif
 
+#if IS_ACTIVE(CONFIG_AT_SEND_SKIP_ECHO)
+#define AT_SEND_ECHO 0
+#else
+#define AT_SEND_ECHO 1
+#endif
+
 #if defined(MODULE_AT_URC_ISR)
 static void _event_process_urc(event_t *_event)
 {
