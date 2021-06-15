@@ -214,9 +214,16 @@ static void _send(iolist_t *pkt)
     /* Block until the radio confirms the state change */
     while(ieee802154_radio_confirm_set_trx_state(ieee802154_hal_test_get_dev(RADIO_DEFAULT_ID)) == -EAGAIN);
 
-    /* Trigger the transmit and wait for the mutex unlock (TX_DONE event) */
+    /* Set the frame filter to receive ACKs */
     ieee802154_radio_set_frame_filter_mode(ieee802154_hal_test_get_dev(RADIO_DEFAULT_ID), IEEE802154_FILTER_ACK_ONLY);
-    ieee802154_radio_request_transmit(ieee802154_hal_test_get_dev(RADIO_DEFAULT_ID));
+
+    /* Trigger the transmit and wait for the mutex unlock (TX_DONE event).
+     * Spin if the radio is busy before transmission (this indicates the
+     * transmission is requested before the end of the IFS).
+     * This won't be necessary anymore when the upper layers take care
+     * of the IFS.
+     */
+    while (ieee802154_radio_request_transmit(ieee802154_hal_test_get_dev(RADIO_DEFAULT_ID)) == -EBUSY) {}
     mutex_lock(&lock);
 
     event_post(EVENT_PRIO_HIGHEST, &_tx_finish_ev);
