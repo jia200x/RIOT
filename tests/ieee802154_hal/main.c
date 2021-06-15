@@ -106,10 +106,9 @@ void _crc_error_handler(event_t *event)
 {
     (void) event;
     puts("Packet with invalid CRC received");
-    ieee802154_dev_t* dev = ieee802154_hal_test_get_dev(RADIO_DEFAULT_ID);
+
     /* switch back to RX_ON state */
-    ieee802154_radio_request_set_trx_state(dev, IEEE802154_TRX_STATE_RX_ON);
-    while (ieee802154_radio_confirm_set_trx_state(dev) == -EAGAIN) {}
+    _set_trx_state(IEEE802154_TRX_STATE_RX_ON, false);
 }
 
 static event_t _crc_error_event = {
