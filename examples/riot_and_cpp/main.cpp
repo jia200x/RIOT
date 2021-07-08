@@ -28,6 +28,9 @@
 #include <cstdio>
 #include <vector>
 #include "cpp_class.hpp"
+#include "DSMEPlatform.h"
+
+dsme::DSMEPlatform m_dsme;
 
 using namespace std;
 
@@ -74,6 +77,8 @@ int main()
     }
 
     printf("}\n");
+    m_dsme.initialize();
+    //m_dsme.start();
 
     return 0;
 }

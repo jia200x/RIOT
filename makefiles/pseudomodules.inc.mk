@@ -337,6 +337,8 @@ PSEUDOMODULES += crypto_aes_unroll
 # declare shell version of test_utils_interactive_sync
 PSEUDOMODULES += test_utils_interactive_sync_shell
 
+PSEUDOMODULES += opendsme
+
 # All auto_init modules are pseudomodules
 PSEUDOMODULES += auto_init_%
 NO_PSEUDOMODULES += auto_init_can

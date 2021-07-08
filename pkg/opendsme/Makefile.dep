@@ -1,0 +1,14 @@
+FEATURES_REQUIRED += cpp
+
+USEMODULE += opendsme_dsmelayer
+USEMODULE += opendsme_acklayer
+USEMODULE += opendsme_associationmanager
+USEMODULE += opendsme_beaconmanager
+USEMODULE += opendsme_caplayer
+USEMODULE += opendsme_gtsmanager
+USEMODULE += opendsme_messagedispatcher
+USEMODULE += opendsme_messages
+USEMODULE += opendsme_datastructures
+USEMODULE += opendsme_mcps_sap
+USEMODULE += opendsme_mlme_sap
+USEMODULE += opendsme_pib
