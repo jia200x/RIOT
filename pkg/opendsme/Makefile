@@ -1,0 +1,50 @@
+PKG_NAME=opendsme
+PKG_URL=https://github.com/openDSME/openDSME.git
+PKG_VERSION=72562f2c6d194b854557494e80572bbe1c11b229
+PKG_LICENSE=GPL
+
+include $(RIOTBASE)/pkg/pkg.mk
+
+OPENDSME_MODULES = \
+                    opendsme_dsmelayer \
+                    opendsme_acklayer \
+                    opendsme_associationmanager \
+                    opendsme_beaconmanager \
+                    opendsme_caplayer \
+                    opendsme_gtsmanager \
+                    opendsme_messagedispatcher \
+                    opendsme_messages \
+                    opendsme_datastructures \
+                    opendsme_mcps_sap \
+                    opendsme_mlme_sap \
+                    opendsme_pib
+
+CPPFLAGS += -Wno-deprecated-copy -Wno-unused-parameter
+
+# dsmeLayer
+DIR_DSME_LAYER = dsmeLayer
+DIR_opendsme_dsmelayer = $(DIR_DSME_LAYER)
+DIR_opendsme_acklayer = $(DIR_DSME_LAYER)/ackLayer
+DIR_opendsme_associationmanager = $(DIR_DSME_LAYER)/associationManager
+DIR_opendsme_beaconmanager = $(DIR_DSME_LAYER)/beaconManager
+DIR_opendsme_caplayer = $(DIR_DSME_LAYER)/capLayer
+DIR_opendsme_gtsmanager = $(DIR_DSME_LAYER)/gtsManager
+DIR_opendsme_messagedispatcher = $(DIR_DSME_LAYER)/messageDispatcher
+DIR_opendsme_messages = $(DIR_DSME_LAYER)/messages
+
+# MAC Services
+
+DIR_MAC_SERVICES = mac_services
+DIR_opendsme_datastructures = $(DIR_MAC_SERVICES)/dataStructures
+DIR_opendsme_mcps_sap = $(DIR_MAC_SERVICES)/mcps_sap
+DIR_opendsme_mlme_sap = $(DIR_MAC_SERVICES)/mlme_sap
+DIR_opendsme_pib = $(DIR_MAC_SERVICES)/pib
+
+.PHONY: opendsme_%
+
+export SRCXXEXT=cc
+
+all: $(OPENDSME_MODULES)
+
+opendsme_%:
+	$(QQ)"$(MAKE)" -C $(PKG_SOURCE_DIR)/$(DIR_$@) -f $(CURDIR)/Makefile.$@
