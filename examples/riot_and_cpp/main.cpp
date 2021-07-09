@@ -46,39 +46,8 @@ int main()
     printf("\n************ RIOT and C++ demo program ***********\n");
     printf("\n");
 
-    /* create thread A */
-    thread_create(threadA_stack, sizeof(threadA_stack), 0,
-                                        THREAD_CREATE_WOUT_YIELD,
-                                        threadA_func, NULL, "thread A");
-
-    printf("******** Hello, you're in thread #%" PRIkernel_pid " ********\n",
-           thread_getpid());
-    printf("We'll test C++ class and methods here!\n");
-
-    cpp_class cpp_obj;
-    printf("\n-= Test overloading functions =-\n");
-    cpp_obj.say_hello();
-    cpp_obj.say_hello(42);
-    cpp_obj.say_hello(3.141592f);
-
-    printf("\n-= Test namespace =-\n");
-    printf("typing std::vector is obsolete when 'using namespace std;'\n");
-    vector<int> vInts;
-    vInts.push_back(1);
-    vInts.push_back(3);
-    vInts.push_back(2);
-    printf("The vector vInts has been filled with %d numbers.\n", (int)vInts.size());
-
-    printf("\n-= Test iterator =-\n");
-    printf("The content of vInts = { ");
-
-    for (vector<int>::iterator it = vInts.begin(); it != vInts.end(); ++it) {
-        printf("%d ", *(it));
-    }
-
-    printf("}\n");
     m_dsme.initialize();
-    //m_dsme.start();
+    m_dsme.start();
 
     return 0;
 }
