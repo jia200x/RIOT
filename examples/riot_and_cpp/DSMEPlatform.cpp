@@ -1,4 +1,10 @@
 #include "DSMEPlatform.h"
+#include "ztimer.h"
+
+static void _timer_cb(void *arg)
+{
+    dsme::DSMEPlatform::instance->getDSME().getEventDispatcher().timerInterrupt();
+}
 
 namespace dsme {
 
@@ -16,6 +22,8 @@ DSMEPlatform::DSMEPlatform() :
         channel(MIN_CHANNEL),
 				currentTXLength(0){
     instance = this;
+    this->timer.callback = _timer_cb;
+    this->timer.arg = this;
 }
 
 DSMEPlatform::~DSMEPlatform()
@@ -93,6 +101,52 @@ void DSMEPlatform::initialize()
     this->initialized = true;
 }
 
+void DSMEPlatform::startScan()
+{
+    channelList_t scanChannels;
+    scanChannels.add(26);
+    uint8_t scanDuration = 8;
+    if(!this->scanOrSyncInProgress) {
+        this->scanOrSyncInProgress = true;
+        DSME_ASSERT(!this->syncActive);
+
+        //this->recordedPanDescriptors.clear();
+
+        mlme_sap::SCAN::request_parameters params;
+
+        LOG_INFO("Initiating passive scan");
+        params.scanType = ScanType::PASSIVE;
+
+        params.scanChannels = scanChannels;
+        params.scanDuration = scanDuration;
+        params.channelPage = this->phy_pib.phyCurrentPage;
+        params.linkQualityScan = false;
+
+        this->mlme_sap.getSCAN().request(params);
+    } else {
+        LOG_INFO("Scan already in progress.");
+    }
+}
+
+void DSMEPlatform::startAssociation()
+{
+    if(!this->associationInProgress) {
+        startScan();
+    } else {
+        LOG_INFO("Association already in progress.");
+    }
+}
+
+void DSMEPlatform::start()
+{
+    assert(this->initialized);
+    this->dsme.start();
+    if(!this->mac_pib.macAssociatedPANCoord) {
+        LOG_DEBUG("Device is not associated with PAN.");
+        startAssociation();
+    }
+}
+
 void DSMEPlatform::handleDataIndication(mcps_sap::DATA_indication_parameters& params)
 {
     assert(false);
@@ -138,21 +192,23 @@ void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
 
 void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
 {
-    assert(false);
+    uint32_t delta = (symbolCounterValue - getSymbolCounter()) << 4;
+    ztimer_set(ZTIMER_USEC, &timer, delta);
 }
 
 uint32_t DSMEPlatform::getSymbolCounter()
 {
-    assert(false);
-    return 0;
+    return ztimer_now(ZTIMER_USEC) >> 4;
 }
 
 void DSMEPlatform::scheduleStartOfCFP()
 {
-    assert(false);
+    printf("Start of CFP\n");
 }
 
-void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver) {
+void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver)
+{
+
 }
 
 #if 0
@@ -186,7 +242,7 @@ void DSMEPlatform::signalSuccessPacketsCAP(uint32_t packets) {
 
 bool DSMEPlatform::setChannelNumber(uint8_t channel)
 {
-    assert(false);
+    printf("Setting channel to %d\n", channel);
     return true;
 }
 
@@ -221,7 +277,7 @@ bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMs
 
 void DSMEPlatform::setReceiveDelegate(receive_delegate_t receiveDelegate)
 {
-    assert(false);
+    this->receiveFromAckLayerDelegate = receiveDelegate;
 }
 
 bool DSMEPlatform::startCCA()
@@ -232,12 +288,12 @@ bool DSMEPlatform::startCCA()
 
 void DSMEPlatform::turnTransceiverOn()
 {
-    assert(false);
+    puts("Radio on! :)");
 }
 
 void DSMEPlatform::turnTransceiverOff()
 {
-    assert(false);
+    puts("Radio off! :)");
 }
 
 }

@@ -35,6 +35,7 @@ FEATURES_REQUIRED += libstdcpp # libstdc++ support (for #include <cstdio>)
 # to CXXEXFLAGS variable
 CXXEXFLAGS += -Wno-unused-parameter -Wno-pedantic -Wno-deprecated-copy -Wno-missing-field-initializers -Wno-unused-but-set-variable -Wno-maybe-uninitialized -Wno-unused-variable -Wno-reorder -Wno-address -Wno-sign-compare -Wno-unused-function
 USEPKG += opendsme
+USEMODULE += ztimer_usec
 
 export PKG_SOURCE_LOCAL_OPENDSME = /home/jialamos/Development/opendsme
 

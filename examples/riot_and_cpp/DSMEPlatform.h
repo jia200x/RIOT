@@ -16,6 +16,7 @@
 #include "mac_services/pib/MAC_PIB.h"
 #include "mac_services/pib/PHY_PIB.h"
 #include "opendsme/dsme_settings.h"
+#include "ztimer.h"
 
 //#include "DSMEMessageBuffer.h"
 //#include "HandleMessageTask.h"
@@ -72,6 +73,8 @@ public:
     ~DSMEPlatform();
 
     void initialize();
+    void startAssociation();
+    void startScan();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /* IDSMEPlatformBase */
@@ -208,6 +211,9 @@ protected:
 		uint16_t messagesInUse;
 
     bool initialized;
+    bool scanOrSyncInProgress{false};
+    bool associationInProgress{false};
+    bool syncActive{false};
 
 		receive_delegate_t receiveFromAckLayerDelegate;
 
@@ -228,6 +234,7 @@ protected:
     mac_result_t MCPS_transmit_status;
 
     uint8_t currentTXLength;
+    ztimer_t timer;
 };
 
 }
