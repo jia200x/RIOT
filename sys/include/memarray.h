@@ -98,11 +98,11 @@ static inline void *memarray_alloc(memarray_t *mem)
  */
 static inline void *memarray_calloc(memarray_t *mem)
 {
-    void *new = memarray_alloc(mem);
-    if (new) {
-        memset(new, 0, mem->size);
+    void *_new = memarray_alloc(mem);
+    if (_new) {
+        memset(_new, 0, mem->size);
     }
-    return new;
+    return _new;
 }
 
 /**
