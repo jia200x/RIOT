@@ -235,6 +235,13 @@ protected:
 
     uint8_t currentTXLength;
     ztimer_t timer;
+
+    struct DSMEMessagePool {
+        DSMEMessage msg;
+        DSMEMessagePool *next;
+    };
+    DSMEMessagePool *head;
+    DSMEMessagePool pool[8];
 };
 
 }

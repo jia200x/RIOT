@@ -1,5 +1,6 @@
 #include "DSMEPlatform.h"
 #include "ztimer.h"
+#include "iolist.h"
 
 static void _timer_cb(void *arg)
 {
@@ -24,6 +25,12 @@ DSMEPlatform::DSMEPlatform() :
     instance = this;
     this->timer.callback = _timer_cb;
     this->timer.arg = this;
+    
+    this->head = &this->pool[0];
+    for (int i=0; i<7; i++) {
+        this->pool[i].next = &this->pool[i+1];
+    }
+    this->pool[7].next = NULL;
 }
 
 DSMEPlatform::~DSMEPlatform()
@@ -182,12 +189,19 @@ void DSMEPlatform::handleReceivedMessageFromAckLayer(IDSMEMessage* message)
 
 DSMEMessage *DSMEPlatform::getEmptyMessage()
 {
-    return NULL;
+    DSMEMessage *msg = &this->head->msg;
+    this->head = head->next;
+    assert(msg);
+    msg->pkt = NULL;
+    return msg;
 }
 
 void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
 {
-    assert(false);
+    DSMEMessagePool *entry = (DSMEMessagePool*) msg;
+    gnrc_pktbuf_release(entry->msg.pkt);
+    entry->next = this->head;
+    this->head = entry;
 }
 
 void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
@@ -254,7 +268,18 @@ uint8_t DSMEPlatform::getChannelNumber()
 
 bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> txEndCallback)
 {
-    assert(false);
+    DSMEMessage *m = (DSMEMessage*) msg;
+    gnrc_pktsnip_t *pkt = m->pkt;
+    uint8_t mhr[23];
+    uint8_t mhr_len = msg->getHeader().getSerializationLength();
+    uint8_t *p = mhr;
+    msg->getHeader().serializeTo(p);
+    iolist_t iol = {
+        .iol_next = (iolist_t*) pkt,
+        .iol_base = mhr,
+        .iol_len = mhr_len,
+    };
+    puts("Pr");
     return true;
 }
 
@@ -288,12 +313,12 @@ bool DSMEPlatform::startCCA()
 
 void DSMEPlatform::turnTransceiverOn()
 {
-    puts("Radio on! :)");
+    //puts("Radio on! :)");
 }
 
 void DSMEPlatform::turnTransceiverOff()
 {
-    puts("Radio off! :)");
+    //puts("Radio off! :)");
 }
 
 }

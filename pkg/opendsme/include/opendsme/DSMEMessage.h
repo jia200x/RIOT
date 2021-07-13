@@ -14,6 +14,7 @@ extern "C" {
 #include "mac_services/dataStructures/DSMEMessageElement.h"
 #include "dsmeLayer/messages/IEEE802154eMACHeader.h"
 #include "interfaces/IDSMEMessage.h"
+#include "net/gnrc/pktbuf.h"
 
 namespace dsme {
 
@@ -23,9 +24,9 @@ class DSMEMessage : public IDSMEMessage {
 public:
 //////////////////////////////////////////////////////////////////////////////////
 		/* IDSMEMessage */
-    void prependFrom(DSMEMessageElement* msg);
+    void prependFrom(DSMEMessageElement* msg) override;
 
-    void decapsulateTo(DSMEMessageElement* msg);
+    void decapsulateTo(DSMEMessageElement* msg) override;
 
     void copyTo(DSMEMessageElement* msg);
 
@@ -56,6 +57,7 @@ public:
 				return bytes*2; // 4 bit per symbol
 		}
 
+    uint8_t getMPDUSymbols() override;
     IEEE802154eMACHeader& getHeader() {
         return macHdr;
     }
@@ -181,6 +183,7 @@ private:
     uint8_t radio_last_rssi;
     uint8_t channelSent;
     uint8_t  messageLQI;
+    gnrc_pktsnip_t *pkt;
 
     //mac_callback_t macCallbackFunction; /* callback for this packet */
 //		void *macCallbackPointer; /* MAC callback parameter */
