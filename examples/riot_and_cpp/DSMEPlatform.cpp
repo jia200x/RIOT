@@ -1,15 +1,26 @@
 #include "DSMEPlatform.h"
 #include "ztimer.h"
 #include "iolist.h"
-
-static void _timer_cb(void *arg)
-{
-    dsme::DSMEPlatform::instance->getDSME().getEventDispatcher().timerInterrupt();
-}
+#include "event.h"
+#include "event/thread.h"
 
 namespace dsme {
 
 DSMEPlatform* DSMEPlatform::instance = nullptr;
+uint8_t DSMEPlatform::state = STATE_READY;
+Delegate<void(bool)> DSMEPlatform::txEndCallback;
+static void _timer_ev_handler(event_t *ev)
+{
+    dsme::DSMEPlatform::instance->getDSME().getEventDispatcher().timerInterrupt();
+}
+
+static event_t timer_event;
+
+static void _timer_cb(void *arg)
+{
+    event_post(EVENT_PRIO_HIGHEST, &timer_event);
+}
+
 
 DSMEPlatform::DSMEPlatform() :
 				phy_pib(),
@@ -25,6 +36,8 @@ DSMEPlatform::DSMEPlatform() :
     instance = this;
     this->timer.callback = _timer_cb;
     this->timer.arg = this;
+
+    timer_event.handler = _timer_ev_handler;
     
     this->head = &this->pool[0];
     for (int i=0; i<7; i++) {
@@ -193,6 +206,8 @@ DSMEMessage *DSMEPlatform::getEmptyMessage()
     this->head = head->next;
     assert(msg);
     msg->pkt = NULL;
+    msg->receivedViaMCPS = false;
+    signalNewMsg(msg);
     return msg;
 }
 
@@ -217,7 +232,6 @@ uint32_t DSMEPlatform::getSymbolCounter()
 
 void DSMEPlatform::scheduleStartOfCFP()
 {
-    printf("Start of CFP\n");
 }
 
 void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver)
@@ -256,7 +270,6 @@ void DSMEPlatform::signalSuccessPacketsCAP(uint32_t packets) {
 
 bool DSMEPlatform::setChannelNumber(uint8_t channel)
 {
-    printf("Setting channel to %d\n", channel);
     return true;
 }
 
@@ -270,6 +283,8 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
 {
     DSMEMessage *m = (DSMEMessage*) msg;
     gnrc_pktsnip_t *pkt = m->pkt;
+    DSMEPlatform::state = STATE_SEND;
+    DSMEPlatform::txEndCallback = txEndCallback;
     uint8_t mhr[23];
     uint8_t mhr_len = msg->getHeader().getSerializationLength();
     uint8_t *p = mhr;
@@ -279,7 +294,6 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
         .iol_base = mhr,
         .iol_len = mhr_len,
     };
-    puts("Pr");
     return true;
 }
 

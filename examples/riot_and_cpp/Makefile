@@ -38,6 +38,8 @@ USEPKG += opendsme
 USEMODULE += ztimer_usec
 USEMODULE += memarray
 USEMODULE += gnrc_pktbuf
+USEMODULE += event_thread_highest
+USEMODULE += cpp11-compat
 
 export PKG_SOURCE_LOCAL_OPENDSME = /home/jialamos/Development/opendsme
 
