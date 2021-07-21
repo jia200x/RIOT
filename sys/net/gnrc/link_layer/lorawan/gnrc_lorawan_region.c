@@ -100,7 +100,7 @@ uint32_t gnrc_lorawan_pick_channel(gnrc_lorawan_t *mac)
 {
     uint8_t index = 0;
 
-    uint8_t random_number = random_uint32_range(0, bitarithm_bits_set(mac->channel_mask));
+    uint8_t random_number = random_uint32_range(0, bitarithm_bits_set(mac->channel_mask) + 1);
     unsigned state = mac->channel_mask;
 
     for (int i = 0; i < random_number; i++) {
