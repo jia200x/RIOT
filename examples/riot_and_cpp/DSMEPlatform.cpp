@@ -11,9 +11,25 @@ extern ieee802154_dev_t cc2538_rf_dev;
 
 namespace dsme {
 
+ztimer_t send_timer;
+event_t send_timer_ev;
 DSMEPlatform* DSMEPlatform::instance = nullptr;
 uint8_t DSMEPlatform::state = STATE_READY;
 Delegate<void(bool)> DSMEPlatform::txEndCallback;
+static event_t timer_event;
+static event_t tx_done_event;
+
+
+static void _send_timer_ev_handler(event_t *ev)
+{
+    dsme::DSMEPlatform::instance-> send_pkt();
+    ztimer_set(ZTIMER_USEC, &send_timer, 2000000);
+}
+
+static void _send_timer_cb(void *arg)
+{
+    event_post(EVENT_PRIO_HIGHEST, &send_timer_ev);
+}
 
 static void _timer_ev_handler(event_t *ev)
 {
@@ -24,9 +40,6 @@ static void _tx_done_handler(event_t *ev)
 {
     dsme::DSMEPlatform::txEndCallback(true);
 }
-
-static event_t timer_event;
-static event_t tx_done_event;
 
 static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
 {
@@ -56,6 +69,46 @@ static void _timer_cb(void *arg)
 }
 
 
+void DSMEPlatform::send_pkt()
+{
+    if(!this->mac_pib.macAssociatedPANCoord) {
+        puts("Discarding message");
+        return;
+    }
+
+    IDSMEMessage* message = getEmptyMessage();
+    IEEE802154MacAddress dst;
+    dst.setShortAddress(0x1234);
+    mcps_sap::DATA::request_parameters params;
+
+    message->getHeader().setSrcAddrMode(SHORT_ADDRESS);
+    message->getHeader().setDstAddrMode(SHORT_ADDRESS);
+    message->getHeader().setDstAddr(dst);
+
+    message->getHeader().setSrcPANId(this->mac_pib.macPANId);
+    message->getHeader().setDstPANId(this->mac_pib.macPANId);
+
+    // Both PAN IDs are equal and we are using short addresses
+    // so suppress the PAN ID -> This should not be the task
+    // for the user of the MCPS, but it is specified like this... TODO
+    params.panIdSuppressed = true;
+
+    params.msdu = message;
+    params.msduHandle = 0; // TODO
+    //params.gtsTx = !dst.isBroadcast();
+    //params.gtsTx = par("gtsTx");
+    params.gtsTx = false;
+    params.ackTx = false;
+    params.indirectTx = false;
+    params.ranging = NON_RANGING;
+    params.uwbPreambleSymbolRepetitions = 0;
+    params.dataRate = 0; // DSSS -> 0
+    params.seqNumSuppressed = false;
+    params.sendMultipurpose = false;
+
+    this->mcps_sap.getDATA().request(params);
+}
+
 DSMEPlatform::DSMEPlatform() :
 				phy_pib(),
 				mac_pib(phy_pib),
@@ -71,6 +124,9 @@ DSMEPlatform::DSMEPlatform() :
     this->timer.callback = _timer_cb;
     this->timer.arg = this;
 
+    send_timer.callback = _send_timer_cb;
+    send_timer.arg = this;
+    send_timer_ev.handler = _send_timer_ev_handler;
     timer_event.handler = _timer_ev_handler;
     tx_done_event.handler = _tx_done_handler;
     
@@ -159,6 +215,7 @@ void DSMEPlatform::initialize()
     this->mcps_sap.getDATA().indication(DELEGATE(&DSMEPlatform::handleDataIndication, *this));
     this->mcps_sap.getDATA().confirm(DELEGATE(&DSMEPlatform::handleDataConfirm, *this));
 
+    ztimer_set(ZTIMER_USEC, &send_timer, 2005000);
     this->dsme.initialize(this);
 
     this->initialized = true;
