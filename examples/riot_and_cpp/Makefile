@@ -40,6 +40,7 @@ USEMODULE += memarray
 USEMODULE += gnrc_pktbuf
 USEMODULE += event_thread_highest
 USEMODULE += cpp11-compat
+USEMODULE += netdev_default
 
 export PKG_SOURCE_LOCAL_OPENDSME = /home/jialamos/Development/opendsme
 

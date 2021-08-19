@@ -4,17 +4,51 @@
 #include "event.h"
 #include "event/thread.h"
 
+#include "cc2538_rf.h"
+#include "net/ieee802154/radio.h"
+
+extern ieee802154_dev_t cc2538_rf_dev;
+
 namespace dsme {
 
 DSMEPlatform* DSMEPlatform::instance = nullptr;
 uint8_t DSMEPlatform::state = STATE_READY;
 Delegate<void(bool)> DSMEPlatform::txEndCallback;
+
 static void _timer_ev_handler(event_t *ev)
 {
     dsme::DSMEPlatform::instance->getDSME().getEventDispatcher().timerInterrupt();
 }
 
+static void _tx_done_handler(event_t *ev)
+{
+    dsme::DSMEPlatform::txEndCallback(true);
+}
+
 static event_t timer_event;
+static event_t tx_done_event;
+
+static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
+{
+    switch (status) {
+        case IEEE802154_RADIO_CONFIRM_TX_DONE:
+            event_post(EVENT_PRIO_HIGHEST, &tx_done_event);
+            break;
+        case IEEE802154_RADIO_INDICATION_RX_START:
+            break;
+        case IEEE802154_RADIO_INDICATION_CRC_ERROR:
+            break;
+        case IEEE802154_RADIO_INDICATION_TX_START:
+            break;
+        case IEEE802154_RADIO_INDICATION_RX_DONE:
+            break;
+        case IEEE802154_RADIO_CONFIRM_CCA:
+            break;
+        default:
+            puts(";/");
+            assert(false);
+    }
+}
 
 static void _timer_cb(void *arg)
 {
@@ -38,6 +72,7 @@ DSMEPlatform::DSMEPlatform() :
     this->timer.arg = this;
 
     timer_event.handler = _timer_ev_handler;
+    tx_done_event.handler = _tx_done_handler;
     
     this->head = &this->pool[0];
     for (int i=0; i<7; i++) {
@@ -88,6 +123,14 @@ void DSMEPlatform::initialize()
 
     uint16_t id = 0x1234;
     translateMacAddress(id, this->mac_pib.macExtendedAddress);
+
+    cc2538_rf_dev.cb = _hal_radio_cb;
+    cc2538_init();
+    ieee802154_radio_request_on(&cc2538_rf_dev);
+    while (ieee802154_radio_confirm_on(&cc2538_rf_dev) == -EAGAIN) {}
+    ieee802154_radio_set_csma_params(&cc2538_rf_dev, NULL, -1);
+
+    /* Call more radio stuff here... */
 
     this->mac_pib.macShortAddress = this->mac_pib.macExtendedAddress.getShortAddress();
     this->mac_pib.macIsPANCoord = true;
@@ -221,7 +264,7 @@ void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
 
 void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
 {
-    uint32_t delta = (symbolCounterValue - getSymbolCounter()) << 4;
+    uint32_t delta = (symbolCounterValue - getSymbolCounter() - 1) << 4;
     ztimer_set(ZTIMER_USEC, &timer, delta);
 }
 
@@ -270,6 +313,14 @@ void DSMEPlatform::signalSuccessPacketsCAP(uint32_t packets) {
 
 bool DSMEPlatform::setChannelNumber(uint8_t channel)
 {
+    ieee802154_phy_conf_t conf = {
+        .phy_mode = IEEE802154_PHY_OQPSK,
+        .channel = channel,
+        .page = 0,
+        .pow = 6,
+    };
+    int res = ieee802154_radio_config_phy(&cc2538_rf_dev, &conf);
+    assert(res == 0);
     return true;
 }
 
@@ -294,12 +345,20 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
         .iol_base = mhr,
         .iol_len = mhr_len,
     };
+    int res = ieee802154_radio_request_set_trx_state(&cc2538_rf_dev, IEEE802154_TRX_STATE_TX_ON);
+    assert(res == 0);
+    while(ieee802154_radio_confirm_set_trx_state(&cc2538_rf_dev) == -EAGAIN);
+    res = ieee802154_radio_write(&cc2538_rf_dev, &iol);
+    assert(res == 0);
+
     return true;
 }
 
 bool DSMEPlatform::sendNow()
 {
-    assert(false);
+    puts("S");
+    int res = ieee802154_radio_request_transmit(&cc2538_rf_dev);
+    assert(res == 0);
     return true;
 }
 
@@ -327,12 +386,16 @@ bool DSMEPlatform::startCCA()
 
 void DSMEPlatform::turnTransceiverOn()
 {
-    //puts("Radio on! :)");
+    int res = ieee802154_radio_request_set_trx_state(&cc2538_rf_dev, IEEE802154_TRX_STATE_RX_ON);
+    assert(res == 0);
+    while(ieee802154_radio_confirm_set_trx_state(&cc2538_rf_dev) == -EAGAIN) {}
 }
 
 void DSMEPlatform::turnTransceiverOff()
 {
-    //puts("Radio off! :)");
+    int res = ieee802154_radio_request_set_trx_state(&cc2538_rf_dev, IEEE802154_TRX_STATE_TRX_OFF);
+    assert(res == 0);
+    while(ieee802154_radio_confirm_set_trx_state(&cc2538_rf_dev) == -EAGAIN) {}
 }
 
 }
