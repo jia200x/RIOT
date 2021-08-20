@@ -4,21 +4,40 @@
 #include "event.h"
 #include "event/thread.h"
 
+#if IS_USED(MODULE_CC2538_RF)
 #include "cc2538_rf.h"
+#endif
+
+#if IS_USED(MODULE_NRF802154)
+#include "nrf802154.h"
+#endif
+
 #include "net/ieee802154/radio.h"
 
-extern ieee802154_dev_t cc2538_rf_dev;
+ieee802154_dev_t _radio;
 
 namespace dsme {
 
 ztimer_t send_timer;
 event_t send_timer_ev;
+ztimer_t cca_timer;
+event_t cca_timer_ev;
 DSMEPlatform* DSMEPlatform::instance = nullptr;
 uint8_t DSMEPlatform::state = STATE_READY;
 Delegate<void(bool)> DSMEPlatform::txEndCallback;
 static event_t timer_event;
 static event_t tx_done_event;
 
+
+static void _cca_timer_ev_handler(event_t *ev)
+{
+    dsme::DSMEPlatform::instance->getDSME().dispatchCCAResult(true);
+}
+
+static void _cca_timer_cb(void *arg)
+{
+    event_post(EVENT_PRIO_HIGHEST, &cca_timer_ev);
+}
 
 static void _send_timer_ev_handler(event_t *ev)
 {
@@ -59,7 +78,7 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
             break;
         default:
             puts(";/");
-            assert(false);
+            DSME_ASSERT(false);
     }
 }
 
@@ -78,7 +97,7 @@ void DSMEPlatform::send_pkt()
 
     IDSMEMessage* message = getEmptyMessage();
     IEEE802154MacAddress dst;
-    dst.setShortAddress(0x1234);
+    dst.setShortAddress(0xbeef);
     mcps_sap::DATA::request_parameters params;
 
     message->getHeader().setSrcAddrMode(SHORT_ADDRESS);
@@ -127,6 +146,9 @@ DSMEPlatform::DSMEPlatform() :
     send_timer.callback = _send_timer_cb;
     send_timer.arg = this;
     send_timer_ev.handler = _send_timer_ev_handler;
+    cca_timer.callback = _cca_timer_cb;
+    cca_timer.arg = this;
+    cca_timer_ev.handler = _cca_timer_ev_handler;
     timer_event.handler = _timer_ev_handler;
     tx_done_event.handler = _tx_done_handler;
     
@@ -180,11 +202,19 @@ void DSMEPlatform::initialize()
     uint16_t id = 0x1234;
     translateMacAddress(id, this->mac_pib.macExtendedAddress);
 
-    cc2538_rf_dev.cb = _hal_radio_cb;
+    _radio.cb = _hal_radio_cb;
+#if IS_USED(MODULE_CC2538_RF)
+    cc2538_rf_hal_setup(&_radio);
     cc2538_init();
-    ieee802154_radio_request_on(&cc2538_rf_dev);
-    while (ieee802154_radio_confirm_on(&cc2538_rf_dev) == -EAGAIN) {}
-    ieee802154_radio_set_csma_params(&cc2538_rf_dev, NULL, -1);
+#elif IS_USED(MODULE_NRF802154)
+    nrf802154_hal_setup(&_radio);
+    nrf802154_init();
+#else
+#error "Please select a radio"
+#endif
+    ieee802154_radio_request_on(&_radio);
+    while (ieee802154_radio_confirm_on(&_radio) == -EAGAIN) {}
+    ieee802154_radio_set_csma_params(&_radio, NULL, -1);
 
     /* Call more radio stuff here... */
 
@@ -200,7 +230,7 @@ void DSMEPlatform::initialize()
     this->mac_pib.macAssociatedPANCoord = this->mac_pib.macIsPANCoord;
     this->mac_pib.macSuperframeOrder = 4;
     this->mac_pib.macMultiSuperframeOrder = 5;
-    this->mac_pib.macBeaconOrder = 7;
+    this->mac_pib.macBeaconOrder = 9;
 
     this->mac_pib.macMinBE = 7;
     this->mac_pib.macMaxBE = 8;
@@ -259,7 +289,7 @@ void DSMEPlatform::startAssociation()
 
 void DSMEPlatform::start()
 {
-    assert(this->initialized);
+    DSME_ASSERT(this->initialized);
     this->dsme.start();
     if(!this->mac_pib.macAssociatedPANCoord) {
         LOG_DEBUG("Device is not associated with PAN.");
@@ -269,42 +299,44 @@ void DSMEPlatform::start()
 
 void DSMEPlatform::handleDataIndication(mcps_sap::DATA_indication_parameters& params)
 {
-    assert(false);
+    DSME_ASSERT(false);
     LOG_DEBUG("Received DATA message from MCPS.");
 }
 
 void DSMEPlatform::handleDataConfirm(mcps_sap::DATA_confirm_parameters& params)
 {
-    assert(false);
+    IDSMEMessage* msg = params.msduHandle;
+    releaseMessage(msg);
+    /* TODO */
 }
 
 void DSMEPlatform::handleDataMessageFromMCPSWrapper(IDSMEMessage* msg)
 {
-    assert(false);
+    DSME_ASSERT(false);
     this->handleDataMessageFromMCPS(static_cast<DSMEMessage*>(msg));
 }
 
 void DSMEPlatform::handleDataMessageFromMCPS(DSMEMessage* msg)
 {
-    assert(false);
+    DSME_ASSERT(false);
 }
 
 bool DSMEPlatform::isReceptionFromAckLayerPossible()
 {
-    assert(false);
+    /* TODO: */
     return true;
 }
 
 void DSMEPlatform::handleReceivedMessageFromAckLayer(IDSMEMessage* message)
 {
-    assert(false);
+    DSME_ASSERT(false);
 }
 
 DSMEMessage *DSMEPlatform::getEmptyMessage()
 {
     DSMEMessage *msg = &this->head->msg;
     this->head = head->next;
-    assert(msg);
+    DSME_ASSERT(msg);
     msg->pkt = NULL;
     msg->receivedViaMCPS = false;
     signalNewMsg(msg);
@@ -321,7 +353,7 @@ void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
 
 void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
 {
-    uint32_t delta = (symbolCounterValue - getSymbolCounter() - 1) << 4;
+    uint32_t delta = (symbolCounterValue - getSymbolCounter()) << 4;
     ztimer_set(ZTIMER_USEC, &timer, delta);
 }
 
@@ -376,14 +408,17 @@ bool DSMEPlatform::setChannelNumber(uint8_t channel)
         .page = 0,
         .pow = 6,
     };
-    int res = ieee802154_radio_config_phy(&cc2538_rf_dev, &conf);
-    assert(res == 0);
+    int res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_TRX_OFF);
+    DSME_ASSERT(res == 0);
+    while (ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
+    res = ieee802154_radio_config_phy(&_radio, &conf);
+    DSME_ASSERT(res == 0);
     return true;
 }
 
 uint8_t DSMEPlatform::getChannelNumber()
 {
-    assert(false);
+    DSME_ASSERT(false);
     return 0;
 }
 
@@ -402,11 +437,11 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
         .iol_base = mhr,
         .iol_len = mhr_len,
     };
-    int res = ieee802154_radio_request_set_trx_state(&cc2538_rf_dev, IEEE802154_TRX_STATE_TX_ON);
-    assert(res == 0);
-    while(ieee802154_radio_confirm_set_trx_state(&cc2538_rf_dev) == -EAGAIN);
-    res = ieee802154_radio_write(&cc2538_rf_dev, &iol);
-    assert(res == 0);
+    int res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_TX_ON);
+    DSME_ASSERT(res == 0);
+    while(ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN);
+    res = ieee802154_radio_write(&_radio, &iol);
+    DSME_ASSERT(res == 0);
 
     return true;
 }
@@ -414,19 +449,19 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
 bool DSMEPlatform::sendNow()
 {
     puts("S");
-    int res = ieee802154_radio_request_transmit(&cc2538_rf_dev);
-    assert(res == 0);
+    int res = ieee802154_radio_request_transmit(&_radio);
+    DSME_ASSERT(res == 0);
     return true;
 }
 
 void DSMEPlatform::abortPreparedTransmission()
 {
-    assert(false);
+    DSME_ASSERT(false);
 }
 
 bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMsg, Delegate<void(bool)> txEndCallback)
 {
-    assert(false);
+    DSME_ASSERT(false);
     return true;
 }
 
@@ -437,22 +472,23 @@ void DSMEPlatform::setReceiveDelegate(receive_delegate_t receiveDelegate)
 
 bool DSMEPlatform::startCCA()
 {
-    assert(false);
+    /* TODO: This MUST be implemented properly */
+    ztimer_set(ZTIMER_USEC, &cca_timer, 16*8);
     return true;
 }
 
 void DSMEPlatform::turnTransceiverOn()
 {
-    int res = ieee802154_radio_request_set_trx_state(&cc2538_rf_dev, IEEE802154_TRX_STATE_RX_ON);
-    assert(res == 0);
-    while(ieee802154_radio_confirm_set_trx_state(&cc2538_rf_dev) == -EAGAIN) {}
+    int res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_RX_ON);
+    DSME_ASSERT(res == 0);
+    while(ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
 }
 
 void DSMEPlatform::turnTransceiverOff()
 {
-    int res = ieee802154_radio_request_set_trx_state(&cc2538_rf_dev, IEEE802154_TRX_STATE_TRX_OFF);
-    assert(res == 0);
-    while(ieee802154_radio_confirm_set_trx_state(&cc2538_rf_dev) == -EAGAIN) {}
+    int res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_TRX_OFF);
+    DSME_ASSERT(res == 0);
+    while(ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
 }
 
 }
