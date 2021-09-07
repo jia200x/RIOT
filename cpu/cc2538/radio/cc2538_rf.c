@@ -135,7 +135,7 @@ void cc2538_init(void)
 
     /* Set default IRQ */
     RFCORE_XREG_RFIRQM1 = TXDONE | CSP_STOP | TXACKDONE;
-    RFCORE_XREG_RFIRQM0 = RXPKTDONE | FIFOP | SFD;
+    RFCORE_XREG_RFIRQM0 = RXPKTDONE | SFD;
 
     /* Enable all RF CORE error interrupts */
     RFCORE_XREG_RFERRM = STROBE_ERR | TXUNDERF | TXOVERF | \
