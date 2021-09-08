@@ -20,8 +20,12 @@ USEMODULE += od
 USEMODULE += shell
 USEMODULE += ps
 USEMODULE += event_thread_highest
-USEMODULE += netdev_ieee802154_submac
 USEMODULE += netdev_default
+USEMODULE += luid
+USEMODULE += eui_provider
+USEMODULE += ieee802154
+USEMODULE += ieee802154_submac
+USEMODULE += ztimer_usec
 
 CFLAGS += -DEVENT_THREAD_HIGHEST_STACKSIZE=1024
 
