@@ -15,6 +15,7 @@
 #include "mac_services/mlme_sap/MLME_SAP.h"
 #include "mac_services/pib/MAC_PIB.h"
 #include "mac_services/pib/PHY_PIB.h"
+#include "mac_services/pib/dsme_phy_constants.h"
 #include "opendsme/dsme_settings.h"
 #include "ztimer.h"
 
@@ -75,7 +76,7 @@ public:
     void initialize();
     void startAssociation();
     void startScan();
-    void send_pkt();
+    void send_pkt(uint16_t addr);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /* IDSMEPlatformBase */
@@ -171,6 +172,7 @@ public:
     };
 
     static Delegate<void(bool)> txEndCallback;
+    PANDescriptor panDescriptorToSyncTo;
 
 protected:
     /** @brief Copy constructor is not allowed.
@@ -189,8 +191,14 @@ protected:
 
     void handleDataIndication(mcps_sap::DATA_indication_parameters& params);
     void handleDataConfirm(mcps_sap::DATA_confirm_parameters& params);
-		void handleConfirmFromMCPSWrapper(IDSMEMessage* msg, DataStatus::Data_Status dataStatus);
-		void handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Status dataStatus);
+    void handleSCAN_confirm(mlme_sap::SCAN_confirm_parameters& params);
+    void handleConfirmFromMCPSWrapper(IDSMEMessage* msg, DataStatus::Data_Status dataStatus);
+    void handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Status dataStatus);
+    void handleSyncLossIndication(mlme_sap::SYNC_LOSS_indication_parameters& params);
+    void handleBEACON_NOTIFY_indication(mlme_sap::BEACON_NOTIFY_indication_parameters& params);
+    void handleASSOCIATION_confirm(mlme_sap::ASSOCIATE_confirm_parameters& params);
+    void handleASSOCIATION_indication(mlme_sap::ASSOCIATE_indication_parameters& params);
+    void associate(uint16_t coordPANId, AddrMode addrMode, IEEE802154MacAddress& coordAddress, uint8_t channel);
 
     std::string printDSMEManagement(uint8_t management, DSMESABSpecification& sabSpec, CommandFrameIdentifier cmd);
 

@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "opendsme/dsme_settings.h"
+#include "opendsme/dsme_platform.h"
 
 extern "C" {
 //#include "net/mac/mac.h"
@@ -30,12 +31,16 @@ public:
 
     void copyTo(DSMEMessageElement* msg);
 
+#if 0
     uint8_t getByte(uint8_t pos) {
-        return payload[pos];
+        DSME_ASSERT(false);
+        //return payload[pos];
+        return 0;
     }
+#endif
 
     bool hasPayload() {
-        return (payloadLength > 0);
+        return this->pkt != NULL;
     }
 
     // gives the symbol counter at the end of the SFD
@@ -48,8 +53,9 @@ public:
     }
 
     uint16_t getTotalSymbols() {
+        DSME_ASSERT(pkt);
 				uint16_t bytes = macHdr.getSerializationLength()
-																	 + payloadLength
+																	 + pkt->size
 																	 + 2 // FCS
 																	 + 4 // Preamble
 																	 + 1 // SFD
@@ -93,16 +99,28 @@ public:
 
 //////////////////////////////////////////////////////////////////////////////////
     void clearMessage() {
-    		this->setPayloadLength(0);
+        if (pkt) {
+            gnrc_pktbuf_release(pkt);
+        }
+        pkt = NULL;
     }
 
     uint8_t getPayloadLength() {
-				return payloadLength;
+            DSME_ASSERT(pkt);
+            return pkt->size;
 		}
 
     int8_t getRSSI() override {
     		return this->radio_last_rssi;
     }
+
+    int loadBuffer(size_t len);
+    uint8_t *getPayload() {
+        DSME_ASSERT(pkt);
+        return (uint8_t*) pkt->data;
+    }
+
+    int dropHdr(size_t len);
 
 //    radio_value_t getChannelSent() {
 //    		return this->channelSent;
@@ -124,11 +142,11 @@ public:
 		void setMacCallbackPointer(void* macCallbackPointer) {
 				this->macCallbackPointer = macCallbackPointer;
 		}
-#endif
 
 		void makeCopyFrom(DSMEMessage* msg, const uint8_t * cbuf, uint8_t * buf) {
+                DSME_ASSERT(false);
 				this->firstTry = msg->firstTry;
-				this->payloadLength = msg->getPayloadLength();
+				//this->payloadLength = msg->getPayloadLength();
 				this->radio_last_rssi = msg->getRSSI();
 				//this->channelSent = msg->getChannelSent();
 				this->messageLQI = msg->getLQI();
@@ -136,18 +154,17 @@ public:
 				this->currentlySending = msg->getCurrentlySending();
 				this->retryCounter = msg->getRetryCounter();
 				this->startOfFrameDelimiterSymbolCounter = msg->getStartOfFrameDelimiterSymbolCounter();
-				memcpy(this->getPayload(), msg->getPayload(), msg->getPayloadLength());
+				memcpy((const uint8_t*) this->getPayload(), msg->getPayload(), msg->getPayloadLength());
 
 				msg->getHeader().serializeTo(buf);
 				//const uint8_t * buf = buffer;
 				this->getHeader().deserializeFrom(cbuf, 2);
 		}
+#endif
 
     bool firstTry;
-
 private:
     DSMEMessage() :
-        		payloadLength(0),
 						radio_last_rssi(0),
 						channelSent(0),
 						messageLQI(0),
@@ -159,7 +176,7 @@ private:
 
 		~DSMEMessage() {
 		}
-
+  
     void prepare() {
         currentlySending = false;
         firstTry = true;
@@ -169,17 +186,7 @@ private:
         macHdr.reset();
     }
 
-    uint8_t* getPayload() {
-        return payload;
-    }
-  
-    void setPayloadLength(uint8_t length) {
-        payloadLength = length;
-    }
-  
     IEEE802154eMACHeader macHdr;
-    uint8_t payload[DSME_PACKET_MAX_LEN];
-    uint8_t payloadLength;
     uint8_t radio_last_rssi;
     uint8_t channelSent;
     uint8_t  messageLQI;
