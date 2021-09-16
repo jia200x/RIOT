@@ -42,6 +42,8 @@ USEMODULE += event_thread_highest
 USEMODULE += cpp11-compat
 USEMODULE += netdev_default
 USEMODULE += ieee802154
+CFLAGS += -DEVENT_THREAD_HIGHEST_STACKSIZE=2048
+CFLAGS += -DCONFIG_IEEE802154_AUTO_ACK_DISABLE=1
 
 export PKG_SOURCE_LOCAL_OPENDSME = /home/jialamos/Development/opendsme
 

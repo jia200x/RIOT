@@ -14,17 +14,44 @@ void DSMEMessage::prependFrom(DSMEMessageElement *msg)
 
 void DSMEMessage::decapsulateTo(DSMEMessageElement* me)
 {
-    assert(false);
+    this->copyTo(me);
+    this->dropHdr(me->getSerializationLength());
+    //this->setPayloadLength(this->getPayloadLength()-me->getSerializationLength());
 }
 
 void DSMEMessage::copyTo(DSMEMessageElement* msg)
 {
-    assert(false);
+    Serializer s(this->getPayload(), DESERIALIZATION);
+    msg->serialize(s);
+    DSME_ASSERT(this->getPayload()+msg->getSerializationLength() == s.getData());
 }
 
 uint8_t DSMEMessage::getMPDUSymbols()
 {
     assert(false);
+    return 0;
+}
+
+int DSMEMessage::loadBuffer(size_t len)
+{
+    int res = -ENOBUFS;
+    gnrc_pktsnip_t *pkt = gnrc_pktbuf_add(NULL, NULL, len, GNRC_NETTYPE_UNDEF);
+    if (pkt == NULL) {
+        goto end;
+    }
+    this->pkt = pkt; 
+    res = 0;
+
+end:
+    return res;
+}
+
+int DSMEMessage::dropHdr(size_t len)
+{
+    gnrc_pktsnip_t *hdr = gnrc_pktbuf_mark(this->pkt, len, GNRC_NETTYPE_UNDEF);
+    if (!hdr) {
+        return -EINVAL;
+    }
     return 0;
 }
 }
