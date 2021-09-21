@@ -115,46 +115,6 @@ public:
 
     int dropHdr(size_t len);
 
-//    radio_value_t getChannelSent() {
-//    		return this->channelSent;
-//    }
-
-//    mac_callback_t getMacCallbackFunction() const {
-//    		return macCallbackFunction;
-//    }
-
-//		void setMacCallbackFunction(mac_callback_t macCallbackFunction) {
-//				this->macCallbackFunction = macCallbackFunction;
-//		}
-
-#if 0
-		void* getMacCallbackPointer() const {
-				return macCallbackPointer;
-		}
-
-		void setMacCallbackPointer(void* macCallbackPointer) {
-				this->macCallbackPointer = macCallbackPointer;
-		}
-
-		void makeCopyFrom(DSMEMessage* msg, const uint8_t * cbuf, uint8_t * buf) {
-                DSME_ASSERT(false);
-				this->firstTry = msg->firstTry;
-				//this->payloadLength = msg->getPayloadLength();
-				this->radio_last_rssi = msg->getRSSI();
-				//this->channelSent = msg->getChannelSent();
-				this->messageLQI = msg->getLQI();
-				this->receivedViaMCPS = msg->getReceivedViaMCPS();
-				this->currentlySending = msg->getCurrentlySending();
-				this->retryCounter = msg->getRetryCounter();
-				this->startOfFrameDelimiterSymbolCounter = msg->getStartOfFrameDelimiterSymbolCounter();
-				memcpy((const uint8_t*) this->getPayload(), msg->getPayload(), msg->getPayloadLength());
-
-				msg->getHeader().serializeTo(buf);
-				//const uint8_t * buf = buffer;
-				this->getHeader().deserializeFrom(cbuf, 2);
-		}
-#endif
-
     bool firstTry;
     bool free;
 private:
