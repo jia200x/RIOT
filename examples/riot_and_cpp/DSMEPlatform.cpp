@@ -50,11 +50,6 @@ static void _cca_timer_ev_handler(event_t *ev)
     dsme::DSMEPlatform::instance->getDSME().dispatchCCAResult(true);
 }
 
-static void _request_slot_ev_timer(event_t *ev)
-{
-    
-}
-
 static void _acktimer_ev_handler(event_t *ev)
 {
     //puts("sendAck");
@@ -181,7 +176,6 @@ static void _timer_cb(void *arg)
     event_post(EVENT_PRIO_HIGHEST, &timer_event);
 }
 
-
 void DSMEPlatform::send_pkt(uint16_t addr)
 {
     if(!this->mac_pib.macAssociatedPANCoord) {
@@ -203,27 +197,6 @@ void DSMEPlatform::send_pkt(uint16_t addr)
     message->getHeader().setSrcPANId(this->mac_pib.macPANId);
     message->getHeader().setDstPANId(this->mac_pib.macPANId);
 
-#if 0
-    // Both PAN IDs are equal and we are using short addresses
-    // so suppress the PAN ID -> This should not be the task
-    // for the user of the MCPS, but it is specified like this... TODO
-    params.panIdSuppressed = true;
-
-    params.msdu = message;
-    params.msduHandle = 0; // TODO
-    //params.gtsTx = !dst.isBroadcast();
-    //params.gtsTx = par("gtsTx");
-    params.gtsTx = false;
-    params.ackTx = false;
-    params.indirectTx = false;
-    params.ranging = NON_RANGING;
-    params.uwbPreambleSymbolRepetitions = 0;
-    params.dataRate = 0; // DSSS -> 0
-    params.seqNumSuppressed = false;
-    params.sendMultipurpose = false;
-
-    this->mcps_sap.getDATA().request(params);
-#endif
     this->dsmeAdaptionLayer.sendMessage(message);
 }
 
@@ -234,10 +207,7 @@ DSMEPlatform::DSMEPlatform() :
 				mcps_sap(dsme),
 				mlme_sap(dsme),
                 dsmeAdaptionLayer(dsme),
-				messagesInUse(0),
-				initialized(false),
-        channel(MIN_CHANNEL),
-				currentTXLength(0){
+				initialized(false){
     instance = this;
     this->timer.callback = _timer_cb;
     this->timer.arg = this;
@@ -255,7 +225,7 @@ DSMEPlatform::DSMEPlatform() :
     tx_done_event.handler = _tx_done_handler;
     rx_done_event.handler = _rx_done_handler;
     
-    for (int i=0; i<7; i++) {
+    for (int i=0; i<DSME_POOL_SIZE; i++) {
         this->pool[i].free = true;
     }
 }
@@ -364,18 +334,6 @@ void DSMEPlatform::initialize()
 
     this->phy_pib.phyCurrentChannel = 26;
 		
-#if 0
-    this->mlme_sap.getASSOCIATE().indication(DELEGATE(&DSMEPlatform::handleASSOCIATION_indication, *this));
-    this->mlme_sap.getASSOCIATE().confirm(DELEGATE(&DSMEPlatform::handleASSOCIATION_confirm, *this));
-    this->mcps_sap.getDATA().indication(DELEGATE(&DSMEPlatform::handleDataIndication, *this));
-    this->mcps_sap.getDATA().confirm(DELEGATE(&DSMEPlatform::handleDataConfirm, *this));
-    this->mlme_sap.getSCAN().confirm(DELEGATE(&DSMEPlatform::handleSCAN_confirm, *this));
-
-    this->mlme_sap.getSYNC_LOSS().indication(DELEGATE(&DSMEPlatform::handleSyncLossIndication, *this));
-    this->mlme_sap.getBEACON_NOTIFY().indication(DELEGATE(&DSMEPlatform::handleBEACON_NOTIFY_indication, *this));
-    this->mlme_sap.getDSME_GTS().indication(DELEGATE(&DSMEPlatform::handleDSME_GTS_indication, *this));
-    this->mlme_sap.getDSME_GTS().confirm(DELEGATE(&DSMEPlatform::handleDSME_GTS_confirm, *this));
-#endif
     this->dsmeAdaptionLayer.setIndicationCallback(DELEGATE(&DSMEPlatform::handleDataMessageFromMCPSWrapper, *this));
     this->dsmeAdaptionLayer.setConfirmCallback(DELEGATE(&DSMEPlatform::handleConfirmFromMCPSWrapper, *this));
 
@@ -394,293 +352,11 @@ void DSMEPlatform::initialize()
     this->initialized = true;
 }
 
-void DSMEPlatform::handleASSOCIATION_indication(mlme_sap::ASSOCIATE_indication_parameters& params) {
-    //LOG_INFO("Association requested from 0x" << params.deviceAddress.getShortAddress() << ".");
-
-    mlme_sap::ASSOCIATE::response_parameters response_params;
-    response_params.deviceAddress = params.deviceAddress;
-    response_params.assocShortAddress = params.deviceAddress.a4();
-    response_params.status = AssociationStatus::SUCCESS;
-    response_params.channelOffset = this->mac_pib.macChannelOffset;
-    if(params.hoppingSequenceRequest == true || params.hoppingSequenceId == 1) {
-        response_params.hoppingSequence = this->mac_pib.macHoppingSequenceList;
-    }
-
-    // TODO update list of associated devices
-
-    this->mlme_sap.getASSOCIATE().response(response_params);
-    puts("IND");
-    return;
-}
-
-void DSMEPlatform::handleASSOCIATION_confirm(mlme_sap::ASSOCIATE_confirm_parameters& params) {
-    //this->associationCompleteDelegate(params.status);
-    if(params.status == AssociationStatus::SUCCESS) {
-        puts("Association completed successfully.");
-        ieee802154_radio_config_addr_filter(&_radio, IEEE802154_AF_PANID, &this->mac_pib.macPANId);
-        ztimer_set(ZTIMER_USEC, &send_timer, 2005000);
-#if 0
-        if (!par("isPANCoordinator")) {
-            request_slot();
-            EV_INFO << "Node doesn't have slot. Requesting one" << endl;
-        }
-#endif
-
-    } else {
-        puts("Association failed.");
-        //this->scanOrSyncInProgress = false;
-        //startAssociation();
-    }
-}
-
-void DSMEPlatform::associate(uint16_t coordPANId, AddrMode addrMode, IEEE802154MacAddress& coordAddress, uint8_t channel)
-{
-    CapabilityInformation capabilityInformation;
-    capabilityInformation.alternatePANCoordinator = false;
-    capabilityInformation.deviceType = 1;
-    capabilityInformation.powerSource = 0;
-    capabilityInformation.receiverOnWhenIdle = 1;
-    capabilityInformation.associationType = 1; // TODO: FastA? 1 -> yes, 0 -> no
-    capabilityInformation.reserved = 0;
-    capabilityInformation.securityCapability = 0;
-    capabilityInformation.allocateAddress = 1;
-
-    mlme_sap::ASSOCIATE::request_parameters params;
-    params.channelNumber = channel;
-    params.channelPage = this->phy_pib.phyCurrentPage;
-    params.coordAddrMode = SHORT_ADDRESS;
-    params.coordPanId = coordPANId;
-    params.coordAddress = coordAddress;
-    params.capabilityInformation = capabilityInformation;
-    params.channelOffset = this->mac_pib.macChannelOffset;
-    params.hoppingSequenceId = 1;
-    params.hoppingSequenceRequest = true;
-
-    // TODO start timer for macMaxFrameTotalWaitTime, report NO_DATA on timeout
-    this->mlme_sap.getASSOCIATE().request(params);
-}
-
-void DSMEPlatform::handleBEACON_NOTIFY_indication(mlme_sap::BEACON_NOTIFY_indication_parameters& params) {
-    if(!this->mac_pib.macAutoRequest) {
-        //this->recordedPanDescriptors.add(params.panDescriptor);
-    }
-
-    uint16_t shortAddress = params.panDescriptor.coordAddress.getShortAddress();
-#if 0
-    if(!heardCoordinators.contains(shortAddress)) {
-        heardCoordinators.add(shortAddress);
-    }
-#endif
-
-    if(this->syncActive) {
-        // TODO check if the beacon is actually from the PAN described in the activePanDescriptor
-        this->syncActive = false;
-        /* Associate */
-        puts("ASSOCIATE");
-        associate(this->panDescriptorToSyncTo.coordPANId, this->panDescriptorToSyncTo.coordAddrMode, this->panDescriptorToSyncTo.coordAddress,
-                                                                 this->panDescriptorToSyncTo.channelNumber);
-        //handleSCAN_confirm(&this->panDescriptorToSyncTo);
-    }
-
-    // TODO CROSS-LAYER-CALLS, no interface for this information
-#if 0
-    LOG_INFO("Checking whether to become a coordinator: "
-             << "isAssociated:" << this->mac_pib.macAssociatedPANCoord << ", isCoordinator:"
-             << this->mac_pib.macIsCoord << ", numHeardCoordinators:" << ((uint16_t)heardCoordinators.getLength()) << ".");
-    if(this->mac_pib.macAssociatedPANCoord && !this->mac_pib.macIsCoord && heardCoordinators.getLength() < 2) {
-        uint16_t random_value = this->dsmeAdaptionLayer.getDSME().getPlatform().getRandom() % 3;
-        if(random_value < 1) {
-            mlme_sap::START::request_parameters request_params;
-            request_params.panCoordinator = false;
-            // TODO: fill rest;
-
-            LOG_INFO("Turning into a coordinator now.");
-            this->dsmeAdaptionLayer.getMLME_SAP().getSTART().request(request_params);
-
-            mlme_sap::START_confirm_parameters confirm_params;
-            bool confirmed = this->dsmeAdaptionLayer.getMLME_SAP().getSTART().confirm(&confirm_params);
-            DSME_ASSERT(confirmed);
-            DSME_ASSERT(confirm_params.status == StartStatus::SUCCESS);
-        }
-    }
-
-    return;
-#endif
-}
-
-void DSMEPlatform::handleSyncLossIndication(mlme_sap::SYNC_LOSS_indication_parameters& params) {
-    puts("handleSyncLossIndication");
-    DSME_ASSERT(false);
-#if 0
-    if(params.lossReason == LossReason::BEACON_LOST) {
-        LOG_ERROR("Beacon tracking lost.");
-        // DSME_SIM_ASSERT(false); TODO
-    } else {
-        LOG_ERROR("Tracking lost for unsupported reason: " << (uint16_t)params.lossReason);
-        DSME_ASSERT(false);
-    }
-
-    if(this->syncActive) {
-        this->syncActive = false;
-        this->scanAndSyncCompleteDelegate(nullptr);
-    } else {
-        this->syncLossAfterSyncedDelegate();
-    }
-    return;
-#endif
-}
-
-void DSMEPlatform::handleSCAN_confirm(mlme_sap::SCAN_confirm_parameters& params) {
-    PanDescriptorList* list = &params.panDescriptorList;
-    if (list->size() > 0) {
-        this->panDescriptorToSyncTo = (*list)[0];
-        mlme_sap::SYNC::request_parameters syncParams;
-        syncParams.channelNumber = this->panDescriptorToSyncTo.channelNumber;
-        syncParams.channelPage = this->panDescriptorToSyncTo.channelPage;
-        syncParams.trackBeacon = true;
-        syncParams.syncParentShortAddress = this->panDescriptorToSyncTo.coordAddress.getShortAddress();
-        syncParams.syncParentSdIndex = this->panDescriptorToSyncTo.dsmePANDescriptor.getBeaconBitmap().getSDIndex();
-        this->syncActive = true;
-        this->mlme_sap.getSYNC().request(syncParams);
-        puts("FOUND CANDIDATES. Request sync");
-    }
-    else {
-        puts("FOUND NO CANDIDATES");
-    }
-#if 0
-    DSME_ASSERT(!this->syncActive);
-
-    PanDescriptorList* list;
-
-    if(!this->mac_pib.macAutoRequest) {
-        list = &this->recordedPanDescriptors;
-    } else {
-        list = &params.panDescriptorList;
-    }
-
-    if(list->size() == 0) {
-        //EV_INFO << "SCAN: Found no candidates" << endl;
-        this->scanOrSyncInProgress = false;
-        startScan();
-        return;
-    }
-
-    // Find the coordinator with the best LQI,
-    // then find the coordinator with this LQI,
-    // but the best RSSI.
-
-    uint8_t bestLQI = 0;
-    int8_t bestRSSI = INT8_MIN;
-    uint8_t bestIdx = 0xFF;
-
-    for(uint8_t i = 0; i < list->size(); i++) {
-        if((*list)[i].linkQuality > bestLQI) {
-            bestLQI = (*list)[i].linkQuality;
-        }
-    }
-
-    if(bestLQI < this->dsme->getPlatform().getMinCoordinatorLQI()) {
-        //this->scanAndSyncCompleteDelegate(nullptr);
-        //EV_INFO << "SCAN: No candidate with LQI above threshold" << endl;
-        startScan();
-        return;
-    }
-
-    for(uint8_t i = 0; i < list->size(); i++) {
-        if((*list)[i].linkQuality == bestLQI) {
-            if((*list)[i].rssi > bestRSSI) {
-                bestRSSI = (*list)[i].rssi;
-                bestIdx = i;
-            }
-        }
-    }
-
-    this->panDescriptorToSyncTo = (*list)[bestIdx];
-
-    mlme_sap::SYNC::request_parameters syncParams;
-    syncParams.channelNumber = this->panDescriptorToSyncTo.channelNumber;
-    syncParams.channelPage = this->panDescriptorToSyncTo.channelPage;
-    syncParams.trackBeacon = true;
-    syncParams.syncParentShortAddress = this->panDescriptorToSyncTo.coordAddress.getShortAddress();
-    syncParams.syncParentSdIndex = this->panDescriptorToSyncTo.dsmePANDescriptor.getBeaconBitmap().getSDIndex();
-    this->syncActive = true;
-    //EV_INFO << "SCAN: complete. Requesting to sync" << endl;
-    this->mlme_sap.getSYNC().request(syncParams);
-
-    return;
-#endif
-}
-
-void DSMEPlatform::startScan()
-{
-    channelList_t scanChannels;
-    scanChannels.add(26);
-    uint8_t scanDuration = 8;
-    if(!this->scanOrSyncInProgress) {
-        this->scanOrSyncInProgress = true;
-        DSME_ASSERT(!this->syncActive);
-
-        //this->recordedPanDescriptors.clear();
-
-        mlme_sap::SCAN::request_parameters params;
-
-        LOG_INFO("Initiating passive scan");
-        params.scanType = ScanType::PASSIVE;
-
-        params.scanChannels = scanChannels;
-        params.scanDuration = scanDuration;
-        params.channelPage = this->phy_pib.phyCurrentPage;
-        params.linkQualityScan = false;
-
-        this->mlme_sap.getSCAN().request(params);
-    } else {
-        LOG_INFO("Scan already in progress.");
-    }
-}
-
-void DSMEPlatform::startAssociation()
-{
-    if(!this->associationInProgress) {
-        startScan();
-    } else {
-        LOG_INFO("Association already in progress.");
-    }
-}
-
 void DSMEPlatform::start()
 {
     DSME_ASSERT(this->initialized);
     this->dsme.start();
     this->dsmeAdaptionLayer.startAssociation();
-#if 0
-    if(!this->mac_pib.macAssociatedPANCoord) {
-        LOG_DEBUG("Device is not associated with PAN.");
-        startAssociation();
-    }
-#endif
-}
-
-void DSMEPlatform::handleDataIndication(mcps_sap::DATA_indication_parameters& params)
-{
-    puts("Received DATA message from MCPS. :)");
-    IDSMEMessage *msg = params.msdu;
-    releaseMessage(msg);
-    if (PAN_COORD) {
-        send_pkt(msg->getHeader().getSrcAddr().getShortAddress());
-    }
-}
-
-void DSMEPlatform::handleDataConfirm(mcps_sap::DATA_confirm_parameters& params)
-{
-    IDSMEMessage* msg = params.msduHandle;
-    if(params.status != DataStatus::SUCCESS) {
-        puts("FAILED TO SEND DATA");
-    }
-    else {
-        puts("SUCCESS");
-    }
-    releaseMessage(msg);
-    /* TODO */
 }
 
 void DSMEPlatform::handleDataMessageFromMCPSWrapper(IDSMEMessage* msg)
@@ -691,6 +367,7 @@ void DSMEPlatform::handleDataMessageFromMCPSWrapper(IDSMEMessage* msg)
 void DSMEPlatform::handleConfirmFromMCPSWrapper(IDSMEMessage* msg, DataStatus::Data_Status dataStatus) {
     this->handleConfirmFromMCPS(static_cast<DSMEMessage*>(msg), dataStatus);
 }
+
 void DSMEPlatform::handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Status dataStatus) {
     puts(":)");
     if (dataStatus == DataStatus::Data_Status::SUCCESS) {
@@ -699,13 +376,6 @@ void DSMEPlatform::handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Stat
     printf("%02x\n", (int) dataStatus );
     IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
     releaseMessage(m);
-    int a=0;
-    for (int i=0;i<7;i++) {
-        if (this->pool[i].free) {
-            a++;
-        }
-    }
-    printf("%02x\n", a);
 }
 
 void DSMEPlatform::handleDataMessageFromMCPS(DSMEMessage* msg)
@@ -727,23 +397,16 @@ void DSMEPlatform::handleReceivedMessageFromAckLayer(IDSMEMessage* message)
     receiveFromAckLayerDelegate(message);
 }
 
-int a;
-int b;
 DSMEMessage *DSMEPlatform::getEmptyMessage()
 {
     DSMEMessage *msg = NULL;
-    for (int i=0; i<7; i++) {
+    for (int i=0; i<DSME_POOL_SIZE; i++) {
         if (this->pool[i].free) {
             msg = &this->pool[i];
             break;
         }
     }
-    if (!msg) {
-        printf("%02x %02x", a, b);
-        gnrc_pktbuf_stats();
-    }
     DSME_ASSERT(msg);
-    a++;
     msg->pkt = NULL;
     msg->free = false;
     msg->receivedViaMCPS = false;
@@ -759,7 +422,6 @@ void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
         gnrc_pktbuf_release(m->pkt);
     }
     m->free = true;
-    b++;
 }
 
 void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
@@ -782,35 +444,6 @@ void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmiss
 {
 
 }
-
-#if 0
-void DSMEPlatform::signalGTSChange(bool deallocation, IEEE802154MacAddress counterpart) {
-}
-
-void DSMEPlatform::signalQueueLength(uint32_t length) {
-}
-
-void DSMEPlatform::signalPacketsTXPerSlot(uint32_t packets) {
-}
-
-void DSMEPlatform::signalPacketsRXPerSlot(uint32_t packets) {
-}
-
-void DSMEPlatform::signalPacketsPerCAP(uint32_t packets) {
-}
-
-void DSMEPlatform::signalFailedPacketsPerCAP(uint32_t packets) {
-}
-
-void DSMEPlatform::signalFailedCCAs(uint32_t failedAttempts) {
-}
-
-void DSMEPlatform::signalPRRCAP(double prr) {
-}
-
-void DSMEPlatform::signalSuccessPacketsCAP(uint32_t packets) {
-}
-#endif
 
 bool DSMEPlatform::setChannelNumber(uint8_t channel)
 {

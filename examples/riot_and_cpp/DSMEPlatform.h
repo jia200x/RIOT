@@ -24,44 +24,9 @@
 
 #include "dsmeLayer/DSMELayer.h"
 #include "dsmeAdaptionLayer/DSMEAdaptionLayer.h"
+#define DSME_POOL_SIZE (8)
 
 namespace dsme {
-
-/**
- * Contains parameters to configure an exponential backoff algorithm.
- *
- * @li unitBackoff
- */
-typedef struct mac_backoffCfg_t {
-    /** minimum backoff exponent (initial value of the BE) */
-    uint8_t minBE;
-
-    /** maximum backoff exponent used for the backoff algorithm */
-    uint8_t maxBE;
-
-    /**
-     * Defines the number of retries this MAL SHALL use
-     * when it is configured to perform a CCA before
-     * sending and this CCA fails
-     * */
-    uint8_t maxBackoffRetries;
-
-    /** duration of unit backoff period in bits; t = (unitBackoff bit)/txRate*/
-    uint16_t unitBackoff;
-} mac_backoffCfg_t;
-
-/**
- * Contains parameters needed for the configuration of an acknowledgement
- * algorithm.
- */
-typedef struct mac_ackCfg_t {
-    /** Maximum number of frame retransmissions, before packet is discarded */
-    uint8_t maxFrameRetries;
-    /** Duration to wait for an ACK, before assuming a transmission error */
-    uint16_t ackWaitDuration;
-} mac_ackCfg_t;
-
-typedef uint8_t mac_result_t;
 
 struct DSMESettings;
 class DSMELayer;
@@ -74,8 +39,6 @@ public:
     ~DSMEPlatform();
 
     void initialize();
-    void startAssociation();
-    void startScan();
     void send_pkt(uint16_t addr);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,17 +113,11 @@ public:
 
 		void printSequenceChartInfo(DSMEMessage* msg, bool outgoing);
 
-		void invokeMessageTask();
-
 		DSMELayer& getDSME() {
 				return dsme;
 		}
 
-    void requestPending();
-
     bool isAssociated();
-
-    mac_result_t getMCPSTtransmitStatus();
 
     void signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver) override;
 
@@ -173,7 +130,6 @@ public:
     };
 
     static Delegate<void(bool)> txEndCallback;
-    PANDescriptor panDescriptorToSyncTo;
 
 protected:
     /** @brief Copy constructor is not allowed.
@@ -183,23 +139,14 @@ protected:
      */
     DSMEPlatform& operator=(const DSMEPlatform&);
 
-    static uint32_t getSFDTimestamp();
     virtual void signalNewMsg(DSMEMessage* msg) {}
     virtual void signalReleasedMsg(DSMEMessage* msg) {}
 
     void handleDataMessageFromMCPSWrapper(IDSMEMessage* msg);
     void handleDataMessageFromMCPS(DSMEMessage* msg);
 
-    void handleDataIndication(mcps_sap::DATA_indication_parameters& params);
-    void handleDataConfirm(mcps_sap::DATA_confirm_parameters& params);
-    void handleSCAN_confirm(mlme_sap::SCAN_confirm_parameters& params);
     void handleConfirmFromMCPSWrapper(IDSMEMessage* msg, DataStatus::Data_Status dataStatus);
     void handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Status dataStatus);
-    void handleSyncLossIndication(mlme_sap::SYNC_LOSS_indication_parameters& params);
-    void handleBEACON_NOTIFY_indication(mlme_sap::BEACON_NOTIFY_indication_parameters& params);
-    void handleASSOCIATION_confirm(mlme_sap::ASSOCIATE_confirm_parameters& params);
-    void handleASSOCIATION_indication(mlme_sap::ASSOCIATE_indication_parameters& params);
-    void associate(uint16_t coordPANId, AddrMode addrMode, IEEE802154MacAddress& coordAddress, uint8_t channel);
 
     std::string printDSMEManagement(uint8_t management, DSMESABSpecification& sabSpec, CommandFrameIdentifier cmd);
 
@@ -218,35 +165,17 @@ protected:
 
 		DSMEAdaptionLayer dsmeAdaptionLayer;
 
-		uint16_t messagesInUse;
-
-    bool initialized;
-    bool scanOrSyncInProgress{false};
-    bool associationInProgress{false};
-    bool syncActive{false};
+        bool initialized;
+        bool scanOrSyncInProgress{false};
+        bool associationInProgress{false};
+        bool syncActive{false};
 
 		receive_delegate_t receiveFromAckLayerDelegate;
 
-		DSMESettings* settings;
-
 		/** @brief the bit rate at which we transmit */
-		double bitrate;
-
-    //HandleMessageTask handleMessageTask;
-
-    uint8_t bufferUp[DSME_PACKET_MAX_LEN];
-    uint8_t bufferDown[DSME_PACKET_MAX_LEN];
-
-    static mac_ackCfg_t ackCfg;
-    static mac_backoffCfg_t backoffCfg;
-
-    uint8_t channel;
-    mac_result_t MCPS_transmit_status;
-
-    uint8_t currentTXLength;
     ztimer_t timer;
 
-    DSMEMessage pool[8];
+    DSMEMessage pool[DSME_POOL_SIZE];
     GTSScheduling* scheduling = nullptr;
 };
 
