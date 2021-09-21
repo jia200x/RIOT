@@ -33,7 +33,7 @@ FEATURES_REQUIRED += libstdcpp # libstdc++ support (for #include <cstdio>)
 
 # If you want to add some extra flags when compile c++ files, add these flags
 # to CXXEXFLAGS variable
-CXXEXFLAGS += -Wno-unused-parameter -Wno-pedantic -Wno-deprecated-copy -Wno-missing-field-initializers -Wno-unused-but-set-variable -Wno-maybe-uninitialized -Wno-unused-variable -Wno-reorder -Wno-address -Wno-sign-compare -Wno-unused-function
+CXXEXFLAGS += -Wno-unused-parameter -Wno-pedantic -Wno-deprecated-copy -Wno-missing-field-initializers -Wno-unused-but-set-variable -Wno-maybe-uninitialized -Wno-unused-variable -Wno-reorder -Wno-address -Wno-sign-compare -Wno-unused-function -Wno-error
 USEPKG += opendsme
 USEMODULE += ztimer_usec
 USEMODULE += memarray
@@ -42,7 +42,8 @@ USEMODULE += event_thread_highest
 USEMODULE += cpp11-compat
 USEMODULE += netdev_default
 USEMODULE += ieee802154
-CFLAGS += -DEVENT_THREAD_HIGHEST_STACKSIZE=2048
+USEMODULE += od
+CFLAGS += -DEVENT_THREAD_HIGHEST_STACKSIZE=4096
 CFLAGS += -DCONFIG_IEEE802154_AUTO_ACK_DISABLE=1
 
 export PKG_SOURCE_LOCAL_OPENDSME = /home/jialamos/Development/opendsme
