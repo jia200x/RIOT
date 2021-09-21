@@ -23,7 +23,7 @@
 //#include "HandleMessageTask.h"
 
 #include "dsmeLayer/DSMELayer.h"
-//#include "dsmeAdaptionLayer/DSMEAdaptionLayer.h"
+#include "dsmeAdaptionLayer/DSMEAdaptionLayer.h"
 
 namespace dsme {
 
@@ -106,6 +106,7 @@ public:
 
 		bool isReceptionFromAckLayerPossible() override;
 
+        void handle_rx();
 		void handleReceivedMessageFromAckLayer(IDSMEMessage* message) override;
 		void handleReceivedMessageFromAckLayer(DSMEMessage* message);
 
@@ -215,7 +216,7 @@ protected:
 		mcps_sap::MCPS_SAP mcps_sap;
 		mlme_sap::MLME_SAP mlme_sap;
 
-		//DSMEAdaptionLayer dsmeAdaptionLayer;
+		DSMEAdaptionLayer dsmeAdaptionLayer;
 
 		uint16_t messagesInUse;
 
@@ -245,12 +246,8 @@ protected:
     uint8_t currentTXLength;
     ztimer_t timer;
 
-    struct DSMEMessagePool {
-        DSMEMessage msg;
-        DSMEMessagePool *next;
-    };
-    DSMEMessagePool *head;
-    DSMEMessagePool pool[8];
+    DSMEMessage pool[8];
+    GTSScheduling* scheduling = nullptr;
 };
 
 }

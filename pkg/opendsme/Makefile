@@ -17,9 +17,12 @@ OPENDSME_MODULES = \
                     opendsme_datastructures \
                     opendsme_mcps_sap \
                     opendsme_mlme_sap \
-                    opendsme_pib
+                    opendsme_pib \
+                    opendsme_adaption_layer \
+                    opendsme_adaption_layer_scheduling \
+					#
 
-CPPFLAGS += -Wno-deprecated-copy -Wno-unused-parameter
+CPPFLAGS += -Wno-deprecated-copy -Wno-unused-parameter -Wno-error
 
 # dsmeLayer
 DIR_DSME_LAYER = dsmeLayer
@@ -39,6 +42,11 @@ DIR_opendsme_datastructures = $(DIR_MAC_SERVICES)/dataStructures
 DIR_opendsme_mcps_sap = $(DIR_MAC_SERVICES)/mcps_sap
 DIR_opendsme_mlme_sap = $(DIR_MAC_SERVICES)/mlme_sap
 DIR_opendsme_pib = $(DIR_MAC_SERVICES)/pib
+
+# DSME Adoption Layer
+DIR_DSME_ADAPTION_LAYER = dsmeAdaptionLayer
+DIR_opendsme_adaption_layer = $(DIR_DSME_ADAPTION_LAYER)
+DIR_opendsme_adaption_layer_scheduling = $(DIR_DSME_ADAPTION_LAYER)/scheduling
 
 .PHONY: opendsme_%
 

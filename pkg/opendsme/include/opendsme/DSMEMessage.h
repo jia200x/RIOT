@@ -40,7 +40,7 @@ public:
 #endif
 
     bool hasPayload() {
-        return this->pkt != NULL;
+        return this->pkt != NULL && this->pkt->size > 0;
     }
 
     // gives the symbol counter at the end of the SFD
@@ -98,13 +98,6 @@ public:
     }
 
 //////////////////////////////////////////////////////////////////////////////////
-    void clearMessage() {
-        if (pkt) {
-            gnrc_pktbuf_release(pkt);
-        }
-        pkt = NULL;
-    }
-
     uint8_t getPayloadLength() {
             DSME_ASSERT(pkt);
             return pkt->size;
@@ -163,6 +156,7 @@ public:
 #endif
 
     bool firstTry;
+    bool free;
 private:
     DSMEMessage() :
 						radio_last_rssi(0),

@@ -4,6 +4,7 @@
 #include "event.h"
 #include "event/thread.h"
 #include "luid.h"
+#include "dsmeAdaptionLayer/scheduling/TPS.h"
 
 #if IS_USED(MODULE_CC2538_RF)
 #include "cc2538_rf.h"
@@ -39,6 +40,7 @@ Delegate<void(bool)> DSMEPlatform::txEndCallback;
 static event_t timer_event;
 static event_t tx_done_event;
 static event_t rx_done_event;
+static event_t request_slot_ev;
 static uint32_t rx_sfd;
 static bool wait_for_ack;
 static bool changed;
@@ -46,6 +48,11 @@ static bool changed;
 static void _cca_timer_ev_handler(event_t *ev)
 {
     dsme::DSMEPlatform::instance->getDSME().dispatchCCAResult(true);
+}
+
+static void _request_slot_ev_timer(event_t *ev)
+{
+    
 }
 
 static void _acktimer_ev_handler(event_t *ev)
@@ -69,8 +76,10 @@ static void _acktimer_cb(void *arg)
 
 static void _send_timer_ev_handler(event_t *ev)
 {
-    dsme::DSMEPlatform::instance->send_pkt(dsme::DSMEPlatform::instance->panDescriptorToSyncTo.coordAddress.getShortAddress());
+    //dsme::DSMEPlatform::instance->send_pkt(dsme::DSMEPlatform::instance->panDescriptorToSyncTo.coordAddress.getShortAddress());
+    dsme::DSMEPlatform::instance->send_pkt(0x9fad);
     ztimer_set(ZTIMER_USEC, &send_timer, 2000000);
+    puts("S");
 }
 
 static void _send_timer_cb(void *arg)
@@ -102,9 +111,9 @@ static void _tx_done_handler(event_t *ev)
     dsme::DSMEPlatform::txEndCallback(true);
 }
 
-static void _rx_done_handler(event_t *ev)
+void DSMEPlatform::handle_rx()
 {
-    DSMEMessage *message = dsme::DSMEPlatform::instance->getEmptyMessage();
+    DSMEMessage *message = getEmptyMessage();
     message->setStartOfFrameDelimiterSymbolCounter(rx_sfd);
 
     int res;
@@ -117,8 +126,11 @@ static void _rx_done_handler(event_t *ev)
     int len = ieee802154_radio_len(&_radio);
     res = message->loadBuffer(len);
     DSME_ASSERT(res >= 0);
+    ieee802154_rx_info_t info;
 
-    ieee802154_radio_read(&_radio, message->getPayload(), 127, NULL);
+    ieee802154_radio_read(&_radio, message->getPayload(), 127, &info);
+    message->messageLQI = info.lqi;
+    message->radio_last_rssi = info.rssi;
     const uint8_t *buf = message->getPayload();
     if (buf[0] & IEEE802154_FCF_TYPE_ACK) {
         //puts("ACK");
@@ -133,8 +145,12 @@ static void _rx_done_handler(event_t *ev)
     DSME_ASSERT(res == 0);
     while(ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
 
-    dsme::DSMEPlatform::instance->getDSME().getAckLayer().receive(message);
+    getDSME().getAckLayer().receive(message);
+}
 
+static void _rx_done_handler(event_t *ev)
+{
+    dsme::DSMEPlatform::instance->handle_rx();
 }
 
 static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
@@ -173,6 +189,7 @@ void DSMEPlatform::send_pkt(uint16_t addr)
         return;
     }
 
+    puts("S");
     DSMEMessage* message = getEmptyMessage();
     message->loadBuffer(4);
     IEEE802154MacAddress dst;
@@ -186,6 +203,7 @@ void DSMEPlatform::send_pkt(uint16_t addr)
     message->getHeader().setSrcPANId(this->mac_pib.macPANId);
     message->getHeader().setDstPANId(this->mac_pib.macPANId);
 
+#if 0
     // Both PAN IDs are equal and we are using short addresses
     // so suppress the PAN ID -> This should not be the task
     // for the user of the MCPS, but it is specified like this... TODO
@@ -205,6 +223,8 @@ void DSMEPlatform::send_pkt(uint16_t addr)
     params.sendMultipurpose = false;
 
     this->mcps_sap.getDATA().request(params);
+#endif
+    this->dsmeAdaptionLayer.sendMessage(message);
 }
 
 DSMEPlatform::DSMEPlatform() :
@@ -213,7 +233,7 @@ DSMEPlatform::DSMEPlatform() :
 
 				mcps_sap(dsme),
 				mlme_sap(dsme),
-
+                dsmeAdaptionLayer(dsme),
 				messagesInUse(0),
 				initialized(false),
         channel(MIN_CHANNEL),
@@ -235,11 +255,9 @@ DSMEPlatform::DSMEPlatform() :
     tx_done_event.handler = _tx_done_handler;
     rx_done_event.handler = _rx_done_handler;
     
-    this->head = &this->pool[0];
     for (int i=0; i<7; i++) {
-        this->pool[i].next = &this->pool[i+1];
+        this->pool[i].free = true;
     }
-    this->pool[7].next = NULL;
 }
 
 DSMEPlatform::~DSMEPlatform()
@@ -332,8 +350,8 @@ void DSMEPlatform::initialize()
     this->mac_pib.macCapReduction = false;
 
     this->mac_pib.macAssociatedPANCoord = this->mac_pib.macIsPANCoord;
-    this->mac_pib.macSuperframeOrder = 4;
-    this->mac_pib.macMultiSuperframeOrder = 5;
+    this->mac_pib.macSuperframeOrder = 6;
+    this->mac_pib.macMultiSuperframeOrder = 6;
     this->mac_pib.macBeaconOrder = 7;
 
     this->mac_pib.macMinBE = 7;
@@ -341,11 +359,12 @@ void DSMEPlatform::initialize()
     this->mac_pib.macMaxCSMABackoffs = 5;
     this->mac_pib.macMaxFrameRetries = 3;
 
-    this->mac_pib.macDSMEGTSExpirationTime = 50;
+    this->mac_pib.macDSMEGTSExpirationTime = 255;
     this->mac_pib.macResponseWaitTime = 244;
 
     this->phy_pib.phyCurrentChannel = 26;
 		
+#if 0
     this->mlme_sap.getASSOCIATE().indication(DELEGATE(&DSMEPlatform::handleASSOCIATION_indication, *this));
     this->mlme_sap.getASSOCIATE().confirm(DELEGATE(&DSMEPlatform::handleASSOCIATION_confirm, *this));
     this->mcps_sap.getDATA().indication(DELEGATE(&DSMEPlatform::handleDataIndication, *this));
@@ -354,12 +373,24 @@ void DSMEPlatform::initialize()
 
     this->mlme_sap.getSYNC_LOSS().indication(DELEGATE(&DSMEPlatform::handleSyncLossIndication, *this));
     this->mlme_sap.getBEACON_NOTIFY().indication(DELEGATE(&DSMEPlatform::handleBEACON_NOTIFY_indication, *this));
+    this->mlme_sap.getDSME_GTS().indication(DELEGATE(&DSMEPlatform::handleDSME_GTS_indication, *this));
+    this->mlme_sap.getDSME_GTS().confirm(DELEGATE(&DSMEPlatform::handleDSME_GTS_confirm, *this));
+#endif
+    this->dsmeAdaptionLayer.setIndicationCallback(DELEGATE(&DSMEPlatform::handleDataMessageFromMCPSWrapper, *this));
+    this->dsmeAdaptionLayer.setConfirmCallback(DELEGATE(&DSMEPlatform::handleConfirmFromMCPSWrapper, *this));
 
     if (ENABLE_SEND) {
-        ztimer_set(ZTIMER_USEC, &send_timer, 2005000);
+        ztimer_set(ZTIMER_USEC, &send_timer, 10000000);
     }
     this->dsme.initialize(this);
 
+    channelList_t scanChannels;
+    scanChannels.add(26);
+    TPS* tps = new TPS(this->dsmeAdaptionLayer);
+    tps->setAlpha(0.1);
+    tps->setMinFreshness(this->mac_pib.macDSMEGTSExpirationTime);
+    scheduling = tps;
+    this->dsmeAdaptionLayer.initialize(scanChannels,8,scheduling);
     this->initialized = true;
 }
 
@@ -620,10 +651,13 @@ void DSMEPlatform::start()
 {
     DSME_ASSERT(this->initialized);
     this->dsme.start();
+    this->dsmeAdaptionLayer.startAssociation();
+#if 0
     if(!this->mac_pib.macAssociatedPANCoord) {
         LOG_DEBUG("Device is not associated with PAN.");
         startAssociation();
     }
+#endif
 }
 
 void DSMEPlatform::handleDataIndication(mcps_sap::DATA_indication_parameters& params)
@@ -651,13 +685,34 @@ void DSMEPlatform::handleDataConfirm(mcps_sap::DATA_confirm_parameters& params)
 
 void DSMEPlatform::handleDataMessageFromMCPSWrapper(IDSMEMessage* msg)
 {
-    DSME_ASSERT(false);
     this->handleDataMessageFromMCPS(static_cast<DSMEMessage*>(msg));
+}
+
+void DSMEPlatform::handleConfirmFromMCPSWrapper(IDSMEMessage* msg, DataStatus::Data_Status dataStatus) {
+    this->handleConfirmFromMCPS(static_cast<DSMEMessage*>(msg), dataStatus);
+}
+void DSMEPlatform::handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Status dataStatus) {
+    puts(":)");
+    if (dataStatus == DataStatus::Data_Status::SUCCESS) {
+        puts("NO TE LO PUEDO CREER!");
+    }
+    printf("%02x\n", (int) dataStatus );
+    IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
+    releaseMessage(m);
+    int a=0;
+    for (int i=0;i<7;i++) {
+        if (this->pool[i].free) {
+            a++;
+        }
+    }
+    printf("%02x\n", a);
 }
 
 void DSMEPlatform::handleDataMessageFromMCPS(DSMEMessage* msg)
 {
-    DSME_ASSERT(false);
+    puts("LLEGO?");
+    IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
+    releaseMessage(m);
 }
 
 bool DSMEPlatform::isReceptionFromAckLayerPossible()
@@ -672,12 +727,25 @@ void DSMEPlatform::handleReceivedMessageFromAckLayer(IDSMEMessage* message)
     receiveFromAckLayerDelegate(message);
 }
 
+int a;
+int b;
 DSMEMessage *DSMEPlatform::getEmptyMessage()
 {
-    DSMEMessage *msg = &this->head->msg;
-    this->head = head->next;
+    DSMEMessage *msg = NULL;
+    for (int i=0; i<7; i++) {
+        if (this->pool[i].free) {
+            msg = &this->pool[i];
+            break;
+        }
+    }
+    if (!msg) {
+        printf("%02x %02x", a, b);
+        gnrc_pktbuf_stats();
+    }
     DSME_ASSERT(msg);
+    a++;
     msg->pkt = NULL;
+    msg->free = false;
     msg->receivedViaMCPS = false;
     signalNewMsg(msg);
     return msg;
@@ -685,10 +753,13 @@ DSMEMessage *DSMEPlatform::getEmptyMessage()
 
 void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
 {
-    DSMEMessagePool *entry = (DSMEMessagePool*) msg;
-    gnrc_pktbuf_release(entry->msg.pkt);
-    entry->next = this->head;
-    this->head = entry;
+    DSMEMessage *m = static_cast<DSMEMessage*>(msg);
+    DSME_ASSERT(!m->free);
+    if (m->pkt) {
+        gnrc_pktbuf_release(m->pkt);
+    }
+    m->free = true;
+    b++;
 }
 
 void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
