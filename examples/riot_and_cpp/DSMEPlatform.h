@@ -24,7 +24,7 @@
 
 #include "dsmeLayer/DSMELayer.h"
 #include "dsmeAdaptionLayer/DSMEAdaptionLayer.h"
-#define DSME_POOL_SIZE (8)
+#define DSME_POOL_SIZE (16)
 
 namespace dsme {
 
@@ -72,6 +72,7 @@ public:
         void handle_rx();
 		void handleReceivedMessageFromAckLayer(IDSMEMessage* message) override;
 		void handleReceivedMessageFromAckLayer(DSMEMessage* message);
+        void rx_offload();
 
 		DSMEMessage* getEmptyMessage() override;
 
@@ -176,6 +177,7 @@ protected:
     ztimer_t timer;
 
     DSMEMessage pool[DSME_POOL_SIZE];
+    IDSMEMessage *message;
     GTSScheduling* scheduling = nullptr;
 };
 

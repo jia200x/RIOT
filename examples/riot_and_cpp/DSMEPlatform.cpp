@@ -5,6 +5,7 @@
 #include "event/thread.h"
 #include "luid.h"
 #include "dsmeAdaptionLayer/scheduling/TPS.h"
+#include "board.h"
 
 #if IS_USED(MODULE_CC2538_RF)
 #include "cc2538_rf.h"
@@ -45,6 +46,27 @@ static uint32_t rx_sfd;
 static bool wait_for_ack;
 static bool changed;
 
+static void _handle_rx_offload(event_t *ev)
+{
+    dsme::DSMEPlatform::instance->rx_offload();
+}
+
+void DSMEPlatform::rx_offload()
+{
+    IDSMEMessage *message = this->message;
+    this->message = nullptr;
+    receiveFromAckLayerDelegate(message);
+}
+
+static event_t rx_offload_ev;
+
+static void _start_of_cfp_handler(event_t *ev)
+{
+    dsme::DSMEPlatform::instance->getDSME().handleStartOfCFP();
+}
+
+static event_t start_of_cfp_ev;
+
 static void _cca_timer_ev_handler(event_t *ev)
 {
     dsme::DSMEPlatform::instance->getDSME().dispatchCCAResult(true);
@@ -72,9 +94,9 @@ static void _acktimer_cb(void *arg)
 static void _send_timer_ev_handler(event_t *ev)
 {
     //dsme::DSMEPlatform::instance->send_pkt(dsme::DSMEPlatform::instance->panDescriptorToSyncTo.coordAddress.getShortAddress());
-    dsme::DSMEPlatform::instance->send_pkt(0x9fad);
-    ztimer_set(ZTIMER_USEC, &send_timer, 2000000);
-    puts("S");
+    dsme::DSMEPlatform::instance->send_pkt(0xd565);
+    ztimer_set(ZTIMER_USEC, &send_timer, 200000);
+    //puts("S");
 }
 
 static void _send_timer_cb(void *arg)
@@ -104,17 +126,17 @@ static void _tx_done_handler(event_t *ev)
         ieee802154_radio_set_frame_filter_mode(&_radio, IEEE802154_FILTER_ACCEPT);
     }
     dsme::DSMEPlatform::txEndCallback(true);
+    DSMEPlatform::state = DSMEPlatform::STATE_READY;
 }
 
 void DSMEPlatform::handle_rx()
 {
+    DSME_ASSERT(DSMEPlatform::state == STATE_READY);
     DSMEMessage *message = getEmptyMessage();
     message->setStartOfFrameDelimiterSymbolCounter(rx_sfd);
 
     int res;
     changed = true;
-    //puts("R");
-    //puts("TRX_OFF");
     while((res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_TRX_OFF) == -EBUSY)) {}
     DSME_ASSERT(res == 0);
     while (ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
@@ -183,7 +205,7 @@ void DSMEPlatform::send_pkt(uint16_t addr)
         return;
     }
 
-    puts("S");
+    //puts("S");
     DSMEMessage* message = getEmptyMessage();
     message->loadBuffer(4);
     IEEE802154MacAddress dst;
@@ -224,6 +246,8 @@ DSMEPlatform::DSMEPlatform() :
     timer_event.handler = _timer_ev_handler;
     tx_done_event.handler = _tx_done_handler;
     rx_done_event.handler = _rx_done_handler;
+    rx_offload_ev.handler = _handle_rx_offload;
+    start_of_cfp_ev.handler = _start_of_cfp_handler;
     
     for (int i=0; i<DSME_POOL_SIZE; i++) {
         this->pool[i].free = true;
@@ -320,8 +344,8 @@ void DSMEPlatform::initialize()
     this->mac_pib.macCapReduction = false;
 
     this->mac_pib.macAssociatedPANCoord = this->mac_pib.macIsPANCoord;
-    this->mac_pib.macSuperframeOrder = 6;
-    this->mac_pib.macMultiSuperframeOrder = 6;
+    this->mac_pib.macSuperframeOrder = 3;
+    this->mac_pib.macMultiSuperframeOrder = 4;
     this->mac_pib.macBeaconOrder = 7;
 
     this->mac_pib.macMinBE = 7;
@@ -329,8 +353,9 @@ void DSMEPlatform::initialize()
     this->mac_pib.macMaxCSMABackoffs = 5;
     this->mac_pib.macMaxFrameRetries = 3;
 
-    this->mac_pib.macDSMEGTSExpirationTime = 255;
+    this->mac_pib.macDSMEGTSExpirationTime = 16;
     this->mac_pib.macResponseWaitTime = 244;
+    this->mac_pib.macChannelDiversityMode = Channel_Diversity_Mode::CHANNEL_HOPPING;
 
     this->phy_pib.phyCurrentChannel = 26;
 		
@@ -369,18 +394,17 @@ void DSMEPlatform::handleConfirmFromMCPSWrapper(IDSMEMessage* msg, DataStatus::D
 }
 
 void DSMEPlatform::handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Status dataStatus) {
-    puts(":)");
     if (dataStatus == DataStatus::Data_Status::SUCCESS) {
-        puts("NO TE LO PUEDO CREER!");
+        //puts(":)!");
     }
-    printf("%02x\n", (int) dataStatus );
     IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
     releaseMessage(m);
 }
 
 void DSMEPlatform::handleDataMessageFromMCPS(DSMEMessage* msg)
 {
-    puts("LLEGO?");
+    //puts("R! :)");
+    LED1_TOGGLE;
     IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
     releaseMessage(m);
 }
@@ -388,13 +412,15 @@ void DSMEPlatform::handleDataMessageFromMCPS(DSMEMessage* msg)
 bool DSMEPlatform::isReceptionFromAckLayerPossible()
 {
     /* TODO: */
-    return true;
+    return DSMEPlatform::state == STATE_READY;
 }
 
 void DSMEPlatform::handleReceivedMessageFromAckLayer(IDSMEMessage* message)
 {
     DSME_ASSERT(receiveFromAckLayerDelegate);
-    receiveFromAckLayerDelegate(message);
+    DSME_ASSERT(!this->message);
+    this->message = message;
+    event_post(EVENT_PRIO_HIGHEST, &rx_offload_ev);
 }
 
 DSMEMessage *DSMEPlatform::getEmptyMessage()
@@ -409,7 +435,7 @@ DSMEMessage *DSMEPlatform::getEmptyMessage()
     DSME_ASSERT(msg);
     msg->pkt = NULL;
     msg->free = false;
-    msg->receivedViaMCPS = false;
+    msg->prepare();
     signalNewMsg(msg);
     return msg;
 }
@@ -426,7 +452,9 @@ void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
 
 void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
 {
-    uint32_t delta = (symbolCounterValue - getSymbolCounter()) << 4;
+    uint32_t now = ztimer_now(ZTIMER_USEC);
+    uint32_t offset = now & 0xF;
+    uint32_t delta = ((symbolCounterValue - getSymbolCounter()) << 4) - offset;
     ztimer_set(ZTIMER_USEC, &timer, delta);
 }
 
@@ -437,7 +465,7 @@ uint32_t DSMEPlatform::getSymbolCounter()
 
 void DSMEPlatform::scheduleStartOfCFP()
 {
-    dsme::DSMEPlatform::instance->getDSME().handleStartOfCFP();
+    event_post(EVENT_PRIO_HIGHEST, &start_of_cfp_ev);
 }
 
 void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver)
@@ -517,7 +545,7 @@ bool DSMEPlatform::sendNow()
 
 void DSMEPlatform::abortPreparedTransmission()
 {
-    DSME_ASSERT(false);
+
 }
 
 bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMsg, Delegate<void(bool)> txEndCallback)

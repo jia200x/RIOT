@@ -38,7 +38,7 @@ ifneq (,$(filter gnrc_netdev_default,$(USEMODULE)))
 endif
 
 ifneq (,$(filter netdev_default,$(USEMODULE)))
-  USEMODULE += netdev
+  #USEMODULE += netdev
   USEMODULE += gnrc_netif
 endif
 
