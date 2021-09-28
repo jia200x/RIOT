@@ -33,6 +33,7 @@ extern "C" {
 #include "byteorder.h"
 #include "net/eui64.h"
 #include "net/ieee802154.h"
+#include "errno.h"
 
 /**
  * @brief Forward declaration of the radio ops structure.
@@ -483,6 +484,14 @@ typedef struct {
     int8_t pow;                     /**< TX power in dBm */
 } ieee802154_phy_conf_t;
 
+typedef enum {
+    IEEE802154_HAL_OP_TRANSMIT,
+    IEEE802154_HAL_OP_SET_RX,
+    IEEE802154_HAL_OP_SET_IDLE,
+    IEEE802154_HAL_OP_CCA,
+    IEEE802154_HAL_OP_ED,
+} ieee802154_hal_op_t;
+
 /**
  * @brief Radio ops struct declaration
  */
@@ -509,6 +518,7 @@ struct ieee802154_radio_ops {
      */
     int (*write)(ieee802154_dev_t *dev, const iolist_t *psdu);
 
+#if 0
     /**
      * @brief Request the transmission of a preloaded frame
      *
@@ -550,6 +560,7 @@ struct ieee802154_radio_ops {
      * @return negative errno on error
      */
     int (*confirm_transmit)(ieee802154_dev_t *dev, ieee802154_tx_info_t *info);
+#endif
 
     /**
      * @brief Get the length of the received PSDU frame.
@@ -648,6 +659,7 @@ struct ieee802154_radio_ops {
      */
     int (*confirm_on)(ieee802154_dev_t *dev);
 
+#if 0
     /**
      * @brief Request a PHY state change
      *
@@ -717,6 +729,9 @@ struct ieee802154_radio_ops {
      * @return negative errno on error
      */
     int (*confirm_cca)(ieee802154_dev_t *dev);
+#endif
+    int (*request_op)(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx);
+    int (*confirm_op)(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx);
 
     /**
      * @brief Set the threshold for the Energy Detection (first mode of CCA)
@@ -879,7 +894,7 @@ static inline int ieee802154_radio_write(ieee802154_dev_t *dev, const iolist_t *
  */
 static inline int ieee802154_radio_request_transmit(ieee802154_dev_t *dev)
 {
-    return dev->driver->request_transmit(dev);
+    return dev->driver->request_op(dev, IEEE802154_HAL_OP_TRANSMIT, NULL);
 }
 
 /**
@@ -893,7 +908,7 @@ static inline int ieee802154_radio_request_transmit(ieee802154_dev_t *dev)
 static inline int ieee802154_radio_confirm_transmit(ieee802154_dev_t *dev,
                                                     ieee802154_tx_info_t *info)
 {
-    return dev->driver->confirm_transmit(dev, info);
+    return dev->driver->confirm_op(dev, IEEE802154_HAL_OP_TRANSMIT, info);
 }
 
 /**
@@ -1100,30 +1115,48 @@ static inline int ieee802154_radio_confirm_on(ieee802154_dev_t *dev)
     return dev->driver->confirm_on(dev);
 }
 
-/**
- * @brief Shortcut to @ref ieee802154_radio_ops::request_set_trx_state
- *
- * @param[in] dev IEEE802.15.4 device descriptor
- * @param[in] state the new state
- *
- * @return result of @ref ieee802154_radio_ops::request_set_trx_state
- */
-static inline int ieee802154_radio_request_set_trx_state(ieee802154_dev_t *dev,
-                                                         ieee802154_trx_state_t state)
+static inline int ieee802154_radio_request_set_idle(ieee802154_dev_t *dev, bool force)
 {
-    return dev->driver->request_set_trx_state(dev, state);
+    return dev->driver->request_op(dev, IEEE802154_HAL_OP_SET_IDLE, &force);
 }
 
-/**
- * @brief Shortcut to @ref ieee802154_radio_ops::confirm_set_trx_state
- *
- * @param[in] dev IEEE802.15.4 device descriptor
- *
- * @return result of @ref ieee802154_radio_ops::confirm_set_trx_state
- */
-static inline int ieee802154_radio_confirm_set_trx_state(ieee802154_dev_t *dev)
+static inline int ieee802154_radio_confirm_set_idle(ieee802154_dev_t *dev)
 {
-    return dev->driver->confirm_set_trx_state(dev);
+    return dev->driver->confirm_op(dev, IEEE802154_HAL_OP_SET_IDLE, NULL);
+}
+
+static inline int ieee802154_radio_request_set_rx(ieee802154_dev_t *dev)
+{
+    return dev->driver->request_op(dev, IEEE802154_HAL_OP_SET_RX, NULL);
+}
+
+static inline int ieee802154_radio_confirm_set_rx(ieee802154_dev_t *dev)
+{
+    return dev->driver->confirm_op(dev, IEEE802154_HAL_OP_SET_RX, NULL);
+}
+
+static inline int ieee802154_radio_set_idle(ieee802154_dev_t *dev, bool force)
+{
+    int res = ieee802154_radio_request_set_idle(dev, force);
+    if (res < 0) {
+        goto end;
+    }
+    while (ieee802154_radio_confirm_set_idle(dev) == -EAGAIN) {}
+
+end:
+    return res;
+}
+
+static inline int ieee802154_radio_set_rx(ieee802154_dev_t *dev)
+{
+    int res = ieee802154_radio_request_set_rx(dev);
+    if (res < 0) {
+        goto end;
+    }
+    while (ieee802154_radio_confirm_set_rx(dev) == -EAGAIN) {}
+
+end:
+    return res;
 }
 
 /**
@@ -1135,7 +1168,7 @@ static inline int ieee802154_radio_confirm_set_trx_state(ieee802154_dev_t *dev)
  */
 static inline int ieee802154_radio_request_cca(ieee802154_dev_t *dev)
 {
-    return dev->driver->request_cca(dev);
+    return dev->driver->request_op(dev, IEEE802154_HAL_OP_CCA, NULL);
 }
 
 /**
@@ -1147,7 +1180,12 @@ static inline int ieee802154_radio_request_cca(ieee802154_dev_t *dev)
  */
 static inline int ieee802154_radio_confirm_cca(ieee802154_dev_t *dev)
 {
-    return dev->driver->confirm_cca(dev);
+    bool clear;
+    int res = dev->driver->confirm_op(dev, IEEE802154_HAL_OP_CCA, &clear);
+    if (res < 0) {
+        return res;
+    }
+    return clear;
 }
 
 /**
