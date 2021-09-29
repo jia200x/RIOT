@@ -115,9 +115,8 @@ static void _tx_done_handler(event_t *ev)
     DSME_ASSERT(res >= 0);
     changed = true;
     //puts("RXON");
-    res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_RX_ON);
+    res = ieee802154_radio_set_rx(&_radio);
     DSME_ASSERT(res == 0);
-    while(ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
     if (wait_for_ack) {
         wait_for_ack = false;
         ieee802154_radio_set_frame_filter_mode(&_radio, IEEE802154_FILTER_ACK_ONLY);
@@ -137,9 +136,8 @@ void DSMEPlatform::handle_rx()
 
     int res;
     changed = true;
-    while((res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_TRX_OFF) == -EBUSY)) {}
+    res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
-    while (ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
     int len = ieee802154_radio_len(&_radio);
     res = message->loadBuffer(len);
     DSME_ASSERT(res >= 0);
@@ -158,9 +156,8 @@ void DSMEPlatform::handle_rx()
     }
     message->dropHdr(message->getHeader().getSerializationLength());
 
-    res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_RX_ON);
+    res = ieee802154_radio_set_rx(&_radio);
     DSME_ASSERT(res == 0);
-    while(ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
 
     getDSME().getAckLayer().receive(message);
 }
@@ -484,15 +481,13 @@ bool DSMEPlatform::setChannelNumber(uint8_t channel)
     int res;
     changed = true;
     //puts("TRX_OFF");
-    while((res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_TRX_OFF) == -EBUSY)) {}
+    res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
-    while (ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
     res = ieee802154_radio_config_phy(&_radio, &conf);
     DSME_ASSERT(res == 0);
     //puts("RXON");
-    res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_RX_ON);
+    res = ieee802154_radio_set_rx(&_radio);
     DSME_ASSERT(res == 0);
-    while(ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
     return true;
 }
 
@@ -526,9 +521,8 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
         //puts("A");
     }
     changed = true;
-    int res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_TX_ON);
+    int res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
-    while(ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN);
     res = ieee802154_radio_write(&_radio, &iol);
     DSME_ASSERT(res == 0);
 
@@ -569,11 +563,10 @@ bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMs
     };
 
     changed = true;
-    int res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_TX_ON);
+    int res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
     res = ieee802154_radio_write(&_radio, &iol);
     DSME_ASSERT(res == 0);
-    while(ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN);
 
     // Preamble (4) | SFD (1) | PHY Hdr (1) | MAC Payload | FCS (2)
     uint32_t endOfReception = receivedMsg->getStartOfFrameDelimiterSymbolCounter() + receivedMsg->getTotalSymbols() - 2 * 4 // Preamble
@@ -610,9 +603,8 @@ void DSMEPlatform::turnTransceiverOff()
 {
     changed = true;
     //puts("TRX_OFF");
-    int res = ieee802154_radio_request_set_trx_state(&_radio, IEEE802154_TRX_STATE_TRX_OFF);
+    int res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
-    while(ieee802154_radio_confirm_set_trx_state(&_radio) == -EAGAIN) {}
 }
 
 }
