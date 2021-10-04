@@ -1,5 +1,5 @@
 # name of your application
-APPLICATION = riot_and_cpp
+APPLICATION = opendsme_example
 
 # If no BOARD is found in the environment, use this default:
 BOARD ?= native
@@ -36,15 +36,15 @@ FEATURES_REQUIRED += libstdcpp # libstdc++ support (for #include <cstdio>)
 CXXEXFLAGS += -Wno-unused-parameter -Wno-pedantic -Wno-deprecated-copy -Wno-missing-field-initializers -Wno-unused-but-set-variable -Wno-maybe-uninitialized -Wno-unused-variable -Wno-reorder -Wno-address -Wno-sign-compare -Wno-unused-function -Wno-error
 USEPKG += opendsme
 USEMODULE += ztimer_usec
-USEMODULE += memarray
 USEMODULE += gnrc_pktbuf
-USEMODULE += event_thread_highest
+USEMODULE += event_thread
 USEMODULE += cpp11-compat
 USEMODULE += netdev_default
 USEMODULE += ieee802154
 USEMODULE += od
 USEMODULE += luid
-CFLAGS += -DEVENT_THREAD_HIGHEST_STACKSIZE=4096
+USEMODULE += shell
+CFLAGS += -DEVENT_THREAD_MEDIUM_STACKSIZE=4096
 CFLAGS += -DCONFIG_IEEE802154_AUTO_ACK_DISABLE=1
 CFLAGS += -DDEBUG_ASSERT_VERBOSE
 
