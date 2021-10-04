@@ -23,6 +23,10 @@
 #define ENABLE_SEND PAN_COORD
 #endif
 
+#ifndef CAP_REDUCTION
+#define CAP_REDUCTION false
+#endif
+
 #include "net/ieee802154/radio.h"
 
 ieee802154_dev_t _radio;
@@ -94,7 +98,7 @@ static void _acktimer_cb(void *arg)
 static void _send_timer_ev_handler(event_t *ev)
 {
     //dsme::DSMEPlatform::instance->send_pkt(dsme::DSMEPlatform::instance->panDescriptorToSyncTo.coordAddress.getShortAddress());
-    dsme::DSMEPlatform::instance->send_pkt(0xd565);
+    //dsme::DSMEPlatform::instance->send_pkt(0xd565);
     ztimer_set(ZTIMER_USEC, &send_timer, 200000);
     //puts("S");
 }
@@ -195,7 +199,7 @@ static void _timer_cb(void *arg)
     event_post(EVENT_PRIO_HIGHEST, &timer_event);
 }
 
-void DSMEPlatform::send_pkt(uint16_t addr)
+void DSMEPlatform::send_pkt(uint16_t addr, iolist_t *pkt)
 {
     if(!this->mac_pib.macAssociatedPANCoord) {
         puts("Discarding message");
@@ -204,7 +208,7 @@ void DSMEPlatform::send_pkt(uint16_t addr)
 
     //puts("S");
     DSMEMessage* message = getEmptyMessage();
-    message->loadBuffer(4);
+    message->loadBuffer(pkt);
     IEEE802154MacAddress dst;
     dst.setShortAddress(addr);
     mcps_sap::DATA::request_parameters params;
@@ -338,7 +342,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     ieee802154_radio_config_addr_filter(&_radio, IEEE802154_AF_SHORT_ADDR, &short_addr);
     ieee802154_radio_config_addr_filter(&_radio, IEEE802154_AF_EXT_ADDR, &ext_addr);
 
-    this->mac_pib.macCapReduction = false;
+    this->mac_pib.macCapReduction = CAP_REDUCTION;
 
     this->mac_pib.macAssociatedPANCoord = this->mac_pib.macIsPANCoord;
     this->mac_pib.macSuperframeOrder = 3;
@@ -381,6 +385,12 @@ void DSMEPlatform::start()
     this->dsmeAdaptionLayer.startAssociation();
 }
 
+void DSMEPlatform::getShortAddress(network_uint16_t *addr)
+{
+    addr->u8[0] = this->mac_pib.macExtendedAddress.getShortAddress() >> 8;
+    addr->u8[1] = this->mac_pib.macExtendedAddress.getShortAddress() & 0xFF;
+}
+
 bool DSMEPlatform::isAssociated()
 {
     return this->mac_pib.macAssociatedPANCoord;
@@ -407,8 +417,8 @@ void DSMEPlatform::handleDataMessageFromMCPS(DSMEMessage* msg)
 {
     //puts("R! :)");
     LED1_TOGGLE;
-    IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
-    releaseMessage(m);
+    //releaseMessage(m);
+    msg->dispatchMessage();
 }
 
 bool DSMEPlatform::isReceptionFromAckLayerPossible()
@@ -484,7 +494,10 @@ bool DSMEPlatform::setChannelNumber(uint8_t channel)
     DSME_ASSERT(res == 0);
     res = ieee802154_radio_config_phy(&_radio, &conf);
     DSME_ASSERT(res == 0);
-    //puts("RXON");
+
+    /* TODO: Find a better solution */
+    ieee802154_radio_config_addr_filter(&_radio, IEEE802154_AF_PANID, &this->mac_pib.macPANId);
+
     res = ieee802154_radio_set_rx(&_radio);
     DSME_ASSERT(res == 0);
     return true;
