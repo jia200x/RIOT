@@ -1,5 +1,6 @@
 FEATURES_REQUIRED += cpp
 
+USEMODULE += opendsme-contrib
 USEMODULE += opendsme_dsmelayer
 USEMODULE += opendsme_acklayer
 USEMODULE += opendsme_associationmanager
