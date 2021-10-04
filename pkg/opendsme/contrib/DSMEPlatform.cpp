@@ -381,6 +381,11 @@ void DSMEPlatform::start()
     this->dsmeAdaptionLayer.startAssociation();
 }
 
+bool DSMEPlatform::isAssociated()
+{
+    return this->mac_pib.macAssociatedPANCoord;
+}
+
 void DSMEPlatform::handleDataMessageFromMCPSWrapper(IDSMEMessage* msg)
 {
     this->handleDataMessageFromMCPS(static_cast<DSMEMessage*>(msg));
