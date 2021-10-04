@@ -28,7 +28,7 @@
 #include <cstdio>
 #include <vector>
 #include "cpp_class.hpp"
-#include "DSMEPlatform.h"
+#include "opendsme/DSMEPlatform.h"
 
 dsme::DSMEPlatform m_dsme;
 
