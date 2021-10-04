@@ -95,6 +95,7 @@ public:
     }
 
     int loadBuffer(size_t len);
+    int loadBuffer(iolist_t *pkt);
     uint8_t *getPayload() {
         DSME_ASSERT(pkt);
         return (uint8_t*) pkt->data;
@@ -102,6 +103,7 @@ public:
 
     int dropHdr(size_t len);
     void releaseMessage();
+    void dispatchMessage();
     iolist_t *getIolPayload();
     iolist_t *clearMessage();
 

@@ -17,8 +17,12 @@
 #include <string.h>
 #include "opendsme/opendsme.h"
 
+#include "net/gnrc/pktdump.h"
+#include "net/gnrc.h"
+
 #include "shell.h"
 #include "shell_commands.h"
+#include "net/l2util.h"
 
 static int status_cmd(int argc, char **argv)
 {
@@ -31,6 +35,13 @@ static int status_cmd(int argc, char **argv)
     else {
         puts("Not associated");
     }
+
+    network_uint16_t addr;
+    opendsme_get_short_addr(&addr);
+    char str_addr[sizeof("00:00")];
+    l2util_addr_to_str((uint8_t*) &addr, sizeof(addr), str_addr);
+
+    printf("%s\n", str_addr);
 
     return 0;
 }
@@ -52,9 +63,20 @@ static int start_cmd(int argc, char **argv)
     return 0;
 }
 
+static int txtsnd_cmd(int argc, char **argv)
+{
+    (void) argc;
+    network_uint16_t addr;
+    l2util_addr_from_str(argv[1], (uint8_t*) &addr);
+    gnrc_pktsnip_t *pkt = gnrc_pktbuf_add(NULL, argv[2], strlen(argv[2]), GNRC_NETTYPE_UNDEF);
+    opendsme_send_frame(&addr, 2, pkt);
+    return 0;
+}
+
 static const shell_command_t shell_commands[] = {
     { "status", "check whether the node is associated or not", status_cmd },
     { "start", "start OpenDSME", start_cmd },
+    { "txtsnd", "transmit frame", txtsnd_cmd },
     { NULL, NULL, NULL }
 };
 
@@ -62,6 +84,10 @@ int main(void)
 {
     printf("\n************ RIOT and OpenDSME ***********\n");
     printf("\n");
+
+    gnrc_netreg_entry_t dump = GNRC_NETREG_ENTRY_INIT_PID(GNRC_NETREG_DEMUX_CTX_ALL,
+                                                          gnrc_pktdump_pid);
+    gnrc_netreg_register(GNRC_NETTYPE_UNDEF, &dump);
 
     char line_buf[SHELL_DEFAULT_BUFSIZE];
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);

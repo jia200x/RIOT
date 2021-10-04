@@ -20,6 +20,7 @@
 
 #include "dsmeLayer/DSMELayer.h"
 #include "dsmeAdaptionLayer/DSMEAdaptionLayer.h"
+#include "byteorder.h"
 
 #define DSME_POOL_SIZE (16)
 
@@ -36,7 +37,7 @@ public:
     ~DSMEPlatform();
 
     void initialize(bool pan_coord);
-    void send_pkt(uint16_t addr);
+    void send_pkt(uint16_t addr, iolist_t *pkt);
 
     uint8_t getChannelNumber() override;
     bool setChannelNumber(uint8_t k) override;
@@ -121,6 +122,7 @@ public:
     };
 
     static Delegate<void(bool)> txEndCallback;
+    void getShortAddress(network_uint16_t *addr);
 
 protected:
     /** @brief Copy constructor is not allowed.

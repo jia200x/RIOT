@@ -1,5 +1,7 @@
 #include "assert.h"
 #include "opendsme/DSMEMessage.h"
+#include "net/gnrc/pktdump.h"
+#include "net/gnrc.h"
 
 namespace dsme {
 
@@ -53,6 +55,20 @@ end:
     return res;
 }
 
+int DSMEMessage::loadBuffer(iolist_t *pkt)
+{
+    int res = -ENOBUFS;
+    if (pkt == NULL) {
+        DSME_ASSERT(false);
+        goto end;
+    }
+    this->pkt = (gnrc_pktsnip_t*) pkt; 
+    res = 0;
+
+end:
+    return res;
+}
+
 int DSMEMessage::dropHdr(size_t len)
 {
     gnrc_pktsnip_t *hdr = gnrc_pktbuf_mark(this->pkt, len, GNRC_NETTYPE_UNDEF);
@@ -82,6 +98,19 @@ iolist_t *DSMEMessage::clearMessage()
     pkt = NULL;
     free = false;
     prepare();
+}
+
+void DSMEMessage::dispatchMessage()
+{
+    DSME_ASSERT(!free);
+    if (!gnrc_netapi_dispatch_receive(GNRC_NETTYPE_UNDEF, GNRC_NETREG_DEMUX_CTX_ALL,
+                                      pkt)) {
+        releaseMessage();
+        return;
+    }
+    else {
+        free = true;
+    }
 }
 }
 
