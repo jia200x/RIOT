@@ -430,9 +430,7 @@ DSMEMessage *DSMEPlatform::getEmptyMessage()
         }
     }
     DSME_ASSERT(msg);
-    msg->pkt = NULL;
-    msg->free = false;
-    msg->prepare();
+    msg->clearMessage();
     signalNewMsg(msg);
     return msg;
 }
@@ -440,11 +438,7 @@ DSMEMessage *DSMEPlatform::getEmptyMessage()
 void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
 {
     DSMEMessage *m = static_cast<DSMEMessage*>(msg);
-    DSME_ASSERT(!m->free);
-    if (m->pkt) {
-        gnrc_pktbuf_release(m->pkt);
-    }
-    m->free = true;
+    m->releaseMessage();
 }
 
 void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
@@ -500,7 +494,6 @@ uint8_t DSMEPlatform::getChannelNumber()
 bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> txEndCallback)
 {
     DSMEMessage *m = (DSMEMessage*) msg;
-    gnrc_pktsnip_t *pkt = m->pkt;
     DSMEPlatform::state = STATE_SEND;
     DSMEPlatform::txEndCallback = txEndCallback;
     uint8_t mhr[23];
@@ -508,7 +501,7 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
     uint8_t *p = mhr;
     msg->getHeader().serializeTo(p);
     iolist_t iol = {
-        .iol_next = (iolist_t*) pkt,
+        .iol_next = (iolist_t*) m->getIolPayload(),
         .iol_base = mhr,
         .iol_len = mhr_len,
     };

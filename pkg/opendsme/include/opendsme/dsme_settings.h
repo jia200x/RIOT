@@ -3,25 +3,14 @@
 
 #include <stdint.h>
 
-//extern "C" {
-//#include "net/packetbuf.h"
-//}
-
 #include <stdio.h>
 #define DSME_PRINTF(...) printf(__VA_ARGS__)
 #define DSME_PRINTADDR(addr) DSME_PRINTF(" %02x%02x:%02x%02x:%02x%02x:%02x%02x ", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7])
 #define LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u8[LINKADDR_SIZE - 1] : 0)
 
-
-//#include <stdio.h>
-//#define DSME_PRINTF(...) printf(__VA_ARGS__)
-//#define PRINTADDR(addr) DSME_PRINTF(" %02x%02x:%02x%02x:%02x%02x:%02x%02x ", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7])
-//#define LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u8[LINKADDR_SIZE - 1] : 0)
 #define DSME_PACKET_MAX_LEN 127
 
 #define DSME_MAX_LOST_BEACONS 8
-
-//#define STATISTICS_BEACONS
 
 namespace dsme {
 
@@ -39,7 +28,6 @@ constexpr uint8_t MIN_CHANNEL = 11;
 constexpr uint8_t MAC_DEFAULT_CHANNEL = 20;
 constexpr uint8_t MAX_NEIGHBORS = 25;
 
-/* TODO */
 constexpr uint16_t MAC_DEFAULT_NWK_ID = 0x23;
 
 constexpr uint8_t MIN_SO = 1;
@@ -57,7 +45,6 @@ constexpr uint16_t TOTAL_GTS_QUEUE_SIZE = 30-CAP_QUEUE_SIZE;
 constexpr uint16_t UPPER_LAYER_QUEUE_SIZE = 4;
 constexpr uint16_t MSG_POOL_SIZE = CAP_QUEUE_SIZE + TOTAL_GTS_QUEUE_SIZE + 2 * UPPER_LAYER_QUEUE_SIZE + 10; //48
 
-//TODO sync with AssociationManager
 constexpr uint16_t DSME_BROADCAST_PAN_ID = 0xffff;
 
 constexpr uint8_t ADDITIONAL_ACK_WAIT_DURATION = 63;
