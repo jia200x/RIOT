@@ -7,7 +7,6 @@
 #include <string>
 
 #include "opendsme/DSMEMessage.h"
-//#include "dsmeAdaptionLayer/DSMEAdaptionLayer.h"
 #include "helper/DSMEDelegate.h"
 #include "interfaces/IDSMEPlatform.h"
 #include "mac_services/dataStructures/IEEE802154MacAddress.h"
@@ -19,11 +18,9 @@
 #include "opendsme/dsme_settings.h"
 #include "ztimer.h"
 
-//#include "DSMEMessageBuffer.h"
-//#include "HandleMessageTask.h"
-
 #include "dsmeLayer/DSMELayer.h"
 #include "dsmeAdaptionLayer/DSMEAdaptionLayer.h"
+
 #define DSME_POOL_SIZE (16)
 
 namespace dsme {
@@ -41,82 +38,75 @@ public:
     void initialize();
     void send_pkt(uint16_t addr);
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /* IDSMEPlatformBase */
-
     uint8_t getChannelNumber() override;
     bool setChannelNumber(uint8_t k) override;
 
-		 /**
-		* Directly send packet without delay and without CSMA
-		* but keep the message (the caller has to ensure that the message is eventually released)
-		* This might lead to an additional memory copy in the platform
-		*/
-		bool prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> txEndCallback) override;
-		bool prepareSendingCopy(DSMEMessage* msg, Delegate<void(bool)> txEndCallback);
+     /**
+    * Directly send packet without delay and without CSMA
+    * but keep the message (the caller has to ensure that the message is eventually released)
+    * This might lead to an additional memory copy in the platform
+    */
+    bool prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> txEndCallback) override;
+    bool prepareSendingCopy(DSMEMessage* msg, Delegate<void(bool)> txEndCallback);
 
-		bool sendNow() override;
+    bool sendNow() override;
 
-		void abortPreparedTransmission() override;
+    void abortPreparedTransmission() override;
 
-		/**
-		* Send an ACK message, delay until aTurnaRoundTime after reception_time has expired
-		*/
-		bool sendDelayedAck(IDSMEMessage *ackMsg, IDSMEMessage *receivedMsg, Delegate<void(bool)> txEndCallback) override;
-		bool sendDelayedAck(DSMEMessage *ackMsg, DSMEMessage *receivedMsg, Delegate<void(bool)> txEndCallback);
+    /**
+    * Send an ACK message, delay until aTurnaRoundTime after reception_time has expired
+    */
+    bool sendDelayedAck(IDSMEMessage *ackMsg, IDSMEMessage *receivedMsg, Delegate<void(bool)> txEndCallback) override;
+    bool sendDelayedAck(DSMEMessage *ackMsg, DSMEMessage *receivedMsg, Delegate<void(bool)> txEndCallback);
 
-		void setReceiveDelegate(receive_delegate_t receiveDelegate) override;
+    void setReceiveDelegate(receive_delegate_t receiveDelegate) override;
 
-		bool isReceptionFromAckLayerPossible() override;
+    bool isReceptionFromAckLayerPossible() override;
 
-        void handle_rx();
-		void handleReceivedMessageFromAckLayer(IDSMEMessage* message) override;
-		void handleReceivedMessageFromAckLayer(DSMEMessage* message);
-        void rx_offload();
+    void handle_rx();
+    void handleReceivedMessageFromAckLayer(IDSMEMessage* message) override;
+    void handleReceivedMessageFromAckLayer(DSMEMessage* message);
+    void rx_offload();
 
-		DSMEMessage* getEmptyMessage() override;
+    DSMEMessage* getEmptyMessage() override;
 
-		void releaseMessage(IDSMEMessage* msg) override;
-		void releaseMessage(DSMEMessage* msg);
+    void releaseMessage(IDSMEMessage* msg) override;
+    void releaseMessage(DSMEMessage* msg);
 
-		bool startCCA() override;
+    bool startCCA() override;
 
-		void startTimer(uint32_t symbolCounterValue) override;
+    void startTimer(uint32_t symbolCounterValue) override;
 
-		uint32_t getSymbolCounter() override;
+    uint32_t getSymbolCounter() override;
 
-		uint16_t getRandom() override {
-				return (rand() % UINT16_MAX);
-		}
+    uint16_t getRandom() override {
+            return (rand() % UINT16_MAX);
+    }
 
-		void updateVisual() override {};
+    void updateVisual() override {};
 
-		void scheduleStartOfCFP();
+    void scheduleStartOfCFP();
 
-		// Beacons with LQI lower than this will not be considered when deciding for a coordinator to associate to
-		// TODO for Cooja, LQI is always 105. Has to be adjusted for other platforms.
-		uint8_t getMinCoordinatorLQI() override{
-				return 100;
-		};
+    // Beacons with LQI lower than this will not be considered when deciding for a coordinator to associate to
+    // TODO for Cooja, LQI is always 105. Has to be adjusted for other platforms.
+    uint8_t getMinCoordinatorLQI() override{
+            return 100;
+    };
 
-        void turnTransceiverOn();
-        void turnTransceiverOff();
+    void turnTransceiverOn();
+    void turnTransceiverOff();
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    IEEE802154MacAddress& getAddress() {
+            return this->mac_pib.macExtendedAddress;
+    }
 
-		//void requestFromPacketbufPending(mac_callback_t sent, void *ptr);
+    void start();
 
-		IEEE802154MacAddress& getAddress() {
-				return this->mac_pib.macExtendedAddress;
-		}
+    void printSequenceChartInfo(DSMEMessage* msg, bool outgoing);
 
-		void start();
-
-		void printSequenceChartInfo(DSMEMessage* msg, bool outgoing);
-
-		DSMELayer& getDSME() {
-				return dsme;
-		}
+    DSMELayer& getDSME() {
+            return dsme;
+    }
 
     bool isAssociated();
 
@@ -152,28 +142,26 @@ protected:
     std::string printDSMEManagement(uint8_t management, DSMESABSpecification& sabSpec, CommandFrameIdentifier cmd);
 
     void translateMacAddress(uint16_t& from, IEEE802154MacAddress& to);
-    //void convertDSMEMacAddressToLinkaddr(IEEE802154MacAddress *from, linkaddr_t *to);
 
-		//DSMEMessageBuffer messageBuffer;		//has to be placed above DSMELayer (and DSMEAdaptionLayer) otherwise destructor tries to release messages that are already destructed
+    //DSMEMessageBuffer messageBuffer;		//has to be placed above DSMELayer (and DSMEAdaptionLayer) otherwise destructor tries to release messages that are already destructed
 
-		PHY_PIB phy_pib;
-		MAC_PIB mac_pib;
+    PHY_PIB phy_pib;
+    MAC_PIB mac_pib;
 
-		DSMELayer dsme;
+    DSMELayer dsme;
 
-		mcps_sap::MCPS_SAP mcps_sap;
-		mlme_sap::MLME_SAP mlme_sap;
+    mcps_sap::MCPS_SAP mcps_sap;
+    mlme_sap::MLME_SAP mlme_sap;
 
-		DSMEAdaptionLayer dsmeAdaptionLayer;
+    DSMEAdaptionLayer dsmeAdaptionLayer;
 
-        bool initialized;
-        bool scanOrSyncInProgress{false};
-        bool associationInProgress{false};
-        bool syncActive{false};
+    bool initialized;
+    bool scanOrSyncInProgress{false};
+    bool associationInProgress{false};
+    bool syncActive{false};
 
-		receive_delegate_t receiveFromAckLayerDelegate;
+    receive_delegate_t receiveFromAckLayerDelegate;
 
-		/** @brief the bit rate at which we transmit */
     ztimer_t timer;
 
     DSMEMessage pool[DSME_POOL_SIZE];

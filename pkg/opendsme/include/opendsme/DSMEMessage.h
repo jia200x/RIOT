@@ -7,15 +7,12 @@
 #include "opendsme/dsme_settings.h"
 #include "opendsme/dsme_platform.h"
 
-extern "C" {
-//#include "net/mac/mac.h"
-//#include "dev/radio.h"
-}
-
 #include "mac_services/dataStructures/DSMEMessageElement.h"
 #include "dsmeLayer/messages/IEEE802154eMACHeader.h"
 #include "interfaces/IDSMEMessage.h"
+
 #include "net/gnrc/pktbuf.h"
+#include "iolist.h"
 
 namespace dsme {
 
@@ -30,14 +27,6 @@ public:
     void decapsulateTo(DSMEMessageElement* msg) override;
 
     void copyTo(DSMEMessageElement* msg);
-
-#if 0
-    uint8_t getByte(uint8_t pos) {
-        DSME_ASSERT(false);
-        //return payload[pos];
-        return 0;
-    }
-#endif
 
     bool hasPayload() {
         return this->pkt != NULL && this->pkt->size > 0;
@@ -68,26 +57,25 @@ public:
         return macHdr;
     }
 
-    //TODO
     uint8_t getLQI() override {
     		return messageLQI;
     }
 
-		bool getReceivedViaMCPS() override {
-				return receivedViaMCPS;
-		}
+    bool getReceivedViaMCPS() override {
+            return receivedViaMCPS;
+    }
 
-		void setReceivedViaMCPS(bool receivedViaMCPS) override {
-				this->receivedViaMCPS = receivedViaMCPS;
-		}
+    void setReceivedViaMCPS(bool receivedViaMCPS) override {
+            this->receivedViaMCPS = receivedViaMCPS;
+    }
 
-		bool getCurrentlySending() override {
-				return currentlySending;
-		}
+    bool getCurrentlySending() override {
+            return currentlySending;
+    }
 
-		void setCurrentlySending(bool currentlySending) override {
-				this->currentlySending = currentlySending;
-		}
+    void setCurrentlySending(bool currentlySending) override {
+            this->currentlySending = currentlySending;
+    }
 
     void increaseRetryCounter() override {
     		this->retryCounter++;
@@ -97,7 +85,6 @@ public:
     		return this->retryCounter;
     }
 
-//////////////////////////////////////////////////////////////////////////////////
     uint8_t getPayloadLength() {
             DSME_ASSERT(pkt);
             return pkt->size;
@@ -114,6 +101,9 @@ public:
     }
 
     int dropHdr(size_t len);
+    void releaseMessage();
+    iolist_t *getIolPayload();
+    iolist_t *clearMessage();
 
     bool firstTry;
     bool free;
@@ -146,11 +136,8 @@ private:
     uint8_t  messageLQI;
     gnrc_pktsnip_t *pkt;
 
-    //mac_callback_t macCallbackFunction; /* callback for this packet */
-//		void *macCallbackPointer; /* MAC callback parameter */
-
     uint32_t startOfFrameDelimiterSymbolCounter;
-    bool receivedViaMCPS; // TODO better handling?
+    bool receivedViaMCPS;
     bool currentlySending;
     uint8_t retryCounter;
 

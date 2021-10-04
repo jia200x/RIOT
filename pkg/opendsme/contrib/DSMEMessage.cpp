@@ -21,7 +21,6 @@ void DSMEMessage::decapsulateTo(DSMEMessageElement* me)
 {
     this->copyTo(me);
     this->dropHdr(me->getSerializationLength());
-    //this->setPayloadLength(this->getPayloadLength()-me->getSerializationLength());
 }
 
 void DSMEMessage::copyTo(DSMEMessageElement* msg)
@@ -33,6 +32,7 @@ void DSMEMessage::copyTo(DSMEMessageElement* msg)
 
 uint8_t DSMEMessage::getMPDUSymbols()
 {
+    /* Not used by OpenDSME */
     assert(false);
     return 0;
 }
@@ -61,6 +61,27 @@ int DSMEMessage::dropHdr(size_t len)
         return -EINVAL;
     }
     return 0;
+}
+
+void DSMEMessage::releaseMessage()
+{
+    DSME_ASSERT(!free);
+    if (pkt) {
+        gnrc_pktbuf_release(pkt);
+    }
+    free = true;
+}
+
+iolist_t *DSMEMessage::getIolPayload()
+{
+    return (iolist_t*) pkt;
+}
+
+iolist_t *DSMEMessage::clearMessage()
+{
+    pkt = NULL;
+    free = false;
+    prepare();
 }
 }
 
