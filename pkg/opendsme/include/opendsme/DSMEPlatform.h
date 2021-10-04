@@ -35,7 +35,7 @@ public:
 
     ~DSMEPlatform();
 
-    void initialize();
+    void initialize(bool pan_coord);
     void send_pkt(uint16_t addr);
 
     uint8_t getChannelNumber() override;

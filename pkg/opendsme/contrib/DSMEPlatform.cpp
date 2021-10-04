@@ -267,7 +267,7 @@ void DSMEPlatform::translateMacAddress(uint16_t& from, IEEE802154MacAddress& to)
     }
 }
 
-void DSMEPlatform::initialize()
+void DSMEPlatform::initialize(bool pan_coord)
 {
     this->instance = this;
     this->dsme.setPHY_PIB(&(this->phy_pib));
@@ -329,7 +329,7 @@ void DSMEPlatform::initialize()
     short_addr.u8[0] = this->mac_pib.macExtendedAddress.getShortAddress() >> 8;
     short_addr.u8[1] = this->mac_pib.macExtendedAddress.getShortAddress() & 0xFF;
 
-    this->mac_pib.macIsPANCoord = PAN_COORD;
+    this->mac_pib.macIsPANCoord = pan_coord;
     if(this->mac_pib.macIsPANCoord) {
       DSME_PRINTF("This node is PAN coordinator\n");
       this->mac_pib.macPANId = 0x23;
