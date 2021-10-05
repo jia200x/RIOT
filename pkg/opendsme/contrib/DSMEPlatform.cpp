@@ -33,8 +33,6 @@ ieee802154_dev_t _radio;
 
 namespace dsme {
 
-ztimer_t send_timer;
-event_t send_timer_ev;
 ztimer_t cca_timer;
 event_t cca_timer_ev;
 ztimer_t acktimer;
@@ -48,7 +46,6 @@ static event_t rx_done_event;
 static event_t request_slot_ev;
 static uint32_t rx_sfd;
 static bool wait_for_ack;
-static bool changed;
 
 static void _handle_rx_offload(event_t *ev)
 {
@@ -78,10 +75,6 @@ static void _cca_timer_ev_handler(event_t *ev)
 
 static void _acktimer_ev_handler(event_t *ev)
 {
-    //puts("sendAck");
-    if (changed) {
-        puts(":(");
-    }
     dsme::DSMEPlatform::instance->sendNow();
 }
 
@@ -95,19 +88,6 @@ static void _acktimer_cb(void *arg)
     event_post(EVENT_PRIO_HIGHEST, &acktimer_ev);
 }
 
-static void _send_timer_ev_handler(event_t *ev)
-{
-    //dsme::DSMEPlatform::instance->send_pkt(dsme::DSMEPlatform::instance->panDescriptorToSyncTo.coordAddress.getShortAddress());
-    //dsme::DSMEPlatform::instance->send_pkt(0xd565);
-    ztimer_set(ZTIMER_USEC, &send_timer, 200000);
-    //puts("S");
-}
-
-static void _send_timer_cb(void *arg)
-{
-    event_post(EVENT_PRIO_HIGHEST, &send_timer_ev);
-}
-
 static void _timer_ev_handler(event_t *ev)
 {
     dsme::DSMEPlatform::instance->getDSME().getEventDispatcher().timerInterrupt();
@@ -117,8 +97,6 @@ static void _tx_done_handler(event_t *ev)
 {
     int res = ieee802154_radio_confirm_transmit(&_radio, NULL);
     DSME_ASSERT(res >= 0);
-    changed = true;
-    //puts("RXON");
     res = ieee802154_radio_set_rx(&_radio);
     DSME_ASSERT(res == 0);
     if (wait_for_ack) {
@@ -139,7 +117,6 @@ void DSMEPlatform::handle_rx()
     message->setStartOfFrameDelimiterSymbolCounter(rx_sfd);
 
     int res;
-    changed = true;
     res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
     int len = ieee802154_radio_len(&_radio);
@@ -151,13 +128,15 @@ void DSMEPlatform::handle_rx()
     message->messageLQI = info.lqi;
     message->radio_last_rssi = info.rssi;
     const uint8_t *buf = message->getPayload();
-    if (buf[0] & IEEE802154_FCF_TYPE_ACK) {
-        //puts("ACK");
-    }
+
     bool success = message->getHeader().deserializeFrom(buf, len);
     if (!success) {
-        puts(":(");
+        message->releaseMessage();
+        res = ieee802154_radio_set_rx(&_radio);
+        DSME_ASSERT(res == 0);
+        return;
     }
+
     message->dropHdr(message->getHeader().getSerializationLength());
 
     res = ieee802154_radio_set_rx(&_radio);
@@ -206,7 +185,6 @@ void DSMEPlatform::send_pkt(uint16_t addr, iolist_t *pkt)
         return;
     }
 
-    //puts("S");
     DSMEMessage* message = getEmptyMessage();
     message->loadBuffer(pkt);
     IEEE802154MacAddress dst;
@@ -235,9 +213,6 @@ DSMEPlatform::DSMEPlatform() :
     this->timer.callback = _timer_cb;
     this->timer.arg = this;
 
-    send_timer.callback = _send_timer_cb;
-    send_timer.arg = this;
-    send_timer_ev.handler = _send_timer_ev_handler;
     cca_timer.callback = _cca_timer_cb;
     cca_timer.arg = this;
     acktimer.callback = _acktimer_cb;
@@ -363,9 +338,6 @@ void DSMEPlatform::initialize(bool pan_coord)
     this->dsmeAdaptionLayer.setIndicationCallback(DELEGATE(&DSMEPlatform::handleDataMessageFromMCPSWrapper, *this));
     this->dsmeAdaptionLayer.setConfirmCallback(DELEGATE(&DSMEPlatform::handleConfirmFromMCPSWrapper, *this));
 
-    if (ENABLE_SEND) {
-        ztimer_set(ZTIMER_USEC, &send_timer, 10000000);
-    }
     this->dsme.initialize(this);
 
     channelList_t scanChannels;
@@ -407,7 +379,7 @@ void DSMEPlatform::handleConfirmFromMCPSWrapper(IDSMEMessage* msg, DataStatus::D
 
 void DSMEPlatform::handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Status dataStatus) {
     if (dataStatus == DataStatus::Data_Status::SUCCESS) {
-        //puts(":)!");
+        /* TODO: Add to statistics */
     }
     IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
     releaseMessage(m);
@@ -415,15 +387,11 @@ void DSMEPlatform::handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Stat
 
 void DSMEPlatform::handleDataMessageFromMCPS(DSMEMessage* msg)
 {
-    //puts("R! :)");
-    LED1_TOGGLE;
-    //releaseMessage(m);
     msg->dispatchMessage();
 }
 
 bool DSMEPlatform::isReceptionFromAckLayerPossible()
 {
-    /* TODO: */
     return DSMEPlatform::state == STATE_READY;
 }
 
@@ -476,7 +444,7 @@ void DSMEPlatform::scheduleStartOfCFP()
 
 void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver)
 {
-
+    /* TODO */
 }
 
 bool DSMEPlatform::setChannelNumber(uint8_t channel)
@@ -485,11 +453,9 @@ bool DSMEPlatform::setChannelNumber(uint8_t channel)
         .phy_mode = IEEE802154_PHY_OQPSK,
         .channel = channel,
         .page = 0,
-        .pow = 6,
+        .pow = CONFIG_IEEE802154_DEFAULT_TXPOWER,
     };
     int res;
-    changed = true;
-    //puts("TRX_OFF");
     res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
     res = ieee802154_radio_config_phy(&_radio, &conf);
@@ -505,6 +471,7 @@ bool DSMEPlatform::setChannelNumber(uint8_t channel)
 
 uint8_t DSMEPlatform::getChannelNumber()
 {
+    /* Apparently not used by OpenDSME */
     DSME_ASSERT(false);
     return 0;
 }
@@ -514,7 +481,7 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
     DSMEMessage *m = (DSMEMessage*) msg;
     DSMEPlatform::state = STATE_SEND;
     DSMEPlatform::txEndCallback = txEndCallback;
-    uint8_t mhr[23];
+    uint8_t mhr[IEEE802154_MAX_HDR_LEN];
     uint8_t mhr_len = msg->getHeader().getSerializationLength();
     uint8_t *p = mhr;
     msg->getHeader().serializeTo(p);
@@ -523,15 +490,14 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
         .iol_base = mhr,
         .iol_len = mhr_len,
     };
-    wait_for_ack= false;
-    /* TODO */
-    if (mhr[0] & 0x20) {
+
+    if (mhr[0] & IEEE802154_FCF_ACK_REQ) {
         wait_for_ack = true;
     }
-    if ((mhr[0] & IEEE802154_FCF_TYPE_MASK) == IEEE802154_FCF_TYPE_ACK) {
-        //puts("A");
+    else {
+        wait_for_ack= false;
     }
-    changed = true;
+
     int res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
     res = ieee802154_radio_write(&_radio, &iol);
@@ -542,7 +508,6 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
 
 bool DSMEPlatform::sendNow()
 {
-    //puts("S");
     int res = ieee802154_radio_request_transmit(&_radio);
     DSME_ASSERT(res == 0);
     return true;
@@ -550,7 +515,8 @@ bool DSMEPlatform::sendNow()
 
 void DSMEPlatform::abortPreparedTransmission()
 {
-
+     /* Nothing to do here, since the Radio HAL will drop the frame if
+      * the write function is called again */
 }
 
 bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMsg, Delegate<void(bool)> txEndCallback)
@@ -558,9 +524,9 @@ bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMs
     DSMEMessage *m = (DSMEMessage*) ackMsg;
     DSME_ASSERT(m != nullptr);
 
-    uint8_t ack[3];
+    uint8_t ack[IEEE802154_ACK_FRAME_LEN - IEEE802154_FCS_LEN];
     uint8_t mhr_len = ackMsg->getHeader().getSerializationLength();
-    DSME_ASSERT(mhr_len == 3);
+    DSME_ASSERT(mhr_len == sizeof(ack));
 
     uint8_t *p = ack;
     ackMsg->getHeader().serializeTo(p);
@@ -573,23 +539,20 @@ bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMs
         .iol_len = mhr_len,
     };
 
-    changed = true;
     int res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
     res = ieee802154_radio_write(&_radio, &iol);
     DSME_ASSERT(res == 0);
 
-    // Preamble (4) | SFD (1) | PHY Hdr (1) | MAC Payload | FCS (2)
-    uint32_t endOfReception = receivedMsg->getStartOfFrameDelimiterSymbolCounter() + receivedMsg->getTotalSymbols() - 2 * 4 // Preamble
-                              - 2 * 1;                                                                                      // SFD
+    /* Preamble (4) | SFD (1) | PHY Hdr (1) | MAC Payload | FCS (2) */
+    uint32_t endOfReception = receivedMsg->getStartOfFrameDelimiterSymbolCounter()
+                              + receivedMsg->getTotalSymbols()
+                              - 2 * 4  /* Preamble */
+                              - 2 * 1; /* SFD */
     uint32_t ackTime = endOfReception + aTurnaroundTime;
     uint32_t now = getSymbolCounter();
     uint32_t diff = ackTime - now;
-    //printf("A:%02x\n", (int)diff);
-    //printf("R: %02x\n", receivedMsg->getTotalSymbols());
-    //printf("E: %02x\n", (int) (now - receivedMsg->getStartOfFrameDelimiterSymbolCounter()));
 
-    changed = false;
     ztimer_set(ZTIMER_USEC, &acktimer, diff * aSymbolDuration);
     return true;
 }
@@ -608,12 +571,11 @@ bool DSMEPlatform::startCCA()
 
 void DSMEPlatform::turnTransceiverOn()
 {
+    /* TODO */
 }
 
 void DSMEPlatform::turnTransceiverOff()
 {
-    changed = true;
-    //puts("TRX_OFF");
     int res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
 }
