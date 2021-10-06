@@ -428,8 +428,12 @@ void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
 {
     uint32_t now = ztimer_now(ZTIMER_USEC);
     uint32_t offset = now & 0xF;
-    uint32_t delta = ((symbolCounterValue - getSymbolCounter()) << 4) - offset;
-    ztimer_set(ZTIMER_USEC, &timer, delta);
+    /* This works even if there's an overflow */
+    int32_t delta = ((symbolCounterValue - getSymbolCounter()) << 4);
+
+    delta -= offset;
+
+    ztimer_set(ZTIMER_USEC, &timer, (uint32_t) delta);
 }
 
 uint32_t DSMEPlatform::getSymbolCounter()
