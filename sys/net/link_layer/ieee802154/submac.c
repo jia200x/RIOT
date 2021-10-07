@@ -508,7 +508,7 @@ int ieee802154_set_phy_conf(ieee802154_submac_t *submac, uint16_t channel_num,
 
     /* If the radio is listening, turn it off first */
     if (current_state == IEEE802154_FSM_STATE_RX) {
-        if ((res = ieee802154_radio_request_set_idle(dev, false) < 0)) {
+        if ((res = ieee802154_radio_request_set_idle(dev, false)) < 0) {
             return res;
         }
     }
