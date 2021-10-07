@@ -271,7 +271,7 @@ static int _confirm_op(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx)
         eagain = (radio_state == RADIO_STATE_STATE_TxDisable || radio_state == RADIO_STATE_STATE_RxDisable);
         break;
     case IEEE802154_HAL_OP_CCA:
-        eagain = (state != STATE_CCA_BUSY && state != STATE_CCA_BUSY);
+        eagain = (state != STATE_CCA_BUSY && state != STATE_CCA_IDLE);
         assert(ctx);
         *((bool*) ctx) = STATE_CCA_CLEAR ? true : false;
         state = STATE_IDLE;
