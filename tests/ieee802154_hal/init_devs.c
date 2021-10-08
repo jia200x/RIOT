@@ -21,6 +21,8 @@
 #include "assert.h"
 #include "kernel_defines.h"
 #include "net/ieee802154/radio.h"
+#include "event.h"
+#include "event/thread.h"
 #include "common.h"
 
 #ifdef MODULE_CC2538_RF
@@ -29,6 +31,32 @@
 
 #ifdef MODULE_NRF802154
 #include "nrf802154.h"
+#endif
+
+#ifdef MODULE_SX127X
+#include "sx127x.h"
+#include "sx127x_params.h"
+static sx127x_t sx127x_dev;
+#endif
+
+#ifdef MODULE_SX127X
+ieee802154_dev_t *sx127x_hal;
+
+void sx127x_hal_task_handler(ieee802154_dev_t *hal);
+
+void _sx127x_handler(event_t *event)
+{
+    (void) event;
+    sx127x_hal_task_handler(sx127x_hal);
+}
+
+event_t sx127x_ev = {.handler = _sx127x_handler};
+
+void sx127x_isr(void *arg)
+{
+    (void) arg;
+    event_post(EVENT_PRIO_HIGHEST, &sx127x_ev);
+}
 #endif
 
 void ieee802154_hal_test_init_devs(ieee802154_dev_cb_t cb, void *opaque)
@@ -48,6 +76,14 @@ void ieee802154_hal_test_init_devs(ieee802154_dev_cb_t cb, void *opaque)
     if ((radio = cb(IEEE802154_DEV_TYPE_NRF802154, opaque)) ){
         nrf802154_hal_setup(radio);
         nrf802154_init();
+    }
+#endif
+
+#ifdef MODULE_SX127X
+    if ((radio = cb(IEEE802154_DEV_TYPE_SX127X, opaque)) ){
+        sx127x_hal = radio;
+        sx127x_hal_setup(&sx127x_dev, radio);
+        sx127x_setup(&sx127x_dev, sx127x_params, radio);
     }
 #endif
 }

@@ -21,7 +21,8 @@
 #include "net/ieee802154/radio.h"
 
 #define RADIOS_NUMOF IS_USED(MODULE_CC2538_RF) + \
-                     IS_USED(MODULE_NRF802154)
+                     IS_USED(MODULE_NRF802154) + \
+                     IS_USED(MODULE_SX127X)
 
 #if RADIOS_NUMOF == 0
 #error "Radio is not supported"
@@ -39,6 +40,7 @@ extern "C" {
 typedef enum {
     IEEE802154_DEV_TYPE_CC2538_RF,
     IEEE802154_DEV_TYPE_NRF802154,
+    IEEE802154_DEV_TYPE_SX127X,
 } ieee802154_dev_type_t;
 
 typedef ieee802154_dev_t* (*ieee802154_dev_cb_t)(ieee802154_dev_type_t type,

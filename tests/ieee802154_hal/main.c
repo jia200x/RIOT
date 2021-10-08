@@ -184,6 +184,7 @@ static void _tx_finish_handler(event_t *event)
     if (!ieee802154_radio_has_irq_ack_timeout(&_radio[0]) && !ieee802154_radio_has_frame_retrans(&_radio[0])) {
         /* This is just to show how the MAC layer would handle ACKs... */
         ieee802154_radio_set_rx(&_radio[0]);
+        puts("ACK TIMER");
         xtimer_set(&timer_ack, ACK_TIMEOUT_TIME);
     }
 
@@ -258,6 +259,9 @@ static ieee802154_dev_t *_reg_callback(ieee802154_dev_type_t type, void *opaque)
             break;
         case IEEE802154_DEV_TYPE_NRF802154:
             printf("nrf52840");
+            break;
+        case IEEE802154_DEV_TYPE_SX127X:
+            printf("sx127x");
             break;
     }
 
