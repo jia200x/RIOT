@@ -7,7 +7,7 @@
 #define DSME_ASSERT(x) do {if (!(x)){printf("%s:%i\n", __FILE__, __LINE__);while(1) {}}} while(0)
 #define DSME_SIM_ASSERT(x) 
 
-#define LOG_INFO(x)
+#define LOG_INFO(x) printf("INFO: %s:%i\n", __FILE__, __LINE__)
 #define LOG_INFO_PURE(x)
 #define LOG_INFO_PREFIX
 #define LOG_ERROR(x)
@@ -17,7 +17,7 @@
 
 #define LOG_ENDL std::endl
 
-#define LOG_DEBUG(x)
+#define LOG_DEBUG(x) printf("DEB: %s:%i\n", __FILE__, __LINE__)
 #define LOG_DEBUG_PURE(x)
 #define LOG_DEBUG_PREFIX
 #endif

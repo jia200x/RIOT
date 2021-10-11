@@ -35,7 +35,7 @@ FEATURES_REQUIRED += libstdcpp # libstdc++ support (for #include <cstdio>)
 # to CXXEXFLAGS variable
 CXXEXFLAGS += -Wno-unused-parameter -Wno-pedantic -Wno-deprecated-copy -Wno-missing-field-initializers -Wno-unused-but-set-variable -Wno-maybe-uninitialized -Wno-unused-variable -Wno-reorder -Wno-address -Wno-sign-compare -Wno-unused-function -Wno-error
 USEPKG += opendsme
-USEMODULE += ztimer_usec
+USEMODULE += ztimer_msec
 USEMODULE += gnrc_pktbuf
 USEMODULE += event_thread
 USEMODULE += cpp11-compat

@@ -17,6 +17,11 @@
 #include <string.h>
 #include "opendsme/opendsme.h"
 
+#if IS_USED(MODULE_SX127X)
+#include "sx127x.h"
+#include "sx127x_params.h"
+#endif
+
 #include "net/gnrc/pktdump.h"
 #include "net/gnrc.h"
 
@@ -94,3 +99,12 @@ int main(void)
 
     return 0;
 }
+
+#if IS_USED(MODULE_SX127X)
+/* HACK */
+void sx127x_init_dsme(sx127x_t *dev, void *radio)
+{
+    sx127x_hal_setup(dev, radio);
+    sx127x_setup(dev, sx127x_params, radio);
+}
+#endif

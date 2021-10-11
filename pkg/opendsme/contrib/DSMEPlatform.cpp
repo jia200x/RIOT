@@ -7,6 +7,11 @@
 #include "dsmeAdaptionLayer/scheduling/TPS.h"
 #include "board.h"
 
+#ifdef MODULE_SX127X
+#include "sx127x.h"
+static sx127x_t sx127x_dev;
+#endif
+
 #if IS_USED(MODULE_CC2538_RF)
 #include "cc2538_rf.h"
 #endif
@@ -30,6 +35,16 @@
 #include "net/ieee802154/radio.h"
 
 ieee802154_dev_t _radio;
+extern "C" {
+void sx127x_init_dsme(sx127x_t *dev, void *radio);
+void sx127x_hal_task_handler(ieee802154_dev_t *hal);
+event_t sx127x_ev;
+void sx127x_isr(void *arg)
+{
+    (void) arg;
+    event_post(EVENT_PRIO_HIGHEST, &sx127x_ev);
+}
+}
 
 namespace dsme {
 
@@ -46,6 +61,17 @@ static event_t rx_done_event;
 static event_t request_slot_ev;
 static uint32_t rx_sfd;
 static bool wait_for_ack;
+
+#ifdef MODULE_SX127X
+
+void _sx127x_handler(event_t *event)
+{
+    (void) event;
+    sx127x_hal_task_handler(&_radio);
+}
+
+
+#endif
 
 static void _handle_rx_offload(event_t *ev)
 {
@@ -131,6 +157,7 @@ void DSMEPlatform::handle_rx()
 
     bool success = message->getHeader().deserializeFrom(buf, len);
     if (!success) {
+        puts(":/");
         message->releaseMessage();
         res = ieee802154_radio_set_rx(&_radio);
         DSME_ASSERT(res == 0);
@@ -157,6 +184,7 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
             event_post(EVENT_PRIO_HIGHEST, &tx_done_event);
             break;
         case IEEE802154_RADIO_INDICATION_RX_START:
+            puts("ELSTA");
             rx_sfd = dsme::DSMEPlatform::instance->getSymbolCounter();
             break;
         case IEEE802154_RADIO_INDICATION_CRC_ERROR:
@@ -164,6 +192,7 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
         case IEEE802154_RADIO_INDICATION_TX_START:
             break;
         case IEEE802154_RADIO_INDICATION_RX_DONE:
+            puts("RXDONE");
             event_post(EVENT_PRIO_HIGHEST, &rx_done_event);
             break;
         case IEEE802154_RADIO_CONFIRM_CCA:
@@ -224,6 +253,9 @@ DSMEPlatform::DSMEPlatform() :
     rx_done_event.handler = _rx_done_handler;
     rx_offload_ev.handler = _handle_rx_offload;
     start_of_cfp_ev.handler = _start_of_cfp_handler;
+#if IS_USED(MODULE_SX127X)
+    sx127x_ev.handler = _sx127x_handler;
+#endif
     
     for (int i=0; i<DSME_POOL_SIZE; i++) {
         this->pool[i].free = true;
@@ -281,6 +313,8 @@ void DSMEPlatform::initialize(bool pan_coord)
 #elif IS_USED(MODULE_NRF802154)
     nrf802154_hal_setup(&_radio);
     nrf802154_init();
+#elif IS_USED(MODULE_SX127X)
+    sx127x_init_dsme(&sx127x_dev, &_radio);
 #else
 #error "Please select a radio"
 #endif
@@ -322,7 +356,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     this->mac_pib.macAssociatedPANCoord = this->mac_pib.macIsPANCoord;
     this->mac_pib.macSuperframeOrder = 3;
     this->mac_pib.macMultiSuperframeOrder = 4;
-    this->mac_pib.macBeaconOrder = 7;
+    this->mac_pib.macBeaconOrder = 5;
 
     this->mac_pib.macMinBE = 7;
     this->mac_pib.macMaxBE = 8;
@@ -346,7 +380,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     tps->setAlpha(0.1);
     tps->setMinFreshness(this->mac_pib.macDSMEGTSExpirationTime);
     scheduling = tps;
-    this->dsmeAdaptionLayer.initialize(scanChannels,8,scheduling);
+    this->dsmeAdaptionLayer.initialize(scanChannels,1,scheduling);
     this->initialized = true;
 }
 
@@ -426,19 +460,16 @@ void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
 
 void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
 {
-    uint32_t now = ztimer_now(ZTIMER_USEC);
-    uint32_t offset = now & 0xF;
+    uint32_t now = ztimer_now(ZTIMER_MSEC);
     /* This works even if there's an overflow */
-    int32_t delta = ((symbolCounterValue - getSymbolCounter()) << 4);
+    int32_t delta = ((symbolCounterValue - getSymbolCounter()));
 
-    delta -= offset;
-
-    ztimer_set(ZTIMER_USEC, &timer, (uint32_t) delta);
+    ztimer_set(ZTIMER_MSEC, &timer, (uint32_t) delta);
 }
 
 uint32_t DSMEPlatform::getSymbolCounter()
 {
-    return ztimer_now(ZTIMER_USEC) >> 4;
+    return ztimer_now(ZTIMER_MSEC);
 }
 
 void DSMEPlatform::scheduleStartOfCFP()
@@ -482,6 +513,7 @@ uint8_t DSMEPlatform::getChannelNumber()
 
 bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> txEndCallback)
 {
+    puts("ELSE");
     DSMEMessage *m = (DSMEMessage*) msg;
     DSMEPlatform::state = STATE_SEND;
     DSMEPlatform::txEndCallback = txEndCallback;
@@ -557,7 +589,8 @@ bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMs
     uint32_t now = getSymbolCounter();
     uint32_t diff = ackTime - now;
 
-    ztimer_set(ZTIMER_USEC, &acktimer, diff * aSymbolDuration);
+    puts("TX_ACK");
+    ztimer_set(ZTIMER_MSEC, &acktimer, diff);
     return true;
 }
 
@@ -569,17 +602,19 @@ void DSMEPlatform::setReceiveDelegate(receive_delegate_t receiveDelegate)
 bool DSMEPlatform::startCCA()
 {
     /* TODO: This MUST be implemented properly */
-    ztimer_set(ZTIMER_USEC, &cca_timer, 16*8);
+    ztimer_set(ZTIMER_MSEC, &cca_timer, 8);
     return true;
 }
 
 void DSMEPlatform::turnTransceiverOn()
 {
     /* TODO */
+    puts("TON");
 }
 
 void DSMEPlatform::turnTransceiverOff()
 {
+    puts("OFF");
     int res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
 }
