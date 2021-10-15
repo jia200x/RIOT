@@ -29,6 +29,9 @@
 #include "shell_commands.h"
 #include "net/l2util.h"
 
+char str_addr[sizeof("00:00")];
+char line_buf[SHELL_DEFAULT_BUFSIZE];
+
 static int status_cmd(int argc, char **argv)
 {
     (void) argc;
@@ -43,7 +46,6 @@ static int status_cmd(int argc, char **argv)
 
     network_uint16_t addr;
     opendsme_get_short_addr(&addr);
-    char str_addr[sizeof("00:00")];
     l2util_addr_to_str((uint8_t*) &addr, sizeof(addr), str_addr);
 
     printf("%s\n", str_addr);
@@ -94,7 +96,6 @@ int main(void)
                                                           gnrc_pktdump_pid);
     gnrc_netreg_register(GNRC_NETTYPE_UNDEF, &dump);
 
-    char line_buf[SHELL_DEFAULT_BUFSIZE];
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
 
     return 0;

@@ -30,9 +30,9 @@ constexpr uint8_t MAX_NEIGHBORS = 25;
 
 constexpr uint16_t MAC_DEFAULT_NWK_ID = 0x23;
 
-constexpr uint8_t MIN_SO = 1;
-constexpr uint8_t MAX_BO = 10;
-constexpr uint8_t MAX_MO = 9;
+constexpr uint8_t MIN_SO = 2;
+constexpr uint8_t MAX_BO = 5;
+constexpr uint8_t MAX_MO = 4;
 constexpr uint16_t MAX_SLOTS_PER_SUPERFRAMES = 1 << (uint16_t)(MAX_BO - MIN_SO);
 constexpr uint16_t MAX_TOTAL_SUPERFRAMES = 1 << (uint16_t)(MAX_BO - MIN_SO);
 constexpr uint16_t MAX_SUPERFRAMES_PER_MULTI_SUPERFRAME = 1 << (uint16_t)(MAX_MO - MIN_SO);

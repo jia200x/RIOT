@@ -146,11 +146,25 @@ void DSMEPlatform::handle_rx()
     res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
     int len = ieee802154_radio_len(&_radio);
+    if (len > 127 || len < 0) {
+        puts("DROP");
+        ieee802154_radio_read(&_radio, NULL, 127, NULL);
+        res = ieee802154_radio_set_rx(&_radio);
+        DSME_ASSERT(res == 0);
+        return;
+    }
     res = message->loadBuffer(len);
     DSME_ASSERT(res >= 0);
     ieee802154_rx_info_t info;
 
-    ieee802154_radio_read(&_radio, message->getPayload(), 127, &info);
+    res = ieee802154_radio_read(&_radio, message->getPayload(), 127, &info);
+    if (res < 0) {
+        puts(":(");
+        message->releaseMessage();
+        res = ieee802154_radio_set_rx(&_radio);
+        DSME_ASSERT(res == 0);
+        return;
+    }
     message->messageLQI = info.lqi;
     message->radio_last_rssi = info.rssi;
     const uint8_t *buf = message->getPayload();
@@ -343,6 +357,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     short_addr.u8[1] = this->mac_pib.macExtendedAddress.getShortAddress() & 0xFF;
 
     this->mac_pib.macIsPANCoord = pan_coord;
+    this->mac_pib.macIsCoord = pan_coord;
     if(this->mac_pib.macIsPANCoord) {
       DSME_PRINTF("This node is PAN coordinator\n");
       this->mac_pib.macPANId = 0x23;
@@ -380,7 +395,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     tps->setAlpha(0.1);
     tps->setMinFreshness(this->mac_pib.macDSMEGTSExpirationTime);
     scheduling = tps;
-    this->dsmeAdaptionLayer.initialize(scanChannels,1,scheduling);
+    this->dsmeAdaptionLayer.initialize(scanChannels,2,scheduling);
     this->initialized = true;
 }
 
@@ -544,6 +559,7 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
 
 bool DSMEPlatform::sendNow()
 {
+    puts("SN");
     int res = ieee802154_radio_request_transmit(&_radio);
     DSME_ASSERT(res == 0);
     return true;
@@ -609,12 +625,10 @@ bool DSMEPlatform::startCCA()
 void DSMEPlatform::turnTransceiverOn()
 {
     /* TODO */
-    puts("TON");
 }
 
 void DSMEPlatform::turnTransceiverOff()
 {
-    puts("OFF");
     int res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
 }
