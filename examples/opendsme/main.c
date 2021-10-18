@@ -100,10 +100,18 @@ static int txtsnd_cmd(int argc, char **argv)
     return 0;
 }
 
+static int id_cmd(int argc, char **argv)
+{
+    (void) argc;
+    node_id = atoi(argv[1]);
+    return 0;
+}
+
 static const shell_command_t shell_commands[] = {
     { "status", "check whether the node is associated or not", status_cmd },
     { "start", "start OpenDSME", start_cmd },
     { "txtsnd", "transmit frame", txtsnd_cmd },
+    { "id", "set node id", id_cmd },
     { NULL, NULL, NULL }
 };
 
