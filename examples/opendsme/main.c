@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "opendsme/opendsme.h"
+#include "event/thread.h"
+#include "luid.h"
 
 #if IS_USED(MODULE_SX127X)
 #include "sx127x.h"
@@ -31,6 +33,25 @@
 
 char str_addr[sizeof("00:00")];
 char line_buf[SHELL_DEFAULT_BUFSIZE];
+uint16_t node_id;
+bool pan_coord;
+gnrc_pktsnip_t *pkt;
+network_uint16_t addr;
+static void _init_ev(event_t *event)
+{
+    (void) event;
+    opendsme_init(pan_coord);
+}
+
+static void _send_ev(event_t *event)
+{
+    (void) event;
+    printf("%p\n", pkt);
+    opendsme_send_frame(&addr, 2, pkt);
+}
+
+event_t send_ev = {.handler = _send_ev};
+event_t init_ev = {.handler = _init_ev};
 
 static int status_cmd(int argc, char **argv)
 {
@@ -56,7 +77,6 @@ static int status_cmd(int argc, char **argv)
 static int start_cmd(int argc, char **argv)
 {
     (void) argc;
-    bool pan_coord;
     if (strcmp(argv[1], "pan_coord") == 0) {
         puts("Starting as PAN coordinator");
         pan_coord = true;
@@ -66,17 +86,17 @@ static int start_cmd(int argc, char **argv)
         pan_coord = false;
     }
 
-    opendsme_init(pan_coord);
+    event_post(EVENT_PRIO_HIGHEST, &init_ev);
+
     return 0;
 }
 
 static int txtsnd_cmd(int argc, char **argv)
 {
     (void) argc;
-    network_uint16_t addr;
     l2util_addr_from_str(argv[1], (uint8_t*) &addr);
-    gnrc_pktsnip_t *pkt = gnrc_pktbuf_add(NULL, argv[2], strlen(argv[2]), GNRC_NETTYPE_UNDEF);
-    opendsme_send_frame(&addr, 2, pkt);
+    pkt = gnrc_pktbuf_add(NULL, argv[2], strlen(argv[2]), GNRC_NETTYPE_UNDEF);
+    event_post(EVENT_PRIO_HIGHEST, &send_ev);
     return 0;
 }
 
