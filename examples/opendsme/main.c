@@ -93,8 +93,15 @@ static int start_cmd(int argc, char **argv)
 static int txtsnd_cmd(int argc, char **argv)
 {
     (void) argc;
+    if (strlen(argv[1]) > sizeof(str_addr)) {
+        puts("Addr to big");
+        return -1;
+    }
     l2util_addr_from_str(argv[1], (uint8_t*) &addr);
     pkt = gnrc_pktbuf_add(NULL, argv[2], strlen(argv[2]), GNRC_NETTYPE_UNDEF);
+    if (pkt == NULL) {
+        puts("Not enough space");
+    }
     event_post(EVENT_PRIO_HIGHEST, &send_ev);
     return 0;
 }
