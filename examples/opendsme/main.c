@@ -46,7 +46,6 @@ static void _init_ev(event_t *event)
 static void _send_ev(event_t *event)
 {
     (void) event;
-    printf("%p\n", pkt);
     opendsme_send_frame(&addr, 2, pkt);
 }
 

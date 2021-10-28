@@ -166,6 +166,12 @@ void DSMEPlatform::handle_rx()
         DSME_ASSERT(res == 0);
         return;
     }
+    uint8_t *p = (uint8_t*) message->getPayload();
+    printf("RECV: ");
+    for (unsigned i=0;i<res;i++) {
+        printf("%02x ", p[i]);
+    }
+    printf("\n");
     message->messageLQI = info.lqi;
     message->radio_last_rssi = info.rssi;
     const uint8_t *buf = message->getPayload();
@@ -199,7 +205,6 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
             event_post(EVENT_PRIO_HIGHEST, &tx_done_event);
             break;
         case IEEE802154_RADIO_INDICATION_RX_START:
-            puts("ELSTA");
             rx_sfd = dsme::DSMEPlatform::instance->getSymbolCounter();
             break;
         case IEEE802154_RADIO_INDICATION_CRC_ERROR:
@@ -207,7 +212,6 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
         case IEEE802154_RADIO_INDICATION_TX_START:
             break;
         case IEEE802154_RADIO_INDICATION_RX_DONE:
-            puts("RXDONE");
             event_post(EVENT_PRIO_HIGHEST, &rx_done_event);
             break;
         case IEEE802154_RADIO_CONFIRM_CCA:
@@ -242,6 +246,7 @@ void DSMEPlatform::send_pkt(uint16_t addr, iolist_t *pkt)
     message->getHeader().setSrcPANId(this->mac_pib.macPANId);
     message->getHeader().setDstPANId(this->mac_pib.macPANId);
 
+    puts("S");
     this->dsmeAdaptionLayer.sendMessage(message);
 }
 
@@ -558,7 +563,6 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
 
 bool DSMEPlatform::sendNow()
 {
-    puts("SN");
     int res = ieee802154_radio_request_transmit(&_radio);
     DSME_ASSERT(res == 0);
     return true;
@@ -604,7 +608,6 @@ bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMs
     uint32_t now = getSymbolCounter();
     uint32_t diff = ackTime - now;
 
-    puts("TX_ACK");
     ztimer_set(ZTIMER_MSEC, &acktimer, diff);
     return true;
 }
