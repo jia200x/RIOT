@@ -26,12 +26,12 @@ constexpr uint8_t MAX_GTSLOTS = const_redefines::aNumSuperframeSlots - MIN_CSMA_
 constexpr uint8_t MAX_CHANNELS = 16;
 constexpr uint8_t MIN_CHANNEL = 11;
 constexpr uint8_t MAC_DEFAULT_CHANNEL = 20;
-constexpr uint8_t MAX_NEIGHBORS = 25;
+constexpr uint8_t MAX_NEIGHBORS = 20;
 
 constexpr uint16_t MAC_DEFAULT_NWK_ID = 0x23;
 
-constexpr uint8_t MIN_SO = 2;
-constexpr uint8_t MAX_BO = 5;
+constexpr uint8_t MIN_SO = 3;
+constexpr uint8_t MAX_BO = 4;
 constexpr uint8_t MAX_MO = 4;
 constexpr uint16_t MAX_SLOTS_PER_SUPERFRAMES = 1 << (uint16_t)(MAX_BO - MIN_SO);
 constexpr uint16_t MAX_TOTAL_SUPERFRAMES = 1 << (uint16_t)(MAX_BO - MIN_SO);

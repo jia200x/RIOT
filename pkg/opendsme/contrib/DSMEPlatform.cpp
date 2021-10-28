@@ -380,7 +380,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     this->mac_pib.macAssociatedPANCoord = this->mac_pib.macIsPANCoord;
     this->mac_pib.macSuperframeOrder = 3;
     this->mac_pib.macMultiSuperframeOrder = 4;
-    this->mac_pib.macBeaconOrder = 5;
+    this->mac_pib.macBeaconOrder = 4;
 
     this->mac_pib.macMinBE = 7;
     this->mac_pib.macMaxBE = 8;
@@ -391,7 +391,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     this->mac_pib.macResponseWaitTime = 244;
     this->mac_pib.macChannelDiversityMode = Channel_Diversity_Mode::CHANNEL_HOPPING;
 
-    this->phy_pib.phyCurrentChannel = 26;
+    this->phy_pib.phyCurrentChannel = 12;
 		
     this->dsmeAdaptionLayer.setIndicationCallback(DELEGATE(&DSMEPlatform::handleDataMessageFromMCPSWrapper, *this));
     this->dsmeAdaptionLayer.setConfirmCallback(DELEGATE(&DSMEPlatform::handleConfirmFromMCPSWrapper, *this));
@@ -399,7 +399,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     this->dsme.initialize(this);
 
     channelList_t scanChannels;
-    scanChannels.add(26);
+    scanChannels.add(12);
     TPS* tps = new TPS(this->dsmeAdaptionLayer);
     tps->setAlpha(0.1);
     tps->setMinFreshness(this->mac_pib.macDSMEGTSExpirationTime);
