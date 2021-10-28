@@ -331,8 +331,8 @@ ifneq (,$(filter log_%,$(USEMODULE)))
 endif
 
 ifneq (,$(filter cpp11-compat,$(USEMODULE)))
-  USEMODULE += xtimer
-  USEMODULE += timex
+  #USEMODULE += xtimer
+  #USEMODULE += timex
   FEATURES_REQUIRED += cpp
   FEATURES_REQUIRED += libstdcpp
 endif
