@@ -234,7 +234,11 @@ void DSMEPlatform::send_pkt(uint16_t addr, iolist_t *pkt)
     }
 
     DSMEMessage* message = getEmptyMessage();
-    message->loadBuffer(pkt);
+    if (message->loadBuffer(pkt) < 0) {
+        puts("Couldn't load buffer");
+        return;
+    }
+
     IEEE802154MacAddress dst;
     dst.setShortAddress(addr);
     mcps_sap::DATA::request_parameters params;
