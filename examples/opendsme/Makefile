@@ -45,7 +45,6 @@ USEMODULE += od
 USEMODULE += luid
 USEMODULE += shell
 USEMODULE += l2util
-USEMODULE += gnrc_pktdump
 USEMODULE += gnrc
 #USEMODULE += shell_commands
 #USEMODULE += heap_cmd

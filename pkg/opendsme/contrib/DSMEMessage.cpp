@@ -103,14 +103,13 @@ iolist_t *DSMEMessage::clearMessage()
 void DSMEMessage::dispatchMessage()
 {
     DSME_ASSERT(!free);
-    if (!gnrc_netapi_dispatch_receive(GNRC_NETTYPE_UNDEF, GNRC_NETREG_DEMUX_CTX_ALL,
-                                      pkt)) {
-        releaseMessage();
-        return;
+    printf("[info];RECV;");
+    uint8_t *p = static_cast<uint8_t*>(pkt->data);
+    for (unsigned i=0; i<pkt->size;i++) {
+        printf("%c", p[i]);
     }
-    else {
-        free = true;
-    }
+    printf("\n");
+    releaseMessage();
 }
 }
 

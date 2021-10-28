@@ -24,7 +24,6 @@
 #include "sx127x_params.h"
 #endif
 
-#include "net/gnrc/pktdump.h"
 #include "net/gnrc.h"
 
 #include "shell.h"
@@ -130,10 +129,6 @@ int main(void)
 {
     printf("\n************ RIOT and OpenDSME ***********\n");
     printf("\n");
-
-    gnrc_netreg_entry_t dump = GNRC_NETREG_ENTRY_INIT_PID(GNRC_NETREG_DEMUX_CTX_ALL,
-                                                          gnrc_pktdump_pid);
-    gnrc_netreg_register(GNRC_NETTYPE_UNDEF, &dump);
 
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
 
