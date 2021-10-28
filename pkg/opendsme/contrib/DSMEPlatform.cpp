@@ -36,7 +36,7 @@ static sx127x_t sx127x_dev;
 
 ieee802154_dev_t _radio;
 extern "C" {
-extern uint16_t node_id;
+uint16_t get_node_id();
 void sx127x_init_dsme(sx127x_t *dev, void *radio);
 void sx127x_hal_task_handler(ieee802154_dev_t *hal);
 event_t sx127x_ev;
@@ -322,7 +322,8 @@ void DSMEPlatform::initialize(bool pan_coord)
     /* Initialize Address */
     IEEE802154MacAddress address;
 
-    translateMacAddress(node_id, this->mac_pib.macExtendedAddress);
+    uint16_t id = get_node_id();
+    translateMacAddress(id, this->mac_pib.macExtendedAddress);
 
     _radio.cb = _hal_radio_cb;
 #if IS_USED(MODULE_CC2538_RF)

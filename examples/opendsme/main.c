@@ -109,8 +109,13 @@ static int txtsnd_cmd(int argc, char **argv)
 static int id_cmd(int argc, char **argv)
 {
     (void) argc;
-    node_id = atoi(argv[1]);
+    node_id = (uint16_t) ((argv[1][0] << 8) + (argv[1][1]));
     return 0;
+}
+
+uint16_t get_node_id(void)
+{
+    return node_id;
 }
 
 static const shell_command_t shell_commands[] = {
