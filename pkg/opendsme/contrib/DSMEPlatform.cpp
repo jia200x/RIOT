@@ -537,7 +537,6 @@ uint8_t DSMEPlatform::getChannelNumber()
 
 bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> txEndCallback)
 {
-    puts("ELSE");
     DSMEMessage *m = (DSMEMessage*) msg;
     DSMEPlatform::state = STATE_SEND;
     DSMEPlatform::txEndCallback = txEndCallback;
@@ -551,6 +550,14 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
         .iol_len = mhr_len,
     };
 
+    printf("[info];TX;");
+    for (iolist_t *io=&iol;io;io=io->iol_next) {
+        uint8_t *p = static_cast<uint8_t*>(io->iol_base);
+        for (unsigned i=0;i<io->iol_len;i++) {
+            printf("%02x ", p[i]);
+        }
+    }
+    printf("\n");
     if (mhr[0] & IEEE802154_FCF_ACK_REQ) {
         wait_for_ack = true;
     }
