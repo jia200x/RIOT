@@ -260,6 +260,7 @@ int sx127x_setup(sx127x_t *dev, const sx127x_params_t *params, ieee802154_dev_t 
     }
 
     sx127x_init_radio_settings(dev);
+    sx127x_set_syncword(dev, 0x17);
     /* Put chip into sleep */
     sx127x_set_sleep(dev);
 
