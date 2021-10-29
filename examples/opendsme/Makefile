@@ -46,6 +46,7 @@ USEMODULE += luid
 USEMODULE += shell
 USEMODULE += l2util
 USEMODULE += gnrc
+USEMODULE += checksum
 #USEMODULE += shell_commands
 #USEMODULE += heap_cmd
 CFLAGS += -DEVENT_THREAD_MEDIUM_STACKSIZE=1700

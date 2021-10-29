@@ -1,3 +1,5 @@
+#include "checksum/ucrc16.h"
+
 #include "sx127x.h"
 #include "sx127x_internal.h"
 #include "sx127x_registers.h"
@@ -10,8 +12,10 @@ static const ieee802154_radio_ops_t sx127x_ops;
 static int _write(ieee802154_dev_t *hal, const iolist_t *iolist)
 {
     uint8_t size = iolist_size(iolist);
+    uint16_t chksum = 0;
     sx127x_t *dev = hal->priv;
-    sx127x_set_payload_length(dev, size);
+    /* Include CRC */
+    sx127x_set_payload_length(dev, size+2);
 
     /* Full buffer used for Tx */
     sx127x_reg_write(dev, SX127X_REG_LR_FIFOTXBASEADDR, 0x00);
@@ -21,8 +25,12 @@ static int _write(ieee802154_dev_t *hal, const iolist_t *iolist)
         if (iol->iol_len > 0) {
             sx127x_write_fifo(dev, iol->iol_base, iol->iol_len);
             DEBUG("[sx127x] Wrote to payload buffer.\n");
+            chksum = ucrc16_calc_le(iol->iol_base, iol->iol_len,
+                                UCRC16_CCITT_POLY_LE, chksum);
         }
     }
+    chksum = byteorder_htols(chksum).u16;
+    sx127x_write_fifo(dev, (uint8_t*) &chksum, sizeof(chksum));
 
     return 0;
 }
@@ -83,83 +91,53 @@ static int _read(ieee802154_dev_t *hal, void *buf, size_t max_size,
     (void) info;
     sx127x_t *dev = hal->priv;
     uint8_t size = 0;
+    uint16_t chksum = 0;
+    uint16_t exp_chksum;
 
     /* TODO */
     if (info) {
         info->lqi = 255;
         info->rssi = 100;
     }
-#if 0
-    if (info) {
-        uint8_t snr_value = sx127x_reg_read(dev, SX127X_REG_LR_PKTSNRVALUE);
-        if (snr_value & 0x80) {     /* The SNR is negative */
-            /* Invert and divide by 4 */
-            //packet_info->snr = -1 * ((~snr_value + 1) & 0xFF) >> 2;
-        }
-        else {
-            /* Divide by 4 */
-            //packet_info->snr = (snr_value & 0xFF) >> 2;
-        }
 
-        //int16_t rssi = sx127x_reg_read(dev, SX127X_REG_LR_PKTRSSIVALUE);
-        /* TODO: */
-        uint8_t rssi = 100;
+    /* Size including CRC */
+    size = sx127x_reg_read(dev, SX127X_REG_LR_RXNBBYTES);
 
-        if (packet_info->snr < 0) {
-#if defined(MODULE_SX1272)
-#error NOT_SUPPORTED
-            packet_info->rssi = SX127X_RSSI_OFFSET + rssi + (rssi >> 4) + packet_info->snr;
-#else /* MODULE_SX1276 */
-            if (dev->settings.channel > SX127X_RF_MID_BAND_THRESH) {
-                packet_info->rssi = SX127X_RSSI_OFFSET_HF + rssi + (rssi >> 4) +
-                                    packet_info->snr;
-            }
-            else {
-                packet_info->rssi = SX127X_RSSI_OFFSET_LF + rssi + (rssi >> 4) +
-                                    packet_info->snr;
-            }
-#endif
-        }
-        else {
-#if defined(MODULE_SX1272)
-            packet_info->rssi = SX127X_RSSI_OFFSET + rssi + (rssi >> 4);
-#else /* MODULE_SX1276 */
-            if (dev->settings.channel > SX127X_RF_MID_BAND_THRESH) {
-                packet_info->rssi = SX127X_RSSI_OFFSET_HF + rssi + (rssi >> 4);
-            }
-            else {
-                packet_info->rssi = SX127X_RSSI_OFFSET_LF + rssi + (rssi >> 4);
-            }
-#endif
-        }
-#endif
+    /* Exclude CRC */
+    if (size > max_size + 2) {
+        sx127x_reg_write(dev, SX127X_REG_LR_FIFORXBASEADDR, 0);
+        sx127x_reg_write(dev, SX127X_REG_LR_FIFOADDRPTR, 0);
+        return -ENOBUFS;
+    }
 
-        size = sx127x_reg_read(dev, SX127X_REG_LR_RXNBBYTES);
-        if (size > max_size) {
-            sx127x_reg_write(dev, SX127X_REG_LR_FIFORXBASEADDR, 0);
-            sx127x_reg_write(dev, SX127X_REG_LR_FIFOADDRPTR, 0);
-            return -ENOBUFS;
-        }
+    if (size < 5) {
+        sx127x_reg_write(dev, SX127X_REG_LR_FIFORXBASEADDR, 0);
+        sx127x_reg_write(dev, SX127X_REG_LR_FIFOADDRPTR, 0);
+        return -EBADMSG;
+    }
 
-        if (buf == NULL) {
-            sx127x_reg_write(dev, SX127X_REG_LR_FIFORXBASEADDR, 0);
-            sx127x_reg_write(dev, SX127X_REG_LR_FIFOADDRPTR, 0);
-            return size;
-        }
+    if (buf == NULL) {
+        sx127x_reg_write(dev, SX127X_REG_LR_FIFORXBASEADDR, 0);
+        sx127x_reg_write(dev, SX127X_REG_LR_FIFOADDRPTR, 0);
+        return size-2;
+    }
 
+    /* Read the last packet from FIFO */
+    uint8_t last_rx_addr = sx127x_reg_read(dev, SX127X_REG_LR_FIFORXCURRENTADDR);
+    sx127x_reg_write(dev, SX127X_REG_LR_FIFOADDRPTR, last_rx_addr);
+    sx127x_read_fifo(dev, (uint8_t *)buf, size-2);
+    sx127x_read_fifo(dev, (uint8_t *) &exp_chksum, sizeof(exp_chksum));
 
-#if 0
-        if (!(dev->settings.lora.flags & SX127X_RX_CONTINUOUS_FLAG)) {
-            sx127x_set_state(dev, SX127X_RF_IDLE);
-        }
-#endif
+    chksum = ucrc16_calc_le(buf, size-2,
+                        UCRC16_CCITT_POLY_LE, chksum);
+    chksum = byteorder_htols(chksum).u16;
 
-        /* Read the last packet from FIFO */
-        uint8_t last_rx_addr = sx127x_reg_read(dev, SX127X_REG_LR_FIFORXCURRENTADDR);
-        sx127x_reg_write(dev, SX127X_REG_LR_FIFOADDRPTR, last_rx_addr);
-        sx127x_read_fifo(dev, (uint8_t *)buf, size);
+    /* Validate checksum */
+    if (chksum != exp_chksum) {
+        return -EBADMSG;
+    }
 
-    return size;
+    return size-2;
 }
 
 static int _request_on(ieee802154_dev_t *dev)
@@ -193,7 +171,8 @@ static int _off(ieee802154_dev_t *dev)
 
 int _len(ieee802154_dev_t *hal)
 {
-    return sx127x_reg_read(hal->priv, SX127X_REG_LR_RXNBBYTES);
+    /* Exclude CRC */
+    return sx127x_reg_read(hal->priv, SX127X_REG_LR_RXNBBYTES) - 2;
 }
 
 int _set_cca_mode(ieee802154_dev_t *dev, ieee802154_cca_mode_t mode)
