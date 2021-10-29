@@ -503,7 +503,42 @@ void DSMEPlatform::scheduleStartOfCFP()
 
 void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver)
 {
-    /* TODO */
+    uint16_t short_addr = receiver.getShortAddress();
+
+    printf("[info];TX_INFO;%02x;%02x;%04x\n", success, transmissionAttempts, short_addr);
+}
+
+/*
+ * Signal GTS allocation or deallocation
+ */
+void DSMEPlatform::signalGTSChange(bool deallocation, IEEE802154MacAddress counterpart, uint16_t superframeID, uint8_t gtSlotID, uint8_t channel, Direction direction) {
+    uint16_t short_addr = counterpart.getShortAddress();
+    printf("[info];GTSC;");
+    if (deallocation) {
+        printf("DEALLOC");
+    }
+    else {
+        printf("ALLOC");
+    }
+    printf(";%04x;%02x;%02x;%02x;%02x\n", short_addr, superframeID, gtSlotID, channel, direction);
+}
+
+void DSMEPlatform::signalQueueLength(uint32_t length) {
+    printf("[info];QL;%02x\n", length);
+}
+
+/*
+ * Number of packets sent per CAP
+ */
+void DSMEPlatform::signalPacketsPerCAP(uint32_t packets) {
+    printf("[info];PCAP;%02x\n", packets);
+}
+
+/*
+ * Number of failed packets per CAP
+ */
+void DSMEPlatform::signalFailedPacketsPerCAP(uint32_t packets) {
+    printf("[info];FPPCAP;%04x\n", packets);
 }
 
 bool DSMEPlatform::setChannelNumber(uint8_t channel)

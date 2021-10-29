@@ -112,6 +112,10 @@ public:
     bool isAssociated();
 
     void signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver) override;
+    void signalGTSChange(bool deallocation, IEEE802154MacAddress counterpart, uint16_t superframeID, uint8_t gtSlotID, uint8_t channel, Direction direction) override;
+    void signalQueueLength(uint32_t length) override;
+    void signalPacketsPerCAP(uint32_t packets) override;
+    void signalFailedPacketsPerCAP(uint32_t packets) override;
 
     static DSMEPlatform* instance;
 
