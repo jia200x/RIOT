@@ -49,8 +49,7 @@ void sx127x_isr(void *arg)
 
 namespace dsme {
 
-ztimer_t cca_timer;
-event_t cca_timer_ev;
+event_t cca_ev;
 ztimer_t acktimer;
 event_t acktimer_ev;
 DSMEPlatform* DSMEPlatform::instance = nullptr;
@@ -95,19 +94,23 @@ static void _start_of_cfp_handler(event_t *ev)
 
 static event_t start_of_cfp_ev;
 
-static void _cca_timer_ev_handler(event_t *ev)
+static void _cca_ev_handler(event_t *ev)
 {
-    dsme::DSMEPlatform::instance->getDSME().dispatchCCAResult(true);
+    bool clear = ieee802154_radio_confirm_cca(&_radio);
+    printf("[info];CCA;");
+    if (clear) {
+        printf("1");
+    }
+    else {
+        printf("0");
+    }
+    printf("\n");
+    dsme::DSMEPlatform::instance->getDSME().dispatchCCAResult(clear);
 }
 
 static void _acktimer_ev_handler(event_t *ev)
 {
     dsme::DSMEPlatform::instance->sendNow();
-}
-
-static void _cca_timer_cb(void *arg)
-{
-    event_post(EVENT_PRIO_HIGHEST, &cca_timer_ev);
 }
 
 static void _acktimer_cb(void *arg)
@@ -215,6 +218,7 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
             event_post(EVENT_PRIO_HIGHEST, &rx_done_event);
             break;
         case IEEE802154_RADIO_CONFIRM_CCA:
+            event_post(EVENT_PRIO_HIGHEST, &cca_ev);
             break;
         default:
             DSME_ASSERT(false);
@@ -266,12 +270,10 @@ DSMEPlatform::DSMEPlatform() :
     this->timer.callback = _timer_cb;
     this->timer.arg = this;
 
-    cca_timer.callback = _cca_timer_cb;
-    cca_timer.arg = this;
     acktimer.callback = _acktimer_cb;
     acktimer.arg = this;
     acktimer_ev.handler = _acktimer_ev_handler;
-    cca_timer_ev.handler = _cca_timer_ev_handler;
+    cca_ev.handler = _cca_ev_handler;
     timer_event.handler = _timer_ev_handler;
     tx_done_event.handler = _tx_done_handler;
     rx_done_event.handler = _rx_done_handler;
@@ -676,7 +678,7 @@ void DSMEPlatform::setReceiveDelegate(receive_delegate_t receiveDelegate)
 bool DSMEPlatform::startCCA()
 {
     /* TODO: This MUST be implemented properly */
-    ztimer_set(ZTIMER_MSEC, &cca_timer, 8);
+    ieee802154_radio_request_cca(&_radio);
     return true;
 }
 
