@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #include <string>
+#include "random.h"
 
 #include "opendsme/DSMEMessage.h"
 #include "helper/DSMEDelegate.h"
@@ -81,7 +82,7 @@ public:
     uint32_t getSymbolCounter() override;
 
     uint16_t getRandom() override {
-            return (rand() % UINT16_MAX);
+            return (random_uint32() % UINT16_MAX);
     }
 
     void updateVisual() override {};

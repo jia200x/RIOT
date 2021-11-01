@@ -15,3 +15,5 @@ USEMODULE += opendsme_mlme_sap
 USEMODULE += opendsme_pib
 USEMODULE += opendsme_adaption_layer
 USEMODULE += opendsme_adaption_layer_scheduling
+
+USEMODULE += random
