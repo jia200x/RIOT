@@ -641,6 +641,15 @@ bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMs
         .iol_len = mhr_len,
     };
 
+    printf("[info];TX;");
+    for (iolist_t *io=&iol;io;io=io->iol_next) {
+        uint8_t *p = static_cast<uint8_t*>(io->iol_base);
+        for (unsigned i=0;i<io->iol_len;i++) {
+            printf("%02x ", p[i]);
+        }
+    }
+    printf("\n");
+
     int res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
     res = ieee802154_radio_write(&_radio, &iol);
