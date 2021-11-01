@@ -68,6 +68,10 @@ static int _request_op(ieee802154_dev_t *hal, ieee802154_hal_op_t op, void *ctx)
     case IEEE802154_HAL_OP_SET_IDLE:
         sx127x_set_standby(dev);
         break;
+    case IEEE802154_HAL_OP_CCA:
+        sx127x_set_standby(dev);
+        sx127x_start_cad(dev);
+        break;
     default:
         assert(false);
         break;
@@ -76,11 +80,17 @@ static int _request_op(ieee802154_dev_t *hal, ieee802154_hal_op_t op, void *ctx)
     return 0;
 }
 
-static int _confirm_op(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx)
+/* TODO: Implement properly */
+static int _confirm_op(ieee802154_dev_t *hal, ieee802154_hal_op_t op, void *ctx)
 {
-    (void) dev;
-    (void) op;
-    (void) ctx;
+    sx127x_t *dev = hal->priv;
+    switch (op) {
+        case IEEE802154_HAL_OP_CCA:
+            *((bool*) ctx) = !dev->cad_detected;
+            break;
+        default:
+            break;
+    }
     return 0;
 }
 
@@ -307,6 +317,14 @@ void sx127x_hal_task_handler(ieee802154_dev_t *hal)
 
         sx127x_reg_write(dev, SX127X_REG_LR_IRQFLAGS, SX127X_RF_LORA_IRQFLAGS_VALIDHEADER);
         hal->cb(hal, IEEE802154_RADIO_INDICATION_RX_START);
+    }
+
+    if (interruptReg & SX127X_RF_LORA_IRQFLAGS_CADDONE) {
+        dev->cad_detected = interruptReg & SX127X_RF_LORA_IRQFLAGS_CADDETECTED;
+
+        sx127x_reg_write(dev, SX127X_REG_LR_IRQFLAGS, SX127X_RF_LORA_IRQFLAGS_CADDONE |
+                                                      SX127X_RF_LORA_IRQFLAGS_CADDETECTED);
+        hal->cb(hal, IEEE802154_RADIO_CONFIRM_CCA);
     }
 #if 0
     if (interruptReg & SX127X_RF_LORA_IRQFLAGS_RXTIMEOUT) {
