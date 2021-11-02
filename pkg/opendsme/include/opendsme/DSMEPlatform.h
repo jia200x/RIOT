@@ -85,7 +85,7 @@ public:
             return (random_uint32() % UINT16_MAX);
     }
 
-    void updateVisual() override {};
+    void updateVisual() override;
 
     void scheduleStartOfCFP();
 
@@ -137,7 +137,7 @@ protected:
      */
     DSMEPlatform& operator=(const DSMEPlatform&);
 
-    virtual void signalNewMsg(DSMEMessage* msg) {}
+    void signalNewMsg(DSMEMessage* msg);
     virtual void signalReleasedMsg(DSMEMessage* msg) {}
 
     void handleDataMessageFromMCPSWrapper(IDSMEMessage* msg);

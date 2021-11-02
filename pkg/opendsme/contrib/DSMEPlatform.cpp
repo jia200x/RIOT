@@ -36,6 +36,7 @@ static sx127x_t sx127x_dev;
 
 ieee802154_dev_t _radio;
 extern "C" {
+extern void heap_stats(void);
 uint16_t get_node_id();
 void sx127x_init_dsme(sx127x_t *dev, void *radio);
 void sx127x_hal_task_handler(ieee802154_dev_t *hal);
@@ -90,6 +91,7 @@ static event_t rx_offload_ev;
 static void _start_of_cfp_handler(event_t *ev)
 {
     dsme::DSMEPlatform::instance->getDSME().handleStartOfCFP();
+    dsme::DSMEPlatform::instance->updateVisual();
 }
 
 static event_t start_of_cfp_ev;
@@ -478,6 +480,10 @@ DSMEMessage *DSMEPlatform::getEmptyMessage()
     return msg;
 }
 
+void DSMEPlatform::signalNewMsg(DSMEMessage* msg)
+{
+}
+
 void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
 {
     DSMEMessage *m = static_cast<DSMEMessage*>(msg);
@@ -541,6 +547,21 @@ void DSMEPlatform::signalPacketsPerCAP(uint32_t packets) {
  */
 void DSMEPlatform::signalFailedPacketsPerCAP(uint32_t packets) {
     printf("[info];FPPCAP;%04x\n", packets);
+}
+
+void DSMEPlatform::updateVisual()
+{
+    printf("[info];ASSOC;");
+    if (isAssociated()) {
+        printf("1");
+    }
+    else {
+        printf("0");
+    }
+    printf("\n");
+    printf("[info];");
+    heap_stats();
+
 }
 
 bool DSMEPlatform::setChannelNumber(uint8_t channel)
@@ -621,6 +642,7 @@ void DSMEPlatform::abortPreparedTransmission()
 {
      /* Nothing to do here, since the Radio HAL will drop the frame if
       * the write function is called again */
+    puts("[info];ABORT");
 }
 
 bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMsg, Delegate<void(bool)> txEndCallback)

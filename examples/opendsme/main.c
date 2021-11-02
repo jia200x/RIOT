@@ -36,9 +36,14 @@ uint16_t node_id;
 bool pan_coord;
 gnrc_pktsnip_t *pkt;
 network_uint16_t addr;
+
+extern void heap_stats(void);
+
 static void _init_ev(event_t *event)
 {
     (void) event;
+    printf("[info];");
+    heap_stats();
     opendsme_init(pan_coord);
 }
 
