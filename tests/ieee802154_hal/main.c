@@ -374,20 +374,21 @@ int _cca(int argc, char **argv)
 {
     (void) argc;
     (void) argv;
-    if (ieee802154_radio_request_cca(&_radio[0]) < 0) {
-        puts("Couldn't perform CCA");
-    }
-    mutex_lock(&lock);
-    int res = ieee802154_radio_confirm_cca(&_radio[0]);
-    assert(res >= 0);
+    while(1) {
+        if (ieee802154_radio_request_cca(&_radio[0]) < 0) {
+            puts("Couldn't perform CCA");
+        }
+        mutex_lock(&lock);
+        int res = ieee802154_radio_confirm_cca(&_radio[0]);
+        assert(res >= 0);
 
-    if (res > 0) {
-        puts("CLEAR");
+        if (res > 0) {
+            puts("CLEAR");
+        }
+        else {
+            puts("BUSY");
+        }
     }
-    else {
-        puts("BUSY");
-    }
-
     return 0;
 }
 
