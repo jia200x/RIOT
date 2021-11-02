@@ -139,12 +139,17 @@ static void _tx_done_handler(event_t *ev)
         ieee802154_radio_set_frame_filter_mode(&_radio, IEEE802154_FILTER_ACCEPT);
     }
     dsme::DSMEPlatform::txEndCallback(true);
+    puts("TXD");
     DSMEPlatform::state = DSMEPlatform::STATE_READY;
 }
 
 void DSMEPlatform::handle_rx()
 {
-    DSME_ASSERT(DSMEPlatform::state == STATE_READY);
+    if (DSMEPlatform::state != STATE_READY) {
+        puts("[info];NOT_READY");
+        return;
+    }
+
     DSMEMessage *message = getEmptyMessage();
     message->setStartOfFrameDelimiterSymbolCounter(rx_sfd);
 
