@@ -103,12 +103,17 @@ iolist_t *DSMEMessage::clearMessage()
 void DSMEMessage::dispatchMessage()
 {
     DSME_ASSERT(!free);
-    printf("[info];RECV;");
+    uint16_t addr = getHeader().getSrcAddr().getShortAddress();
+    /* first 2 bytes are the id */
+    uint8_t *id = static_cast<uint8_t*>(pkt->data);
+    printf("[info];RECV;%02x:%02x;%02x;%02x%02x\n", addr >> 8, addr & 0xFF, pkt->size, id[0] << 8, id[1]);
+#if 0
     uint8_t *p = static_cast<uint8_t*>(pkt->data);
     for (unsigned i=0; i<pkt->size;i++) {
         printf("%c", p[i]);
     }
     printf("\n");
+#endif
     releaseMessage();
 }
 }

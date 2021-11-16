@@ -1,3 +1,4 @@
+#include "opendsme/opendsme.h"
 #include "opendsme/DSMEPlatform.h"
 #include "ztimer.h"
 #include "iolist.h"
@@ -20,16 +21,12 @@ static sx127x_t sx127x_dev;
 #include "nrf802154.h"
 #endif
 
-#ifndef PAN_COORD
-#define PAN_COORD 0
-#endif
-
-#ifndef ENABLE_SEND
-#define ENABLE_SEND PAN_COORD
-#endif
-
 #ifndef CAP_REDUCTION
-#define CAP_REDUCTION false
+#define CAP_REDUCTION 0
+#endif
+
+#ifndef USE_CAD
+#define USE_CAD 1
 #endif
 
 #include "net/ieee802154/radio.h"
@@ -239,6 +236,9 @@ static void _timer_cb(void *arg)
 
 void DSMEPlatform::send_pkt(uint16_t addr, iolist_t *pkt)
 {
+    /* First 2 bytes are the ID */
+    uint8_t *id = static_cast<uint8_t*>(pkt->iol_base);
+    printf("[info];TXTSND;%02x:%02x;%02x%02x\n",addr>>8,addr & 0xFF, id[0] << 8, id[1]);
     if(!this->mac_pib.macAssociatedPANCoord) {
         puts("Discarding message");
         return;
@@ -261,7 +261,6 @@ void DSMEPlatform::send_pkt(uint16_t addr, iolist_t *pkt)
     message->getHeader().setSrcPANId(this->mac_pib.macPANId);
     message->getHeader().setDstPANId(this->mac_pib.macPANId);
 
-    puts("S");
     this->dsmeAdaptionLayer.sendMessage(message);
 }
 

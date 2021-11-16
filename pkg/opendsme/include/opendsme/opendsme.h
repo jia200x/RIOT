@@ -22,6 +22,10 @@
 #include "byteorder.h"
 #include "net/gnrc/pktbuf.h"
 
+#ifndef CONFIG_OPENDSME_PAYLOAD_LENGTH
+#define CONFIG_OPENDSME_PAYLOAD_LENGTH (16U)
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

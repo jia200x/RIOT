@@ -36,6 +36,7 @@ uint16_t node_id;
 bool pan_coord;
 gnrc_pktsnip_t *pkt;
 network_uint16_t addr;
+static uint16_t counter = 0;
 
 extern void heap_stats(void);
 
@@ -72,7 +73,7 @@ static int status_cmd(int argc, char **argv)
     opendsme_get_short_addr(&addr);
     l2util_addr_to_str((uint8_t*) &addr, sizeof(addr), str_addr);
 
-    printf("%s\n", str_addr);
+    printf("[info];ADDR;%s\n", str_addr);
 
     return 0;
 }
@@ -81,11 +82,11 @@ static int start_cmd(int argc, char **argv)
 {
     (void) argc;
     if (strcmp(argv[1], "pan_coord") == 0) {
-        puts("Starting as PAN coordinator");
+        puts("[info];ROLE;PAN_COORD");
         pan_coord = true;
     }
     else {
-        puts("Starting as regular coordinator");
+        puts("[info];ROLE;CHILD");
         pan_coord = false;
     }
 
@@ -98,14 +99,18 @@ static int txtsnd_cmd(int argc, char **argv)
 {
     (void) argc;
     if (strlen(argv[1]) > sizeof(str_addr)) {
-        puts("Addr to big");
+        puts("[error];Addr to big");
         return -1;
     }
     l2util_addr_from_str(argv[1], (uint8_t*) &addr);
-    pkt = gnrc_pktbuf_add(NULL, argv[2], strlen(argv[2]), GNRC_NETTYPE_UNDEF);
+    pkt = gnrc_pktbuf_add(NULL, NULL, CONFIG_OPENDSME_PAYLOAD_LENGTH, GNRC_NETTYPE_UNDEF);
     if (pkt == NULL) {
-        puts("Not enough space");
+        puts("[error];Not enough space");
     }
+    uint8_t *p = pkt->data;
+    p[0] = counter >> 8;
+    p[1] = counter & 0xFF;
+    counter++;
     event_post(EVENT_PRIO_HIGHEST, &send_ev);
     return 0;
 }
