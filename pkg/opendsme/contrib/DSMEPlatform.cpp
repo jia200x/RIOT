@@ -326,6 +326,11 @@ void DSMEPlatform::translateMacAddress(uint16_t& from, IEEE802154MacAddress& to)
 
 void DSMEPlatform::initialize(bool pan_coord)
 {
+    printf("[config];CAP;%01x\n",IS_ACTIVE(CONFIG_OPENDSME_USE_CAP));
+    printf("[config];PAYLOAD_LENGTH;%01x\n", CONFIG_OPENDSME_PAYLOAD_LENGTH);
+    printf("[config];USE_CAD;%01x\n",IS_ACTIVE(USE_CAD));
+    printf("[config];CAP_REDUCTION;%01x\n",CAP_REDUCTION);
+    printf("[config];STATIC_GTS;%01x\n",IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS));
     this->instance = this;
     this->dsme.setPHY_PIB(&(this->phy_pib));
     this->dsme.setMAC_PIB(&(this->mac_pib));
