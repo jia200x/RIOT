@@ -49,6 +49,7 @@ namespace dsme {
 
 event_t cca_ev;
 ztimer_t acktimer;
+ztimer_t cca_timer; /* used only if USE_CAD == 0 */
 event_t acktimer_ev;
 DSMEPlatform* DSMEPlatform::instance = nullptr;
 uint8_t DSMEPlatform::state = STATE_READY;
@@ -95,7 +96,13 @@ static event_t start_of_cfp_ev;
 
 static void _cca_ev_handler(event_t *ev)
 {
-    bool clear = ieee802154_radio_confirm_cca(&_radio);
+    bool clear;
+    if (IS_ACTIVE(USE_CAD)) {
+        clear = ieee802154_radio_confirm_cca(&_radio);
+    }
+    else {
+        clear = true;
+    }
     printf("[info];CCA;");
     if (clear) {
         printf("1");
@@ -115,6 +122,11 @@ static void _acktimer_ev_handler(event_t *ev)
 static void _acktimer_cb(void *arg)
 {
     event_post(EVENT_PRIO_HIGHEST, &acktimer_ev);
+}
+
+static void _cca_timer_cb(void *arg)
+{
+    event_post(EVENT_PRIO_HIGHEST, &cca_ev);
 }
 
 static void _timer_ev_handler(event_t *ev)
@@ -278,6 +290,8 @@ DSMEPlatform::DSMEPlatform() :
 
     acktimer.callback = _acktimer_cb;
     acktimer.arg = this;
+    cca_timer.callback = _cca_timer_cb;
+    cca_timer.arg = this;
     acktimer_ev.handler = _acktimer_ev_handler;
     cca_ev.handler = _cca_ev_handler;
     timer_event.handler = _timer_ev_handler;
@@ -703,8 +717,12 @@ void DSMEPlatform::setReceiveDelegate(receive_delegate_t receiveDelegate)
 
 bool DSMEPlatform::startCCA()
 {
-    /* TODO: This MUST be implemented properly */
-    ieee802154_radio_request_cca(&_radio);
+    if (IS_ACTIVE(USE_CAD)) {
+        ieee802154_radio_request_cca(&_radio);
+    }
+    else {
+        ztimer_set(ZTIMER_MSEC, &cca_timer, 12);
+    }
     return true;
 }
 
