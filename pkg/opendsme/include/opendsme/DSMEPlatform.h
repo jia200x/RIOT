@@ -16,6 +16,7 @@
 #include "mac_services/pib/MAC_PIB.h"
 #include "mac_services/pib/PHY_PIB.h"
 #include "mac_services/pib/dsme_phy_constants.h"
+#include "mac_services/DSME_Common.h"
 #include "opendsme/dsme_settings.h"
 #include "ztimer.h"
 
@@ -111,6 +112,7 @@ public:
     }
 
     bool isAssociated();
+    void allocateGTS(uint8_t superframeID, uint8_t slotID, uint8_t channelID, Direction direction, uint16_t address);
 
     void signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver) override;
     void signalGTSChange(bool deallocation, IEEE802154MacAddress counterpart, uint16_t superframeID, uint8_t gtSlotID, uint8_t channel, Direction direction) override;

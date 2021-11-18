@@ -6,6 +6,7 @@
 #include "event/thread.h"
 #include "luid.h"
 #include "dsmeAdaptionLayer/scheduling/TPS.h"
+#include "dsmeAdaptionLayer/scheduling/StaticScheduling.h"
 #include "board.h"
 
 #ifdef MODULE_SX127X
@@ -432,13 +433,27 @@ void DSMEPlatform::initialize(bool pan_coord)
 
     channelList_t scanChannels;
     scanChannels.add(12);
-    TPS* tps = new TPS(this->dsmeAdaptionLayer);
-    tps->setAlpha(0.1);
-    tps->setMinFreshness(this->mac_pib.macDSMEGTSExpirationTime);
-    scheduling = tps;
+    if (IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)) {
+        StaticScheduling* staticScheduling = new StaticScheduling(this->dsmeAdaptionLayer);
+        staticScheduling->setNegotiateChannels(false);
+        scheduling = staticScheduling;
+    }
+    else {
+        TPS* tps = new TPS(this->dsmeAdaptionLayer);
+        tps->setAlpha(0.1);
+        tps->setMinFreshness(this->mac_pib.macDSMEGTSExpirationTime);
+        scheduling = tps;
+    }
     this->dsmeAdaptionLayer.initialize(scanChannels,2,scheduling);
     this->initialized = true;
 }
+
+#if IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
+void DSMEPlatform::allocateGTS(uint8_t superframeID, uint8_t slotID, uint8_t channelID, Direction direction, uint16_t address)
+{
+    static_cast<StaticScheduling*>(scheduling)->allocateGTS(superframeID, slotID, channelID, direction, address);
+}
+#endif
 
 void DSMEPlatform::start()
 {

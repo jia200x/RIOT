@@ -1,5 +1,6 @@
 #include "opendsme/DSMEPlatform.h"
 #include "opendsme/opendsme.h"
+#include "mac_services/DSME_Common.h"
 
 dsme::DSMEPlatform m_dsme;
 
@@ -17,6 +18,11 @@ int opendsme_is_associated(void)
 void opendsme_get_short_addr(network_uint16_t *addr)
 {
     m_dsme.getShortAddress(addr);
+}
+
+void opendsme_allocate_gts(uint8_t superframeID, uint8_t slotID, uint8_t channelID, bool tx, uint16_t address)
+{
+    m_dsme.allocateGTS(superframeID, slotID, channelID, tx ? dsme::Direction::TX : dsme::Direction::RX, address);
 }
 
 #if 0

@@ -29,6 +29,7 @@
 #include "shell.h"
 #include "shell_commands.h"
 #include "net/l2util.h"
+#include "fmt.h"
 
 char str_addr[sizeof("00:00")];
 char line_buf[SHELL_DEFAULT_BUFSIZE];
@@ -36,6 +37,14 @@ uint16_t node_id;
 bool pan_coord;
 gnrc_pktsnip_t *pkt;
 network_uint16_t addr;
+
+#if !IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
+static uint8_t superframe_id;
+static uint8_t slot_id;
+static uint8_t channel_id;
+static bool tx;
+#endif
+
 static uint16_t counter = 0;
 
 extern void heap_stats(void);
@@ -53,6 +62,17 @@ static void _send_ev(event_t *event)
     (void) event;
     opendsme_send_frame(&addr, 2, pkt);
 }
+
+#if !IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
+static void _gts_ev(event_t *event)
+{
+    (void) event;
+    uint16_t _addr = byteorder_ntohs(addr);
+    opendsme_allocate_gts(superframe_id, slot_id, channel_id, tx, _addr);
+}
+
+event_t gts_ev = {.handler = _gts_ev};
+#endif
 
 event_t send_ev = {.handler = _send_ev};
 event_t init_ev = {.handler = _init_ev};
@@ -127,10 +147,28 @@ uint16_t get_node_id(void)
     return node_id;
 }
 
+#if !IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
+static int gts_cmd(int argc, char **argv)
+{
+    (void) argc;
+    l2util_addr_from_str(argv[1], (uint8_t*) &addr);
+    tx = scn_u32_dec(argv[2],1);
+    superframe_id = scn_u32_dec(argv[3],1);
+    slot_id = scn_u32_dec(argv[4],1);
+    channel_id = scn_u32_dec(argv[5], 1);
+    event_post(EVENT_PRIO_HIGHEST, &gts_ev);
+
+    return 0;
+}
+#endif
+
 static const shell_command_t shell_commands[] = {
     { "status", "check whether the node is associated or not", status_cmd },
     { "start", "start OpenDSME", start_cmd },
     { "txtsnd", "transmit frame", txtsnd_cmd },
+#if !IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
+    { "gts", "add gts slot", gts_cmd },
+#endif
     { "id", "set node id", id_cmd },
     { NULL, NULL, NULL }
 };

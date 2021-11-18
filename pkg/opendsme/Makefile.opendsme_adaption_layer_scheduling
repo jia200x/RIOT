@@ -1,6 +1,6 @@
 MODULE = opendsme_adaption_layer_scheduling
 
 NO_AUTO_SRC := 1
-SRCXX += TPS.cc
+SRCXX += TPS.cc StaticScheduling.cc
 
 include $(RIOTBASE)/Makefile.base

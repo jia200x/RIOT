@@ -34,6 +34,8 @@ int opendsme_init(bool pan_coord);
 int opendsme_is_associated(void);
 void opendsme_get_short_addr(network_uint16_t *addr);
 void opendsme_send_frame(void *addr, size_t addr_len, gnrc_pktsnip_t *pkt);
+void opendsme_allocate_gts(uint8_t superframeID, uint8_t slotID,
+                           uint8_t channelID, bool tx, uint16_t address);
 
 #ifdef __cplusplus
 }
