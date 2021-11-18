@@ -29,6 +29,10 @@ static sx127x_t sx127x_dev;
 #define USE_CAD 1
 #endif
 
+#ifndef CONFIG_DSME_PLATFORM_ACK_REQ
+#define CONFIG_DSME_PLATFORM_ACK_REQ 1
+#endif
+
 #include "net/ieee802154/radio.h"
 
 ieee802154_dev_t _radio;
@@ -331,6 +335,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     printf("[config];USE_CAD;%01x\n",IS_ACTIVE(USE_CAD));
     printf("[config];CAP_REDUCTION;%01x\n",CAP_REDUCTION);
     printf("[config];STATIC_GTS;%01x\n",IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS));
+    printf("[config];ACK_REQ;%01x\n",IS_ACTIVE(CONFIG_DSME_PLATFORM_ACK_REQ));
     this->instance = this;
     this->dsme.setPHY_PIB(&(this->phy_pib));
     this->dsme.setMAC_PIB(&(this->mac_pib));
