@@ -34,6 +34,10 @@ static sx127x_t sx127x_dev;
 #define CONFIG_DSME_PLATFORM_ACK_REQ 1
 #endif
 
+#ifndef CONFIG_DSME_PLATFORM_SF_PER_MSF
+#define CONFIG_DSME_PLATFORM_SF_PER_MSF (2)
+#endif
+
 #include "net/ieee802154/radio.h"
 
 ieee802154_dev_t _radio;
@@ -412,7 +416,7 @@ void DSMEPlatform::initialize(bool pan_coord)
 
     this->mac_pib.macAssociatedPANCoord = this->mac_pib.macIsPANCoord;
     this->mac_pib.macSuperframeOrder = 3;
-    this->mac_pib.macMultiSuperframeOrder = 4;
+    this->mac_pib.macMultiSuperframeOrder = 3 + (CONFIG_DSME_PLATFORM_SF_PER_MSF - 1);
     this->mac_pib.macBeaconOrder = 4;
 
     this->mac_pib.macMinBE = 7;
