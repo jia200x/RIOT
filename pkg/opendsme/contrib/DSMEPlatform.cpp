@@ -120,6 +120,7 @@ static void _cca_ev_handler(event_t *ev)
         printf("0");
     }
     printf("\n");
+    DSMEPlatform::state = DSMEPlatform::STATE_READY;
     dsme::DSMEPlatform::instance->getDSME().dispatchCCAResult(clear);
 }
 
@@ -752,6 +753,8 @@ bool DSMEPlatform::startCCA()
     else {
         ztimer_set(ZTIMER_MSEC, &cca_timer, 12);
     }
+    puts("[INFO];REQ_CCA");
+    DSMEPlatform::state = STATE_CCA_WAIT;
     return true;
 }
 
