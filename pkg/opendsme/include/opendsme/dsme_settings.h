@@ -4,6 +4,8 @@
 #include <stdint.h>
 
 #include <stdio.h>
+#include "kernel_defines.h"
+
 #define DSME_PRINTF(...) printf(__VA_ARGS__)
 #define DSME_PRINTADDR(addr) DSME_PRINTF(" %02x%02x:%02x%02x:%02x%02x:%02x%02x ", ((uint8_t *)addr)[0], ((uint8_t *)addr)[1], ((uint8_t *)addr)[2], ((uint8_t *)addr)[3], ((uint8_t *)addr)[4], ((uint8_t *)addr)[5], ((uint8_t *)addr)[6], ((uint8_t *)addr)[7])
 #define LOG_ID_FROM_LINKADDR(addr) ((addr) ? (addr)->u8[LINKADDR_SIZE - 1] : 0)
@@ -40,8 +42,14 @@ constexpr uint16_t MAX_OCCUPIED_SLOTS = MAX_SUPERFRAMES_PER_MULTI_SUPERFRAME*MAX
 
 constexpr uint8_t MAX_SAB_UNITS = 1;
 
-constexpr uint16_t CAP_QUEUE_SIZE = 8;
-constexpr uint16_t TOTAL_GTS_QUEUE_SIZE = 30-CAP_QUEUE_SIZE;
+#if IS_ACTIVE(CONFIG_OPENDSME_USE_CAP)
+constexpr uint16_t CAP_QUEUE_SIZE = 12;
+constexpr uint16_t TOTAL_GTS_QUEUE_SIZE = 4;
+#else
+constexpr uint16_t CAP_QUEUE_SIZE = 4;
+constexpr uint16_t TOTAL_GTS_QUEUE_SIZE = 12;
+#endif
+
 constexpr uint16_t UPPER_LAYER_QUEUE_SIZE = 4;
 constexpr uint16_t MSG_POOL_SIZE = CAP_QUEUE_SIZE + TOTAL_GTS_QUEUE_SIZE + 2 * UPPER_LAYER_QUEUE_SIZE + 10; //48
 
