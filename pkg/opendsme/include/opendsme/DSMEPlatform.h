@@ -24,8 +24,6 @@
 #include "dsmeAdaptionLayer/DSMEAdaptionLayer.h"
 #include "byteorder.h"
 
-#define DSME_POOL_SIZE (16)
-
 namespace dsme {
 
 struct DSMESettings;
@@ -173,7 +171,6 @@ protected:
 
     ztimer_t timer;
 
-    DSMEMessage pool[DSME_POOL_SIZE];
     IDSMEMessage *message;
     GTSScheduling* scheduling = nullptr;
 };

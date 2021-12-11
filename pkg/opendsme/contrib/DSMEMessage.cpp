@@ -86,6 +86,7 @@ void DSMEMessage::releaseMessage()
         gnrc_pktbuf_release(pkt);
     }
     free = true;
+    delete this;
 }
 
 iolist_t *DSMEMessage::getIolPayload()

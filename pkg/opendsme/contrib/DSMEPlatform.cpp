@@ -312,10 +312,6 @@ DSMEPlatform::DSMEPlatform() :
 #if IS_USED(MODULE_SX127X)
     sx127x_ev.handler = _sx127x_handler;
 #endif
-    
-    for (int i=0; i<DSME_POOL_SIZE; i++) {
-        this->pool[i].free = true;
-    }
 }
 
 DSMEPlatform::~DSMEPlatform()
@@ -515,13 +511,7 @@ void DSMEPlatform::handleReceivedMessageFromAckLayer(IDSMEMessage* message)
 
 DSMEMessage *DSMEPlatform::getEmptyMessage()
 {
-    DSMEMessage *msg = NULL;
-    for (int i=0; i<DSME_POOL_SIZE; i++) {
-        if (this->pool[i].free) {
-            msg = &this->pool[i];
-            break;
-        }
-    }
+    DSMEMessage *msg = new DSMEMessage();
     DSME_ASSERT(msg);
     msg->clearMessage();
     signalNewMsg(msg);
@@ -536,6 +526,7 @@ void DSMEPlatform::releaseMessage(IDSMEMessage* msg)
 {
     DSMEMessage *m = static_cast<DSMEMessage*>(msg);
     m->releaseMessage();
+    //delete m;
 }
 
 void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
