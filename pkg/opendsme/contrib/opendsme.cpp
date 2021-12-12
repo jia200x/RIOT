@@ -5,6 +5,8 @@
 dsme::DSMEPlatform m_dsme;
 
 extern "C" {
+static bool _pan_coord;
+extern void heap_stats(void);
 static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
 
@@ -20,9 +22,33 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
 
 }
 
+static void _start(bool pan_coord)
+{
+    printf("[info];");
+    heap_stats();
+    opendsme_init(pan_coord);
+}
+
 static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
 {
-
+    switch (opt->opt) {
+        case NETOPT_LINK:
+            _start(_pan_coord);
+            break;
+        case NETOPT_PAN_COORD:
+            if (*((bool*)opt->data) == true) {
+                puts("[info];ROLE;PAN_COORD");
+                _pan_coord = true;
+            }
+            else {
+                puts("[info];ROLE;CHILD");
+                _pan_coord = false;
+            }
+            break;
+        default:
+            assert(false);
+            break;
+    }
 }
 
 

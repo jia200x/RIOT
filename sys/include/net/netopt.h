@@ -807,6 +807,7 @@ typedef enum {
      * @brief   (array of byte arrays) Leave an link layer multicast group
      */
     NETOPT_L2_GROUP_LEAVE,
+    NETOPT_PAN_COORD,
     /**
      * @brief   maximum number of options defined here.
      *

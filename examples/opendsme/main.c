@@ -34,7 +34,6 @@
 char str_addr[sizeof("00:00")];
 char line_buf[SHELL_DEFAULT_BUFSIZE];
 uint16_t node_id;
-bool pan_coord;
 gnrc_pktsnip_t *pkt;
 network_uint16_t addr;
 
@@ -53,13 +52,6 @@ gnrc_netif_t *opendsme_get_netif(void);
 int gnrc_netif_dsme_create(gnrc_netif_t *netif, char *stack, int stacksize,
                                  char priority, const char *name, netdev_t *dev);
 
-static void _init_ev(event_t *event)
-{
-    (void) event;
-    printf("[info];");
-    heap_stats();
-    opendsme_init(pan_coord);
-}
 
 static void _send_ev(event_t *event)
 {
@@ -79,7 +71,6 @@ event_t gts_ev = {.handler = _gts_ev};
 #endif
 
 event_t send_ev = {.handler = _send_ev};
-event_t init_ev = {.handler = _init_ev};
 
 static int status_cmd(int argc, char **argv)
 {
@@ -105,16 +96,16 @@ static int status_cmd(int argc, char **argv)
 static int start_cmd(int argc, char **argv)
 {
     (void) argc;
+    bool pan_coord;
     if (strcmp(argv[1], "pan_coord") == 0) {
-        puts("[info];ROLE;PAN_COORD");
         pan_coord = true;
     }
     else {
-        puts("[info];ROLE;CHILD");
         pan_coord = false;
     }
 
-    event_post(opendsme_get_evq(), &init_ev);
+    gnrc_netapi_set(opendsme_get_netif()->pid, NETOPT_PAN_COORD, 0, &pan_coord, sizeof(pan_coord));
+    gnrc_netapi_set(opendsme_get_netif()->pid, NETOPT_LINK, 0, NULL, 0);
 
     return 0;
 }
