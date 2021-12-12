@@ -35,7 +35,6 @@ char str_addr[sizeof("00:00")];
 char line_buf[SHELL_DEFAULT_BUFSIZE];
 uint16_t node_id;
 gnrc_pktsnip_t *pkt;
-network_uint16_t addr;
 
 #if !IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
 static uint8_t superframe_id;
@@ -53,12 +52,6 @@ int gnrc_netif_dsme_create(gnrc_netif_t *netif, char *stack, int stacksize,
                                  char priority, const char *name, netdev_t *dev);
 
 
-static void _send_ev(event_t *event)
-{
-    (void) event;
-    opendsme_send_frame(&addr, 2, pkt);
-}
-
 #if !IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
 static void _gts_ev(event_t *event)
 {
@@ -69,8 +62,6 @@ static void _gts_ev(event_t *event)
 
 event_t gts_ev = {.handler = _gts_ev};
 #endif
-
-event_t send_ev = {.handler = _send_ev};
 
 static int status_cmd(int argc, char **argv)
 {
@@ -117,6 +108,7 @@ static int txtsnd_cmd(int argc, char **argv)
         puts("[error];Addr to big");
         return -1;
     }
+    uint8_t addr[2];
     l2util_addr_from_str(argv[1], (uint8_t*) &addr);
     pkt = gnrc_pktbuf_add(NULL, NULL, CONFIG_OPENDSME_PAYLOAD_LENGTH, GNRC_NETTYPE_UNDEF);
     if (pkt == NULL) {
@@ -126,7 +118,9 @@ static int txtsnd_cmd(int argc, char **argv)
     p[0] = counter >> 8;
     p[1] = counter & 0xFF;
     counter++;
-    event_post(opendsme_get_evq(), &send_ev);
+    gnrc_pktsnip_t *netif_hdr = gnrc_netif_hdr_build(NULL, 0, addr, 2);
+    pkt = gnrc_pkt_prepend(pkt, netif_hdr);
+    gnrc_netapi_send(opendsme_get_netif()->pid, pkt);
     return 0;
 }
 

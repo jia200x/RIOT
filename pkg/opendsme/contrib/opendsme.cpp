@@ -1,6 +1,7 @@
 #include "opendsme/DSMEPlatform.h"
 #include "opendsme/opendsme.h"
 #include "mac_services/DSME_Common.h"
+#include "net/gnrc/netif/hdr.h"
 
 dsme::DSMEPlatform m_dsme;
 
@@ -9,7 +10,12 @@ static bool _pan_coord;
 extern void heap_stats(void);
 static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
-
+    /* HACK: Always short address for the experiments */
+    uint8_t addr[2];
+    gnrc_netif_hdr_t *hdr = (gnrc_netif_hdr_t*) pkt->data;
+    memcpy(addr, gnrc_netif_hdr_get_dst_addr(hdr), 2);
+    pkt = gnrc_pktbuf_remove_snip(pkt, pkt);
+    opendsme_send_frame(&addr, 2, pkt);
 }
 
 static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
