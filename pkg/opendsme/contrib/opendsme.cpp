@@ -51,6 +51,14 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
                 _pan_coord = false;
             }
             break;
+#if IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
+        case NETOPT_GTS_ALLOC: {
+            dsme_alloc_t *alloc = (dsme_alloc_t*) opt->data;
+            uint16_t _addr = byteorder_ntohs(alloc->addr);
+            opendsme_allocate_gts(alloc->superframe_id, alloc->slot_id, alloc->channel_id, alloc->tx, _addr);
+            break;
+        }
+#endif
         default:
             assert(false);
             break;

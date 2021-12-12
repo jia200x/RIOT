@@ -29,6 +29,13 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+typedef struct {
+    network_uint16_t addr;
+    uint8_t superframe_id;
+    uint8_t slot_id;
+    uint8_t channel_id;
+    bool tx;
+} dsme_alloc_t;
 
 int opendsme_init(bool pan_coord);
 int opendsme_is_associated(void);

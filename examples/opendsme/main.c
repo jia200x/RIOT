@@ -36,13 +36,6 @@ char line_buf[SHELL_DEFAULT_BUFSIZE];
 uint16_t node_id;
 gnrc_pktsnip_t *pkt;
 
-#if !IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
-static uint8_t superframe_id;
-static uint8_t slot_id;
-static uint8_t channel_id;
-static bool tx;
-#endif
-
 static uint16_t counter = 0;
 
 extern void heap_stats(void);
@@ -51,17 +44,6 @@ gnrc_netif_t *opendsme_get_netif(void);
 int gnrc_netif_dsme_create(gnrc_netif_t *netif, char *stack, int stacksize,
                                  char priority, const char *name, netdev_t *dev);
 
-
-#if !IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
-static void _gts_ev(event_t *event)
-{
-    (void) event;
-    uint16_t _addr = byteorder_ntohs(addr);
-    opendsme_allocate_gts(superframe_id, slot_id, channel_id, tx, _addr);
-}
-
-event_t gts_ev = {.handler = _gts_ev};
-#endif
 
 static int status_cmd(int argc, char **argv)
 {
@@ -140,12 +122,14 @@ uint16_t get_node_id(void)
 static int gts_cmd(int argc, char **argv)
 {
     (void) argc;
-    l2util_addr_from_str(argv[1], (uint8_t*) &addr);
-    tx = scn_u32_dec(argv[2],1);
-    superframe_id = scn_u32_dec(argv[3],1);
-    slot_id = scn_u32_dec(argv[4],1);
-    channel_id = scn_u32_dec(argv[5], 1);
-    event_post(opendsme_get_evq(), &gts_ev);
+    dsme_alloc_t alloc;
+    memset(&alloc, 0, sizeof(alloc));
+    l2util_addr_from_str(argv[1], (uint8_t*) &alloc.addr);
+    alloc.tx = scn_u32_dec(argv[2],1);
+    alloc.superframe_id = scn_u32_dec(argv[3],1);
+    alloc.slot_id = scn_u32_dec(argv[4],1);
+    alloc.channel_id = scn_u32_dec(argv[5], 1);
+    gnrc_netapi_set(opendsme_get_netif()->pid, NETOPT_GTS_ALLOC, 0, &alloc, sizeof(alloc));
 
     return 0;
 }

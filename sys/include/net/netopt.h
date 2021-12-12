@@ -808,6 +808,7 @@ typedef enum {
      */
     NETOPT_L2_GROUP_LEAVE,
     NETOPT_PAN_COORD,
+    NETOPT_GTS_ALLOC,
     /**
      * @brief   maximum number of options defined here.
      *
