@@ -53,9 +53,9 @@
 #include "debug.h"
 
 static void _update_l2addr_from_dev(gnrc_netif_t *netif);
-static void _check_netdev_capabilities(netdev_t *dev);
+//static void _check_netdev_capabilities(netdev_t *dev);
 static void *_gnrc_netif_thread(void *args);
-static void _event_cb(netdev_t *dev, netdev_event_t event);
+//static void _event_cb(netdev_t *dev, netdev_event_t event);
 
 typedef struct {
     gnrc_netif_t *netif;
@@ -1434,6 +1434,7 @@ static void _init_from_device(gnrc_netif_t *netif)
     _update_l2addr_from_dev(netif);
 }
 
+#if 0
 static void _check_netdev_capabilities(netdev_t *dev)
 {
     /* Check whether RX- and TX-complete interrupts are supported by the driver */
@@ -1451,6 +1452,7 @@ static void _check_netdev_capabilities(netdev_t *dev)
         }
     }
 }
+#endif
 
 #ifdef DEVELHELP
 static bool options_tested = false;
@@ -1615,6 +1617,7 @@ static inline void _event_post(gnrc_netif_t *netif)
 #endif
 }
 
+#if 0
 static void _process_receive_stats(gnrc_netif_t *netdev, gnrc_pktsnip_t *pkt)
 {
     if (!IS_USED(MODULE_NETSTATS_NEIGHBOR)) {
@@ -1635,6 +1638,7 @@ static void _process_receive_stats(gnrc_netif_t *netdev, gnrc_pktsnip_t *pkt)
     src_len = hdr->src_l2addr_len;
     netstats_nb_update_rx(&netdev->netif, src, src_len, hdr->rssi, hdr->lqi);
 }
+#endif
 
 /**
  * @brief   Retrieve the netif event queue if enabled
@@ -1701,6 +1705,7 @@ static void _process_events_await_msg(gnrc_netif_t *netif, msg_t *msg)
     }
 }
 
+#if 0
 static void _send_queued_pkt(gnrc_netif_t *netif)
 {
     (void)netif;
@@ -1713,6 +1718,7 @@ static void _send_queued_pkt(gnrc_netif_t *netif)
     }
 #endif /* IS_USED(MODULE_GNRC_NETIF_PKTQ) */
 }
+#endif
 
 static void _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt, bool push_back)
 {
@@ -1839,10 +1845,11 @@ static void *_gnrc_netif_thread(void *args)
     /* setup the link-layer's message queue */
     msg_init_queue(msg_queue, GNRC_NETIF_MSG_QUEUE_SIZE);
     /* register the event callback with the device driver */
-    dev->event_callback = _event_cb;
-    dev->context = netif;
+    //dev->event_callback = _event_cb;
+    //dev->context = netif;
     /* initialize low-level driver */
-    ctx->result = dev->driver->init(dev);
+    //ctx->result = dev->driver->init(dev);
+    ctx->result = 0;
     /* signal that driver init is done */
     mutex_unlock(&ctx->init_done);
     if (ctx->result < 0) {
@@ -1850,11 +1857,8 @@ static void *_gnrc_netif_thread(void *args)
         return NULL;
     }
     netif_register(&netif->netif);
-    _check_netdev_capabilities(dev);
+    //_check_netdev_capabilities(dev);
     netif->ops->init(netif);
-#if DEVELHELP
-    assert(options_tested);
-#endif
 #ifdef MODULE_NETSTATS_L2
     memset(&netif->stats, 0, sizeof(netstats_t));
 #endif
@@ -1943,6 +1947,7 @@ static void *_gnrc_netif_thread(void *args)
     return NULL;
 }
 
+#if 0
 static void _pass_on_packet(gnrc_pktsnip_t *pkt)
 {
     /* throw away packet if no one is interested */
@@ -2039,4 +2044,5 @@ static void _event_cb(netdev_t *dev, netdev_event_t event)
         }
     }
 }
+#endif
 /** @} */

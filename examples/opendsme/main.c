@@ -48,6 +48,10 @@ static bool tx;
 static uint16_t counter = 0;
 
 extern void heap_stats(void);
+event_queue_t *opendsme_get_evq(void);
+gnrc_netif_t *opendsme_get_netif(void);
+int gnrc_netif_dsme_create(gnrc_netif_t *netif, char *stack, int stacksize,
+                                 char priority, const char *name, netdev_t *dev);
 
 static void _init_ev(event_t *event)
 {
@@ -110,7 +114,7 @@ static int start_cmd(int argc, char **argv)
         pan_coord = false;
     }
 
-    event_post(EVENT_PRIO_HIGHEST, &init_ev);
+    event_post(opendsme_get_evq(), &init_ev);
 
     return 0;
 }
@@ -131,7 +135,7 @@ static int txtsnd_cmd(int argc, char **argv)
     p[0] = counter >> 8;
     p[1] = counter & 0xFF;
     counter++;
-    event_post(EVENT_PRIO_HIGHEST, &send_ev);
+    event_post(opendsme_get_evq(), &send_ev);
     return 0;
 }
 
@@ -156,7 +160,7 @@ static int gts_cmd(int argc, char **argv)
     superframe_id = scn_u32_dec(argv[3],1);
     slot_id = scn_u32_dec(argv[4],1);
     channel_id = scn_u32_dec(argv[5], 1);
-    event_post(EVENT_PRIO_HIGHEST, &gts_ev);
+    event_post(opendsme_get_evq(), &gts_ev);
 
     return 0;
 }
@@ -173,10 +177,12 @@ static const shell_command_t shell_commands[] = {
     { NULL, NULL, NULL }
 };
 
+static char dsme_stack[2000];
 int main(void)
 {
     printf("\n************ RIOT and OpenDSME ***********\n");
     printf("\n");
+    gnrc_netif_dsme_create(opendsme_get_netif(), dsme_stack, 2000, THREAD_PRIORITY_MAIN - 1,"dsme", NULL);
 
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
 

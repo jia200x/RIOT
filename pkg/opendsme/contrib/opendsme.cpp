@@ -4,6 +4,61 @@
 
 dsme::DSMEPlatform m_dsme;
 
+extern "C" {
+static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
+{
+
+}
+
+static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
+{
+
+}
+
+static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
+{
+
+}
+
+static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
+{
+
+}
+
+
+static void _init(gnrc_netif_t *netif)
+{
+    // TODO:
+    // netif->device_type = (uint8_t)tmp;
+    //_update_l2addr_from_dev(netif);
+    netif->flags = 0;
+}
+
+static const gnrc_netif_ops_t dsme_ops = {
+    .init = _init,
+    .send = _send,
+    .recv = _recv,
+    .get = _get,
+    .set = _set,
+};
+
+int gnrc_netif_dsme_create(gnrc_netif_t *netif, char *stack, int stacksize,
+                                 char priority, const char *name, netdev_t *dev)
+{
+    return gnrc_netif_create(netif, stack, stacksize, priority, name, dev,
+                             &dsme_ops);
+}
+event_queue_t *opendsme_get_evq(void)
+{
+    return &m_dsme.netif.evq;
+}
+gnrc_netif_t *opendsme_get_netif(void)
+{
+    return &m_dsme.netif;
+}
+
+}
+
 int opendsme_init(bool pan_coord)
 {
     m_dsme.initialize(pan_coord);

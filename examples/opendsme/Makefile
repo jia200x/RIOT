@@ -37,7 +37,7 @@ CXXEXFLAGS += -Wno-unused-parameter -Wno-pedantic -Wno-deprecated-copy -Wno-miss
 USEPKG += opendsme
 USEMODULE += ztimer_msec
 USEMODULE += gnrc_pktbuf_malloc
-USEMODULE += event_thread
+#USEMODULE += event_thread
 USEMODULE += cpp11-compat
 USEMODULE += netdev_default
 USEMODULE += ieee802154
@@ -47,9 +47,11 @@ USEMODULE += shell
 USEMODULE += l2util
 USEMODULE += gnrc
 USEMODULE += checksum
+USEMODULE += gnrc_netif
+USEMODULE += gnrc_netif_events
 #USEMODULE += shell_commands
 #USEMODULE += heap_cmd
-CFLAGS += -DEVENT_THREAD_MEDIUM_STACKSIZE=2000
+#CFLAGS += -DEVENT_THREAD_MEDIUM_STACKSIZE=2000
 CFLAGS += -DTHREAD_STACKSIZE_MAIN=700
 CFLAGS += -DGNRC_PKTDUMP_STACKSIZE=700
 CFLAGS += -DEVENT_THREAD_MEDIUM_PRIO=EVENT_THREAD_HIGHEST_PRIO

@@ -41,6 +41,7 @@ static sx127x_t sx127x_dev;
 #include "net/ieee802154/radio.h"
 
 ieee802154_dev_t _radio;
+event_queue_t *dsme_ev;
 extern "C" {
 extern void heap_stats(void);
 uint16_t get_node_id();
@@ -50,7 +51,7 @@ event_t sx127x_ev;
 void sx127x_isr(void *arg)
 {
     (void) arg;
-    event_post(EVENT_PRIO_HIGHEST, &sx127x_ev);
+    event_post(dsme_ev, &sx127x_ev);
 }
 }
 
@@ -131,12 +132,12 @@ static void _acktimer_ev_handler(event_t *ev)
 
 static void _acktimer_cb(void *arg)
 {
-    event_post(EVENT_PRIO_HIGHEST, &acktimer_ev);
+    event_post(dsme_ev, &acktimer_ev);
 }
 
 static void _cca_timer_cb(void *arg)
 {
-    event_post(EVENT_PRIO_HIGHEST, &cca_ev);
+    event_post(dsme_ev, &cca_ev);
 }
 
 static void _timer_ev_handler(event_t *ev)
@@ -231,7 +232,7 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
 {
     switch (status) {
         case IEEE802154_RADIO_CONFIRM_TX_DONE:
-            event_post(EVENT_PRIO_HIGHEST, &tx_done_event);
+            event_post(dsme_ev, &tx_done_event);
             break;
         case IEEE802154_RADIO_INDICATION_RX_START:
             rx_sfd = dsme::DSMEPlatform::instance->getSymbolCounter();
@@ -241,10 +242,10 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
         case IEEE802154_RADIO_INDICATION_TX_START:
             break;
         case IEEE802154_RADIO_INDICATION_RX_DONE:
-            event_post(EVENT_PRIO_HIGHEST, &rx_done_event);
+            event_post(dsme_ev, &rx_done_event);
             break;
         case IEEE802154_RADIO_CONFIRM_CCA:
-            event_post(EVENT_PRIO_HIGHEST, &cca_ev);
+            event_post(dsme_ev, &cca_ev);
             break;
         default:
             DSME_ASSERT(false);
@@ -253,7 +254,7 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
 
 static void _timer_cb(void *arg)
 {
-    event_post(EVENT_PRIO_HIGHEST, &timer_event);
+    event_post(dsme_ev, &timer_event);
 }
 
 void DSMEPlatform::send_pkt(uint16_t addr, iolist_t *pkt)
@@ -447,6 +448,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     }
     this->dsmeAdaptionLayer.initialize(scanChannels,2,scheduling);
     this->initialized = true;
+    dsme_ev = &this->netif.evq;
 }
 
 #if IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS)
@@ -506,7 +508,7 @@ void DSMEPlatform::handleReceivedMessageFromAckLayer(IDSMEMessage* message)
     DSME_ASSERT(receiveFromAckLayerDelegate);
     DSME_ASSERT(!this->message);
     this->message = message;
-    event_post(EVENT_PRIO_HIGHEST, &rx_offload_ev);
+    event_post(dsme_ev, &rx_offload_ev);
 }
 
 DSMEMessage *DSMEPlatform::getEmptyMessage()
@@ -545,7 +547,7 @@ uint32_t DSMEPlatform::getSymbolCounter()
 
 void DSMEPlatform::scheduleStartOfCFP()
 {
-    event_post(EVENT_PRIO_HIGHEST, &start_of_cfp_ev);
+    event_post(dsme_ev, &start_of_cfp_ev);
 }
 
 void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver)

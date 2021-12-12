@@ -19,6 +19,7 @@
 #include "mac_services/DSME_Common.h"
 #include "opendsme/dsme_settings.h"
 #include "ztimer.h"
+#include "net/gnrc/netif.h"
 
 #include "dsmeLayer/DSMELayer.h"
 #include "dsmeAdaptionLayer/DSMEAdaptionLayer.h"
@@ -128,6 +129,8 @@ public:
 
     static Delegate<void(bool)> txEndCallback;
     void getShortAddress(network_uint16_t *addr);
+    /*TODO*/
+    gnrc_netif_t netif;
 
 protected:
     /** @brief Copy constructor is not allowed.
