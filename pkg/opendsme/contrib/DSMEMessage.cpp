@@ -105,9 +105,9 @@ void DSMEMessage::dispatchMessage()
 {
     DSME_ASSERT(!free);
     uint16_t addr = getHeader().getSrcAddr().getShortAddress();
-    /* first 2 bytes are the id */
-    uint8_t *id = static_cast<uint8_t*>(pkt->data);
-    printf("[info];RECV;%02x:%02x;%02x;%02x%02x\n", addr >> 8, addr & 0xFF, pkt->size, id[0] << 8, id[1]);
+    uint8_t _addr[2] = {addr >> 8, addr & 0xFF};
+    gnrc_pktsnip_t *netif_hdr = gnrc_netif_hdr_build((uint8_t*) _addr, 2, NULL, 0);
+    pkt = gnrc_pkt_prepend(pkt, netif_hdr);
 #if 0
     uint8_t *p = static_cast<uint8_t*>(pkt->data);
     for (unsigned i=0; i<pkt->size;i++) {
@@ -115,6 +115,11 @@ void DSMEMessage::dispatchMessage()
     }
     printf("\n");
 #endif
+    if (gnrc_netapi_dispatch_receive(GNRC_NETTYPE_UNDEF, GNRC_NETREG_DEMUX_CTX_ALL,
+                                      pkt)) {
+        /* Pass packet to GNRC */
+        pkt = NULL;
+    }
     releaseMessage();
 }
 }

@@ -25,11 +25,31 @@
 #endif
 
 #include "net/gnrc.h"
+#include "net/gnrc/netreg.h"
 
 #include "shell.h"
 #include "shell_commands.h"
 #include "net/l2util.h"
 #include "fmt.h"
+
+static void _cb(uint16_t cmd, gnrc_pktsnip_t *pkt,
+                                       void *ctx)
+{
+    (void) cmd;
+    (void) pkt;
+    (void) ctx;
+    uint8_t addr[2];
+    gnrc_netif_hdr_t *hdr = (gnrc_netif_hdr_t*) pkt->data;
+    memcpy(addr, gnrc_netif_hdr_get_src_addr(hdr), 2);
+    pkt = gnrc_pktbuf_remove_snip(pkt, pkt);
+    /* first 2 bytes are the id */
+    uint8_t *id = pkt->data;
+    printf("[info];RECV;%02x:%02x;%02x;%02x%02x\n", addr[0], addr[1], pkt->size, id[0], id[1]);
+    gnrc_pktbuf_release(pkt);
+}
+
+static gnrc_netreg_entry_cbd_t _cbd = {.cb = _cb};
+gnrc_netreg_entry_t payload_dump = GNRC_NETREG_ENTRY_INIT_CB(GNRC_NETREG_DEMUX_CTX_ALL, &_cbd);
 
 char str_addr[sizeof("00:00")];
 char line_buf[SHELL_DEFAULT_BUFSIZE];
@@ -152,6 +172,7 @@ int main(void)
     printf("\n************ RIOT and OpenDSME ***********\n");
     printf("\n");
     gnrc_netif_dsme_create(opendsme_get_netif(), dsme_stack, 2000, THREAD_PRIORITY_MAIN - 1,"dsme", NULL);
+    gnrc_netreg_register(GNRC_NETTYPE_UNDEF, &payload_dump);
 
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
 
