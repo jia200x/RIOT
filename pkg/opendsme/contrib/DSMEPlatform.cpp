@@ -634,8 +634,6 @@ bool DSMEPlatform::setChannelNumber(uint8_t channel)
         .pow = CONFIG_IEEE802154_DEFAULT_TXPOWER,
     };
     int res;
-    res = ieee802154_radio_set_idle(&_radio, true);
-    DSME_ASSERT(res == 0);
     res = ieee802154_radio_config_phy(&_radio, &conf);
     DSME_ASSERT(res == 0);
 
@@ -777,12 +775,15 @@ bool DSMEPlatform::startCCA()
 
 void DSMEPlatform::turnTransceiverOn()
 {
-    /* TODO */
+    int res = ieee802154_radio_request_on(&_radio);
+    DSME_ASSERT(res == 0);
+    res = ieee802154_radio_confirm_on(&_radio);
+    DSME_ASSERT(res == 0);
 }
 
 void DSMEPlatform::turnTransceiverOff()
 {
-    int res = ieee802154_radio_set_idle(&_radio, true);
+    int res = ieee802154_radio_off(&_radio);
     DSME_ASSERT(res == 0);
 }
 

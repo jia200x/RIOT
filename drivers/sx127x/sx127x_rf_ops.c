@@ -150,9 +150,10 @@ static int _read(ieee802154_dev_t *hal, void *buf, size_t max_size,
     return size-2;
 }
 
-static int _request_on(ieee802154_dev_t *dev)
+static int _request_on(ieee802154_dev_t *hal)
 {
-    (void) dev;
+    sx127x_t *dev = hal->priv;
+    sx127x_set_standby(dev);
     return 0;
 }
 
@@ -172,10 +173,10 @@ static int _config_phy(ieee802154_dev_t *hal, const ieee802154_phy_conf_t *conf)
     return 0;
 }
 
-static int _off(ieee802154_dev_t *dev)
+static int _off(ieee802154_dev_t *hal)
 {
-    (void) dev;
-    /* TODO */
+    sx127x_t *dev = hal->priv;
+    sx127x_set_sleep(dev);
     return 0;
 }
 
