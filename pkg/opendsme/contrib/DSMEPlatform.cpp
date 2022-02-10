@@ -419,9 +419,9 @@ void DSMEPlatform::initialize(bool pan_coord)
     this->mac_pib.macMultiSuperframeOrder = 3 + (CONFIG_DSME_PLATFORM_SF_PER_MSF - 1);
     this->mac_pib.macBeaconOrder = 4;
 
-    this->mac_pib.macMinBE = 7;
-    this->mac_pib.macMaxBE = 8;
-    this->mac_pib.macMaxCSMABackoffs = 5;
+    this->mac_pib.macMinBE = 3;
+    this->mac_pib.macMaxBE = 5;
+    this->mac_pib.macMaxCSMABackoffs = 4;
     this->mac_pib.macMaxFrameRetries = 3;
 
     this->mac_pib.macDSMEGTSExpirationTime = 16;
