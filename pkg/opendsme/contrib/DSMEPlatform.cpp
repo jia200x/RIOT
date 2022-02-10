@@ -70,6 +70,7 @@ static event_t rx_done_event;
 static event_t request_slot_ev;
 static uint32_t rx_sfd;
 static bool wait_for_ack;
+static bool pending_tx;
 
 #ifdef MODULE_SX127X
 
@@ -148,6 +149,7 @@ static void _timer_ev_handler(event_t *ev)
 static void _tx_done_handler(event_t *ev)
 {
     int res = ieee802154_radio_confirm_transmit(&_radio, NULL);
+    pending_tx = false;
     DSME_ASSERT(res >= 0);
     res = ieee802154_radio_set_rx(&_radio);
     DSME_ASSERT(res == 0);
@@ -676,6 +678,7 @@ bool DSMEPlatform::sendNow()
 {
     int res = ieee802154_radio_request_transmit(&_radio);
     DSME_ASSERT(res == 0);
+    pending_tx = true;
     return true;
 }
 
@@ -740,6 +743,9 @@ void DSMEPlatform::setReceiveDelegate(receive_delegate_t receiveDelegate)
 
 bool DSMEPlatform::startCCA()
 {
+    if (pending_tx) {
+        return false;
+    }
     if (IS_ACTIVE(USE_CAD)) {
         ieee802154_radio_request_cca(&_radio);
     }
