@@ -151,8 +151,13 @@ static void _tx_done_handler(event_t *ev)
     int res = ieee802154_radio_confirm_transmit(&_radio, NULL);
     pending_tx = false;
     DSME_ASSERT(res >= 0);
-    res = ieee802154_radio_set_rx(&_radio);
-    DSME_ASSERT(res == 0);
+
+    /* HACK */
+    if (dsme::DSMEPlatform::instance->isRxEnabledOnCap()) {
+        res = ieee802154_radio_set_rx(&_radio);
+        DSME_ASSERT(res == 0);
+    }
+
     if (wait_for_ack) {
         wait_for_ack = false;
         ieee802154_radio_set_frame_filter_mode(&_radio, IEEE802154_FILTER_ACK_ONLY);
@@ -182,8 +187,10 @@ void DSMEPlatform::handle_rx()
     if (len > 127 || len < 0) {
         puts("DROP");
         ieee802154_radio_read(&_radio, NULL, 127, NULL);
-        res = ieee802154_radio_set_rx(&_radio);
-        DSME_ASSERT(res == 0);
+        if (isRxEnabledOnCap()) {
+            res = ieee802154_radio_set_rx(&_radio);
+            DSME_ASSERT(res == 0);
+        }
         return;
     }
     res = message->loadBuffer(len);
@@ -194,8 +201,10 @@ void DSMEPlatform::handle_rx()
     if (res < 0) {
         puts(":(");
         message->releaseMessage();
-        res = ieee802154_radio_set_rx(&_radio);
-        DSME_ASSERT(res == 0);
+        if (isRxEnabledOnCap()) {
+            res = ieee802154_radio_set_rx(&_radio);
+            DSME_ASSERT(res == 0);
+        }
         return;
     }
     uint8_t *p = (uint8_t*) message->getPayload();
@@ -212,15 +221,19 @@ void DSMEPlatform::handle_rx()
     if (!success) {
         puts(":/");
         message->releaseMessage();
-        res = ieee802154_radio_set_rx(&_radio);
-        DSME_ASSERT(res == 0);
+        if (isRxEnabledOnCap()) {
+            res = ieee802154_radio_set_rx(&_radio);
+            DSME_ASSERT(res == 0);
+        }
         return;
     }
 
     message->dropHdr(message->getHeader().getSerializationLength());
 
-    res = ieee802154_radio_set_rx(&_radio);
-    DSME_ASSERT(res == 0);
+    if (isRxEnabledOnCap()) {
+        res = ieee802154_radio_set_rx(&_radio);
+        DSME_ASSERT(res == 0);
+    }
 
     getDSME().getAckLayer().receive(message);
 }
@@ -597,6 +610,11 @@ void DSMEPlatform::updateVisual()
     printf("[info];ASSOC;");
     if (isAssociated()) {
         printf("1");
+        /* HACK */
+        /* Only for CFP */
+        if (!IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && !this->mac_pib.macIsCoord) {
+            rx_on_cap = false;
+        }
     }
     else {
         printf("0");
@@ -766,6 +784,15 @@ void DSMEPlatform::turnTransceiverOff()
 {
     int res = ieee802154_radio_set_idle(&_radio, true);
     DSME_ASSERT(res == 0);
+}
+
+bool DSMEPlatform::isRxEnabledOnCap()
+{
+    if (rx_on_cap) {
+    }
+    else {
+    }
+    return rx_on_cap;
 }
 
 }

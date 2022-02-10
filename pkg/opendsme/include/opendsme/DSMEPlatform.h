@@ -118,6 +118,7 @@ public:
     void signalQueueLength(uint32_t length) override;
     void signalPacketsPerCAP(uint32_t packets) override;
     void signalFailedPacketsPerCAP(uint32_t packets) override;
+    bool isRxEnabledOnCap() override;
 
     static DSMEPlatform* instance;
 
@@ -169,6 +170,7 @@ protected:
     bool scanOrSyncInProgress{false};
     bool associationInProgress{false};
     bool syncActive{false};
+    bool rx_on_cap{true};
 
     receive_delegate_t receiveFromAckLayerDelegate;
 
