@@ -4,6 +4,8 @@
 #include "sx127x_internal.h"
 #include "sx127x_registers.h"
 
+#include "board.h"
+
 #define ENABLE_DEBUG 0
 #include "debug.h"
 
@@ -153,6 +155,7 @@ static int _read(ieee802154_dev_t *hal, void *buf, size_t max_size,
 static int _request_on(ieee802154_dev_t *hal)
 {
     sx127x_t *dev = hal->priv;
+    gpio_set(RADIO_TCXO_VCC_PIN);
     sx127x_set_standby(dev);
     return 0;
 }
@@ -177,6 +180,7 @@ static int _off(ieee802154_dev_t *hal)
 {
     sx127x_t *dev = hal->priv;
     sx127x_set_sleep(dev);
+    gpio_clear(RADIO_TCXO_VCC_PIN);
     return 0;
 }
 

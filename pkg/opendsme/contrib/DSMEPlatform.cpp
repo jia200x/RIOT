@@ -234,6 +234,11 @@ void DSMEPlatform::handle_rx()
         res = ieee802154_radio_set_rx(&_radio);
         DSME_ASSERT(res == 0);
     }
+    else {
+        /* HACK */
+        res = ieee802154_radio_off(&_radio);
+        DSME_ASSERT(res == 0);
+    }
 
     getDSME().getAckLayer().receive(message);
 }
