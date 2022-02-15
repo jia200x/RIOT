@@ -80,7 +80,7 @@ int main(void)
     int count = 0;
     while(true) {
         if (opendsme_is_associated()) {
-            if (count > 1)  {
+            if (count > 2)  {
                 pkt = gnrc_pktbuf_add(NULL, NULL, CONFIG_OPENDSME_PAYLOAD_LENGTH, GNRC_NETTYPE_UNDEF);
                 memset(pkt->data, 0, pkt->size);
                 uint8_t *p = pkt->data;
