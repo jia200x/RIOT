@@ -152,11 +152,8 @@ static void _tx_done_handler(event_t *ev)
     pending_tx = false;
     DSME_ASSERT(res >= 0);
 
-    /* HACK */
-    if (dsme::DSMEPlatform::instance->isRxEnabledOnCap()) {
-        res = ieee802154_radio_set_rx(&_radio);
-        DSME_ASSERT(res == 0);
-    }
+    res = ieee802154_radio_set_rx(&_radio);
+    DSME_ASSERT(res == 0);
 
     if (wait_for_ack) {
         wait_for_ack = false;
@@ -187,10 +184,8 @@ void DSMEPlatform::handle_rx()
     if (len > 127 || len < 0) {
         puts("DROP");
         ieee802154_radio_read(&_radio, NULL, 127, NULL);
-        if (isRxEnabledOnCap()) {
-            res = ieee802154_radio_set_rx(&_radio);
-            DSME_ASSERT(res == 0);
-        }
+        res = ieee802154_radio_set_rx(&_radio);
+        DSME_ASSERT(res == 0);
         return;
     }
     res = message->loadBuffer(len);
@@ -201,10 +196,8 @@ void DSMEPlatform::handle_rx()
     if (res < 0) {
         puts(":(");
         message->releaseMessage();
-        if (isRxEnabledOnCap()) {
-            res = ieee802154_radio_set_rx(&_radio);
-            DSME_ASSERT(res == 0);
-        }
+        res = ieee802154_radio_set_rx(&_radio);
+        DSME_ASSERT(res == 0);
         return;
     }
     uint8_t *p = (uint8_t*) message->getPayload();
@@ -221,24 +214,15 @@ void DSMEPlatform::handle_rx()
     if (!success) {
         puts(":/");
         message->releaseMessage();
-        if (isRxEnabledOnCap()) {
-            res = ieee802154_radio_set_rx(&_radio);
-            DSME_ASSERT(res == 0);
-        }
+        res = ieee802154_radio_set_rx(&_radio);
+        DSME_ASSERT(res == 0);
         return;
     }
 
     message->dropHdr(message->getHeader().getSerializationLength());
 
-    if (isRxEnabledOnCap()) {
-        res = ieee802154_radio_set_rx(&_radio);
-        DSME_ASSERT(res == 0);
-    }
-    else {
-        /* HACK */
-        res = ieee802154_radio_off(&_radio);
-        DSME_ASSERT(res == 0);
-    }
+    res = ieee802154_radio_set_rx(&_radio);
+    DSME_ASSERT(res == 0);
 
     getDSME().getAckLayer().receive(message);
 }
