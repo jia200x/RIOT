@@ -37,6 +37,10 @@
 #define NODE_ID 0x3031
 #endif
 
+#ifndef DEFAULT_COUNTER
+#define DEFAULT_COUNTER 5
+#endif
+
 gnrc_pktsnip_t *pkt;
 static uint16_t counter = 0;
 
@@ -64,7 +68,7 @@ int main(void)
 
     gnrc_netif_dsme_create(opendsme_get_netif(), dsme_stack, 2000, THREAD_PRIORITY_MAIN - 1,"dsme", NULL);
 
-    bool pan_coord = false;
+    bool pan_coord = COORD;
 
     gnrc_netapi_set(opendsme_get_netif()->pid, NETOPT_PAN_COORD, 0, &pan_coord, sizeof(pan_coord));
     gnrc_netapi_set(opendsme_get_netif()->pid, NETOPT_LINK, 0, NULL, 0);
@@ -72,7 +76,7 @@ int main(void)
     l2util_addr_from_str("30:30", (uint8_t*) &alloc.addr);
     alloc.tx = true;
     alloc.superframe_id = 0;
-    alloc.slot_id = 0;
+    alloc.slot_id = 2;
     alloc.channel_id = 0;
     gnrc_netapi_set(opendsme_get_netif()->pid, NETOPT_GTS_ALLOC, 0, &alloc, sizeof(alloc));
 
@@ -80,7 +84,10 @@ int main(void)
     int count = 0;
     while(true) {
         if (opendsme_is_associated()) {
-            if (count > 2)  {
+            if (count > DEFAULT_COUNTER)  {
+                if (!IS_USED(MODULE_STDIO_NULL)) {
+                    LED0_TOGGLE;
+                }
                 pkt = gnrc_pktbuf_add(NULL, NULL, CONFIG_OPENDSME_PAYLOAD_LENGTH, GNRC_NETTYPE_UNDEF);
                 memset(pkt->data, 0, pkt->size);
                 uint8_t *p = pkt->data;
