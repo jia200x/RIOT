@@ -64,6 +64,8 @@ static const struct {
     { "6lo", NETOPT_6LO },
     { "schc", NETOPT_SCHC },
     { "ack_req", NETOPT_ACK_REQ },
+    { "gts", NETOPT_GTS_TX },
+    { "pan_coord", NETOPT_PAN_COORD },
     { "autoack", NETOPT_AUTOACK },
     { "autocca", NETOPT_AUTOCCA },
     { "csma", NETOPT_CSMA },
