@@ -118,12 +118,20 @@ static void _power_off(void)
 
 static bool _l2filter(uint8_t *mhr)
 {
+    uint8_t src_addr[IEEE802154_LONG_ADDRESS_LEN];
     uint8_t dst_addr[IEEE802154_LONG_ADDRESS_LEN];
     le_uint16_t dst_pan;
+    le_uint16_t src_pan;
     uint8_t pan_bcast[] = IEEE802154_PANID_BCAST;
 
     int addr_len = ieee802154_get_dst(mhr, dst_addr, &dst_pan);
+    ieee802154_get_src(mhr, src_addr, &src_pan);
 
+    if ((mhr[0] & IEEE802154_FCF_TYPE_MASK) == IEEE802154_FCF_TYPE_BEACON) {
+        if ((memcmp(&nrf802154_pan_id, pan_bcast, 2) == 0)) {
+            return true;
+        }
+    }
     /* filter PAN ID */
     /* Will only work on little endian platform (all?) */
 
@@ -197,7 +205,7 @@ static int _request_op(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx)
     (void) dev;
 
     int res = -EBUSY;
-    int state;
+    int state = STATE_IDLE;
 
     switch (op) {
     case IEEE802154_HAL_OP_TRANSMIT:
@@ -265,6 +273,10 @@ static int _confirm_op(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx)
 
         state = STATE_IDLE;
         enable_shorts = true;
+        if (info) {
+            info->status = (_state == STATE_CCA_BUSY) ? TX_STATUS_MEDIUM_BUSY : TX_STATUS_SUCCESS;
+        }
+
         break;
     case IEEE802154_HAL_OP_SET_RX:
         eagain = (radio_state == RADIO_STATE_STATE_RxRu);
@@ -290,10 +302,6 @@ static int _confirm_op(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx)
     }
 
     _state = state;
-
-    if (info) {
-        info->status = (_state == STATE_CCA_BUSY) ? TX_STATUS_MEDIUM_BUSY : TX_STATUS_SUCCESS;
-    }
 
     if (enable_shorts) {
         NRF_RADIO->SHORTS = DEFAULT_SHORTS;
