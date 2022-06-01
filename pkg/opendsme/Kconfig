@@ -1,0 +1,31 @@
+# Copyright (c) 2022 HAW Hamburg
+#
+# This file is subject to the terms and conditions of the GNU Lesser
+# General Public License v2.1. See the file LICENSE in the top level
+# directory for more details.
+#
+
+menuconfig KCONFIG_USEPKG_OPENDSME
+    bool "Configure openDSME"
+    help
+        Configure openDSME using Kconfig.
+
+if KCONFIG_USEPKG_OPENDSME
+
+config OPENDSME_MAX_NEIGHBOURS
+    int "Maximum number of DSME neighbours"
+    default 20
+
+config OPENDSME_MAX_LOST_BEACONS
+    int "Maximum number of lost beacons before assuming the device desynchronized"
+    default 8
+
+config OPENDSME_CAP_QUEUE_SIZE
+    int "DSME CAP queue size (for CSMA/CA transmissions)"
+    default 8
+
+config OPENDSME_CFP_QUEUE_SIZE
+    int "DSME CFP queue size (for GTS transmissions)"
+    default 22
+
+endif # KCONFIG_USEPKG_OPENDSME
