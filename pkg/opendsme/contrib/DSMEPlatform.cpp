@@ -601,7 +601,7 @@ void DSMEPlatform::updateVisual()
         printf("1");
         /* HACK */
         /* Only for CFP */
-        if (!IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && !this->mac_pib.macIsCoord) {
+        if (!IS_ACTIVE(CONFIG_OPENDSME_USE_CAP) && IS_ACTIVE(CONFIG_DSME_PLATFORM_STATIC_GTS) && !this->mac_pib.macIsCoord) {
             rx_on_cap = false;
         }
     }
