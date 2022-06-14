@@ -428,7 +428,7 @@ void DSMEPlatform::initialize(bool pan_coord)
 
     this->mac_pib.macDSMEGTSExpirationTime = 16;
     this->mac_pib.macResponseWaitTime = 244;
-    this->mac_pib.macChannelDiversityMode = Channel_Diversity_Mode::CHANNEL_ADAPTATION;
+    this->mac_pib.macChannelDiversityMode = Channel_Diversity_Mode::CHANNEL_HOPPING;
 
     this->phy_pib.phyCurrentChannel = 12;
 		
