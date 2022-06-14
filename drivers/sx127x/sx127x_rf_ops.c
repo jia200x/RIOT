@@ -172,7 +172,12 @@ static int _config_phy(ieee802154_dev_t *hal, const ieee802154_phy_conf_t *conf)
     uint8_t channel = conf->channel;
     assert(channel >= 11 && channel <= 26);
 
-    sx127x_set_channel(dev, (channel-11)*200000LU + 865100000LU);
+    if (channel == 26) {
+        sx127x_set_channel(dev, 869525000LU);
+    }
+    else {
+        sx127x_set_channel(dev, (channel-11)*200000LU + 865500000LU);
+    }
     return 0;
 }
 
