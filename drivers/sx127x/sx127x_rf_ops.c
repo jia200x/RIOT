@@ -172,6 +172,9 @@ static int _config_phy(ieee802154_dev_t *hal, const ieee802154_phy_conf_t *conf)
     uint8_t channel = conf->channel;
     assert(channel >= 11 && channel <= 26);
 
+#if IS_ACTIVE(CONFIG_OPENDSME_LW_CHANNEL)
+    channel += 8;
+#endif
     if (channel == 26) {
         sx127x_set_channel(dev, 869525000LU);
     }

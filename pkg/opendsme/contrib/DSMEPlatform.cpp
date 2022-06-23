@@ -350,7 +350,11 @@ void DSMEPlatform::initialize(bool pan_coord)
     this->dsme.setMLME(&(this->mlme_sap));
 
     /* Initialize channels */
+#if IS_ACTIVE(CONFIG_OPENDSME_LW_CHANNEL)
+    constexpr uint8_t MAX_CHANNELS = 8;
+#else
     constexpr uint8_t MAX_CHANNELS = 16;
+#endif
     uint8_t channels[MAX_CHANNELS];
 
     uint8_t num = MAX_CHANNELS;
