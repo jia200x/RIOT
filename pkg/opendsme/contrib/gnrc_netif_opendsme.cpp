@@ -18,6 +18,12 @@
 #include "mac_services/DSME_Common.h"
 #include "net/gnrc/netif/hdr.h"
 
+#if IS_USED(MODULE_GNRC_IPV6_NIB)
+#include "net/gnrc/ipv6/nib.h"
+#include "net/gnrc/ipv6.h"
+#endif /* IS_USED(MODULE_GNRC_IPV6_NIB) */
+#include "board.h"
+
 dsme::DSMEPlatform m_dsme;
 
 extern "C" {
@@ -29,9 +35,14 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
      * user should not have control over it.
      * Given that, and the fact the current MAC does not communicate with
      * different PANs, we can always use the short address */
+    uint8_t bcast[2] = {0xFF, 0xFF};
     uint8_t *addr;
+    pkt = gnrc_pktbuf_start_write(pkt);
     gnrc_netif_hdr_t *hdr = (gnrc_netif_hdr_t*) pkt->data;
-    if (hdr->dst_l2addr_len == IEEE802154_LONG_ADDRESS_LEN) {
+    if (hdr->flags &= GNRC_NETIF_HDR_FLAGS_MULTICAST) {
+        addr = static_cast<uint8_t*>(&bcast[0]);
+    }
+    else if (hdr->dst_l2addr_len == IEEE802154_LONG_ADDRESS_LEN) {
         addr = gnrc_netif_hdr_get_dst_addr(hdr)
                + IEEE802154_LONG_ADDRESS_LEN
                - IEEE802154_SHORT_ADDRESS_LEN;
@@ -60,7 +71,10 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
 static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
 {
     gnrc_netif_acquire(netif);
-    int res;
+    int res = gnrc_netif_get_ipv6_common(netif, opt);
+    if (res != -ENOTSUP) {
+        return res;
+    }
     network_uint16_t addr;
     le_uint64_t ext_addr;
     uint8_t *addr_ptr = static_cast<uint8_t*>(ext_addr.u8);
@@ -92,6 +106,16 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
                                           ? NETOPT_ENABLE
                                           : NETOPT_DISABLE;
         return sizeof(netopt_enable_t);
+    case NETOPT_DEVICE_TYPE:
+        assert(opt->data_len == sizeof(uint16_t));
+        *((uint16_t *)opt->data) = NETDEV_TYPE_IEEE802154;
+        res = sizeof(uint16_t);
+        break;
+    case NETOPT_PROTO:
+        assert(opt->data_len == sizeof(gnrc_nettype_t));
+        *((gnrc_nettype_t *)opt->data) = GNRC_NETTYPE_SIXLOWPAN;
+        res = sizeof(gnrc_nettype_t);
+        break;
     default:
         res = -ENOTSUP;
         break;
@@ -102,11 +126,24 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
 
 static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
 {
-    int res;
+    network_uint16_t addr;
+    int res = gnrc_netif_set_ipv6_common(netif, opt);
+    if (res != -ENOTSUP) {
+        return res;
+    }
     switch (opt->opt) {
         case NETOPT_LINK:
             m_dsme.initialize(_pan_coord);
             m_dsme.start();
+            netif->flags |= GNRC_NETIF_FLAGS_HAS_L2ADDR;
+            netif->l2addr_len = 2;
+            netif->device_type = NETDEV_TYPE_IEEE802154;
+            m_dsme.getShortAddress(&addr);
+            memcpy(netif->l2addr, &addr, IEEE802154_SHORT_ADDRESS_LEN);
+            netif->cur_hl = CONFIG_GNRC_NETIF_DEFAULT_HL;
+            gnrc_netif_ipv6_init_mtu(netif);
+            gnrc_ipv6_nib_init_iface(netif);
+            res = sizeof(netopt_enable_t);
             break;
         case NETOPT_PAN_COORD:
             if (*((bool*)opt->data) == true) {
@@ -115,12 +152,14 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
             else {
                 _pan_coord = false;
             }
+            res = sizeof(netopt_enable_t);
             break;
 #if IS_ACTIVE(CONFIG_IEEE802154_DSME_STATIC_GTS)
         case NETOPT_GTS_ALLOC: {
-            dsme_alloc_t *alloc = (ieee802154_dsme_alloc_t*) opt->data;
+            ieee802154_dsme_alloc_t *alloc = (ieee802154_dsme_alloc_t*) opt->data;
             uint16_t _addr = byteorder_ntohs(alloc->addr);
             m_dsme.allocateGTS(alloc->superframe_id, alloc->slot_id, alloc->channel, alloc->tx ? dsme::Direction::TX : dsme::Direction::RX, address);
+            res = sizeof(ieee802154_dsme_alloc_t);
             break;
         }
 #endif
@@ -131,10 +170,15 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
         case NETOPT_GTS_TX:
             assert(opt->data_len == sizeof(netopt_enable_t));
             m_dsme.setGTSTransmission(*((netopt_enable_t*) opt->data) ? true : false);
+            res = sizeof(netopt_enable_t);
             break;
         case NETOPT_ACK_REQ:
             assert(opt->data_len == sizeof(netopt_enable_t));
             m_dsme.setAckReq(*((netopt_enable_t*) opt->data) ? true : false);
+            res = sizeof(netopt_enable_t);
+            break;
+        case NETOPT_SRC_LEN:
+            res = sizeof(uint16_t);
             break;
         default:
             assert(false);

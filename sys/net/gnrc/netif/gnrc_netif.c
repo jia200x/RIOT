@@ -168,11 +168,9 @@ gnrc_netif_t *gnrc_netif_get_by_type(netdev_type_t type, uint8_t index)
     return NULL;
 }
 
-int gnrc_netif_get_from_netdev(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
+int gnrc_netif_get_ipv6_common(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
 {
     int res = -ENOTSUP;
-
-    gnrc_netif_acquire(netif);
     switch (opt->opt) {
         case NETOPT_6LO:
             assert(opt->data_len == sizeof(netopt_enable_t));
@@ -299,6 +297,15 @@ int gnrc_netif_get_from_netdev(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
         default:
             break;
     }
+
+    return res;
+}
+
+int gnrc_netif_get_from_netdev(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
+{
+
+    gnrc_netif_acquire(netif);
+    int res = gnrc_netif_get_ipv6_common(netif, opt);
     if (res == -ENOTSUP) {
         res = netif->dev->driver->get(netif->dev, opt->opt, opt->data,
                                       opt->data_len);
@@ -307,12 +314,10 @@ int gnrc_netif_get_from_netdev(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
     return res;
 }
 
-int gnrc_netif_set_from_netdev(gnrc_netif_t *netif,
-                               const gnrc_netapi_opt_t *opt)
+int gnrc_netif_set_ipv6_common(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
 {
     int res = -ENOTSUP;
 
-    gnrc_netif_acquire(netif);
     switch (opt->opt) {
         case NETOPT_HOP_LIMIT:
             assert(opt->data_len == sizeof(uint8_t));
@@ -416,6 +421,16 @@ int gnrc_netif_set_from_netdev(gnrc_netif_t *netif,
         default:
             break;
     }
+
+    return res;
+}
+
+int gnrc_netif_set_from_netdev(gnrc_netif_t *netif,
+                               const gnrc_netapi_opt_t *opt)
+{
+    gnrc_netif_acquire(netif);
+    int res = gnrc_netif_set_ipv6_common(netif, opt);
+
     if (res == -ENOTSUP) {
         res = netif->dev->driver->set(netif->dev, opt->opt, opt->data,
                                       opt->data_len);

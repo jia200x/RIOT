@@ -30,7 +30,7 @@
 #include "net/gnrc/netif.h"
 #include "net/sixlowpan.h"
 
-#define ENABLE_DEBUG 0
+#define ENABLE_DEBUG 1
 #include "debug.h"
 
 static kernel_pid_t _pid = KERNEL_PID_UNDEF;

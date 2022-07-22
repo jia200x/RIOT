@@ -26,6 +26,7 @@
 
 #define ENABLE_DEBUG 0
 #include "debug.h"
+#include "board.h"
 
 /* Use default openDSME value for TPS scheduler alpha */
 #define OPENDSME_TPS_ALPHA (0.1)
@@ -33,6 +34,25 @@
 /* Used for symbol counter calculation */
 #define OPENDSME_TIMER_MASK   (0xF)
 #define OPENDSME_TIMER_OFFSET (4U)
+
+static uint8_t evs[64];
+static uint8_t counter;
+static int puta_la_wea;
+static void post(int line)
+{
+    counter = (counter + 1) % sizeof(evs);
+    evs[counter] = line;
+}
+
+static void dump()
+{
+    for (int i=counter;i>=0;i--) {
+        printf("%i\n", evs[i] );
+    }
+    for (int i=sizeof(evs)-1;i>counter;i--) {
+        printf("%i\n", evs[i] );
+    }
+}
 
 namespace dsme {
 
@@ -69,6 +89,7 @@ static void _acktimer_cb(void *arg)
 
 static void _timer_ev_handler(event_t *ev)
 {
+    LED1_TOGGLE;
     dsme::DSMEPlatform::instance->getDSME().getEventDispatcher().timerInterrupt();
 }
 
@@ -126,6 +147,7 @@ void DSMEPlatform::processCCAEvent()
 void DSMEPlatform::processTXDoneEvent()
 {
     int res = ieee802154_radio_confirm_transmit(this->radio, NULL);
+    puts("T");
     this->pending_tx = false;
     DSME_ASSERT(res >= 0);
 
@@ -146,11 +168,14 @@ void DSMEPlatform::processTXDoneEvent()
 void DSMEPlatform::processRxDone()
 {
     if (this->state != STATE_READY) {
+        printf("%i\n", this->state);
+        dump();
         assert(false);
         return;
     }
 
     DSMEMessage *message = getEmptyMessage();
+    message->netif = this->netif;
     message->setStartOfFrameDelimiterSymbolCounter(rx_sfd);
 
     int res;
@@ -193,16 +218,19 @@ void DSMEPlatform::processRxDone()
     DSME_ASSERT(res == 0);
 
     getDSME().getAckLayer().receive(message);
+    printf("R:%i\n",len);
 }
 
 void DSMEPlatform::offloadCCAEvent()
 {
     event_post(this->getEventQueue(), &this->cca_ev);
+    post(__LINE__);
 }
 
 void DSMEPlatform::offloadTXDoneEvent()
 {
     event_post(this->getEventQueue(), &this->tx_done_event);
+    post(__LINE__);
 }
 
 void DSMEPlatform::indicateRxStart()
@@ -213,20 +241,24 @@ void DSMEPlatform::indicateRxStart()
 void DSMEPlatform::offloadRXDoneEvent()
 {
     event_post(this->getEventQueue(), &this->rx_done_event);
+    post(__LINE__);
 }
 
 void DSMEPlatform::offloadTimerEvent()
 {
     event_post(this->getEventQueue(), &this->timer_event);
+    post(__LINE__);
 }
 
 void DSMEPlatform::offloadACKTimer()
 {
     event_post(this->getEventQueue(), &this->acktimer_ev);
+    post(__LINE__);
 }
 
 static void _timer_cb(void *arg)
 {
+    LED0_TOGGLE;
     dsme::DSMEPlatform::instance->offloadTimerEvent();
 }
 
@@ -253,6 +285,7 @@ void DSMEPlatform::sendFrame(uint16_t addr, iolist_t *pkt)
     message->getHeader().setSrcPANId(this->mac_pib.macPANId);
     message->getHeader().setDstPANId(this->mac_pib.macPANId);
 
+    puts("S");
     this->dsmeAdaptionLayer.sendMessage(message);
 }
 
@@ -447,6 +480,10 @@ void DSMEPlatform::handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Stat
     if (dataStatus == DataStatus::Data_Status::SUCCESS) {
         /* TODO: Add to statistics */
     }
+    else {
+        puts("ELFE");
+        printf("%i\n",dataStatus);
+    }
     IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
     releaseMessage(m);
 }
@@ -467,6 +504,7 @@ void DSMEPlatform::handleReceivedMessageFromAckLayer(IDSMEMessage* message)
     DSME_ASSERT(!this->message);
     this->message = message;
     event_post(this->getEventQueue(), &rx_offload_ev);
+    post(__LINE__);
 }
 
 DSMEMessage *DSMEPlatform::getEmptyMessage()
@@ -497,7 +535,7 @@ void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
     int32_t delta = ((symbolCounterValue - getSymbolCounter()) << OPENDSME_TIMER_OFFSET)
                     - offset;
 
-    ztimer_set(ZTIMER_USEC, &timer, (uint32_t) delta);
+    ztimer_set(ZTIMER_USEC, &timer, (uint32_t) delta - 1);
 }
 
 uint32_t DSMEPlatform::getSymbolCounter()
@@ -508,6 +546,7 @@ uint32_t DSMEPlatform::getSymbolCounter()
 void DSMEPlatform::scheduleStartOfCFP()
 {
     event_post(this->getEventQueue(), &start_of_cfp_ev);
+    post(__LINE__);
 }
 
 void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver)
@@ -604,6 +643,7 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
 
 bool DSMEPlatform::sendNow()
 {
+    puts("Z");
     int res = ieee802154_radio_request_transmit(this->radio);
     DSME_ASSERT(res == 0);
     this->pending_tx = true;
@@ -614,6 +654,8 @@ void DSMEPlatform::abortPreparedTransmission()
 {
      /* Nothing to do here, since the Radio HAL will drop the frame if
       * the write function is called again */
+    this->setPlatformState(DSMEPlatform::STATE_READY);
+    printf("PUTA LA WEA: %i\n",puta_la_wea++);
 }
 
 bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMsg, Delegate<void(bool)> txEndCallback)

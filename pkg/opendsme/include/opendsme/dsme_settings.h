@@ -35,7 +35,7 @@ constexpr uint8_t macSIFSPeriod = 12; /* fixed value, see 8.1.3 of IEEE 802.15.4
 constexpr uint8_t macLIFSPeriod = 40; /* fixed value, see 8.1.3 of IEEE 802.15.4-2011 (assuming no UWB PHY) */
 }
 
-constexpr uint8_t PRE_EVENT_SHIFT = const_redefines::macLIFSPeriod;
+constexpr uint8_t PRE_EVENT_SHIFT = const_redefines::macLIFSPeriod+20;
 constexpr uint8_t MIN_CSMA_SLOTS = 0; /* 0 for CAP reduction */
 constexpr uint8_t MAX_GTSLOTS = const_redefines::aNumSuperframeSlots - MIN_CSMA_SLOTS - 1;
 constexpr uint8_t MAX_CHANNELS = 16;
@@ -46,8 +46,8 @@ constexpr uint8_t MAX_NEIGHBORS = CONFIG_OPENDSME_MAX_NEIGHBOURS;
 constexpr uint16_t MAC_DEFAULT_NWK_ID = CONFIG_IEEE802154_DEFAULT_PANID;
 
 constexpr uint8_t MIN_SO = CONFIG_IEEE802154_DSME_SUPERFRAME_ORDER;
-constexpr uint8_t MAX_BO = CONFIG_IEEE802154_DSME_MULTISUPERFRAME_ORDER;
-constexpr uint8_t MAX_MO = CONFIG_IEEE802154_DSME_BEACON_ORDER;
+constexpr uint8_t MAX_BO = CONFIG_IEEE802154_DSME_BEACON_ORDER;
+constexpr uint8_t MAX_MO = CONFIG_IEEE802154_DSME_MULTISUPERFRAME_ORDER;
 constexpr uint16_t MAX_SLOTS_PER_SUPERFRAMES = 1 << (uint16_t)(MAX_BO - MIN_SO);
 constexpr uint16_t MAX_TOTAL_SUPERFRAMES = 1 << (uint16_t)(MAX_BO - MIN_SO);
 constexpr uint16_t MAX_SUPERFRAMES_PER_MULTI_SUPERFRAME = 1 << (uint16_t)(MAX_MO - MIN_SO);

@@ -211,6 +211,8 @@ private:
     /* number of retransmission attempts */
     uint8_t retryCounter;
 
+    gnrc_netif_t *netif;
+
     /* declare related classes as friends */
     friend class DSMEPlatform;
     friend class DSMEMessageElement;
