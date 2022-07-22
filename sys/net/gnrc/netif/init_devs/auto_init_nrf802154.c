@@ -56,21 +56,20 @@ void auto_init_nrf802154(void)
     netdev_register(&nrf802154_netdev.dev.netdev, NETDEV_NRF802154, 0);
 
     nrf802154_init();
-    if(IS_ACTIVE(MODULE_OPENDSME)) {
+#if IS_USED(MODULE_OPENDSME)
         nrf802154_hal_setup(&nrf802154_netdev.submac.dev);
         /* TODO: HAAAACK */
         gnrc_netif_opendsme_create(&_netif, _stack,
                                  NRF802154_MAC_STACKSIZE,
                                  NRF802154_MAC_PRIO, "nrf802154",
                                  (netdev_t*) &nrf802154_netdev.submac.dev);
-    }
-    else {
+#else
         netdev_ieee802154_submac_init(&nrf802154_netdev);
         nrf802154_hal_setup(&nrf802154_netdev.submac.dev);
         gnrc_netif_ieee802154_create(&_netif, _stack,
                                  NRF802154_MAC_STACKSIZE,
                                  NRF802154_MAC_PRIO, "nrf802154",
                                  &nrf802154_netdev.dev.netdev);
-    }
+#endif
 }
 /** @} */

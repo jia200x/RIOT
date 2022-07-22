@@ -82,6 +82,26 @@ DEVELHELP ?= 1
 # Change this to 0 show compiler invocation lines by default:
 QUIET ?= 1
 
+USEMODULE += ps
+USEMODULE += shell
+USEMODULE += shell_commands
+
+USEPKG += opendsme
+USEMODULE += auto_init_gnrc_netif
+USEMODULE += gnrc_pktbuf_malloc
+USEMODULE += l2util
+USEMODULE += gnrc_pktdump
+USEMODULE += gnrc_txtsnd
+USEMODULE += netopt
+
+USEMODULE += netdev_default
+CFLAGS += -DCONFIG_IEEE802154_CCA_THRESH_DEFAULT=-30
+
+# RIOT Configs
+CFLAGS += -DDEBUG_ASSERT_VERBOSE
+
+CFLAGS += -DISR_STACKSIZE=1024
+
 # Ethos/native TAP interface and UHCP prefix can be configured from make command
 TAP ?= tap0
 ifneq (,$(filter dhcpv6 auto_subnets,$(PREFIX_CONF)))

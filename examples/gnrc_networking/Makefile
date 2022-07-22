@@ -2,7 +2,7 @@
 APPLICATION = gnrc_networking
 
 # If no BOARD is found in the environment, use this default:
-BOARD ?= native
+BOARD ?= nrf52840dk
 
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
@@ -43,6 +43,36 @@ DEVELHELP ?= 1
 # Instead of simulating an Ethernet connection, we can also simulate
 # an IEEE 802.15.4 radio using ZEP
 USE_ZEP ?= 0
+
+USEMODULE += ps
+USEMODULE += shell
+USEMODULE += shell_commands
+
+USEPKG += opendsme
+USEMODULE += auto_init_gnrc_netif
+#USEMODULE += gnrc_pktbuf_malloc
+USEMODULE += l2util
+USEMODULE += gnrc_pktdump
+USEMODULE += gnrc_txtsnd
+USEMODULE += netopt
+USEMODULE += event_thread_lowest
+
+USEMODULE += netdev_default
+USEMODULE += gnrc_pktbuf_cmd
+
+CFLAGS += -DCONFIG_IEEE802154_DSME_SUPERFRAME_ORDER=10
+CFLAGS += -DCONFIG_IEEE802154_DSME_MULTISUPERFRAME_ORDER=10
+CFLAGS += -DCONFIG_IEEE802154_DSME_BEACON_ORDER=10
+CFLAGS += -DCONFIG_IEEE802154_DEFAULT_CSMA_CA_MIN_BE=7
+CFLAGS += -DCONFIG_IEEE802154_DEFAULT_CSMA_CA_MAX_BE=8
+CFLAGS += -DCONFIG_IEEE802154_CCA_THRESH_DEFAULT=-30
+export PKG_SOURCE_LOCAL_OPENDSME=/home/jialamos/Development/opendsme
+#CFLAGS += -DSTATISTICS_MONITOR_LATENESS
+
+# RIOT Configs
+CFLAGS += -DDEBUG_ASSERT_VERBOSE
+
+CFLAGS += -DISR_STACKSIZE=1024
 
 # set the ZEP port for native
 ZEP_PORT_BASE ?= 17754
