@@ -36,6 +36,31 @@
 #include "socket_zep_params.h"
 #endif
 
+#ifdef MODULE_KW2XRF
+#include "kw2xrf.h"
+#include "kw2xrf_params.h"
+#include "event/thread.h"
+#define KW2XRF_NUM   ARRAY_SIZE(kw2xrf_params)
+extern void auto_init_event_thread(void);
+static kw2xrf_t kw2xrf_dev[KW2XRF_NUM];
+
+struct kw2xrf_bh_ctx {
+    event_t event;
+    ieee802154_dev_t *hal;
+} kw2xrf_ctx[KW2XRF_NUM];
+
+static void kw2xrf_irq_cb(void *ctx) {
+    struct kw2xrf_bh_ctx *c = (struct kw2xrf_bh_ctx*) ctx;
+    /* calls the below kw2xrf_irq_event_handler from the the event thread */
+    event_post(EVENT_PRIO_HIGHEST, &c->event);
+}
+
+static void kw2xrf_irq_event_handler(event_t *evt) {
+    struct kw2xrf_bh_ctx *ctx = container_of(evt, struct kw2xrf_bh_ctx, event);
+    kw2xrf_radio_hal_irq_handler(ctx->hal);
+}
+#endif
+
 void ieee802154_hal_test_init_devs(ieee802154_dev_cb_t cb, void *opaque)
 {
     /* Call the init function of the device (this should be handled by
@@ -53,6 +78,20 @@ void ieee802154_hal_test_init_devs(ieee802154_dev_cb_t cb, void *opaque)
     if ((radio = cb(IEEE802154_DEV_TYPE_NRF802154, opaque)) ){
         nrf802154_hal_setup(radio);
         nrf802154_init();
+    }
+#endif
+
+#ifdef MODULE_KW2XRF
+    auto_init_event_thread();
+    if ((radio = cb(IEEE802154_DEV_TYPE_NRF802154, opaque)) ){
+        for (unsigned i = 0; i < KW2XRF_NUM; i++) {
+            const kw2xrf_params_t *p = &kw2xrf_params[i];
+            kw2xrf_ctx[i].event.handler = kw2xrf_irq_event_handler;
+            kw2xrf_ctx[i].hal = radio;
+            kw2xrf_init(&kw2xrf_dev[i], p, radio,
+                            kw2xrf_irq_cb, &kw2xrf_ctx[i]);
+            break;
+        }
     }
 #endif
 
