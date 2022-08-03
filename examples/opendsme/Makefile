@@ -66,6 +66,4 @@ CFLAGS += -DMAXTHREADS=4 -DSCHED_PRIO_LEVELS=4
 CFLAGS += -DSHELL_NO_ECHO=1
 CFLAGS += -DSHELL_NO_PROMPT=1
 
-export PKG_SOURCE_LOCAL_OPENDSME = /home/jialamos/Development/opendsme
-
 include $(RIOTBASE)/Makefile.include
