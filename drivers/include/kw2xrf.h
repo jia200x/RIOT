@@ -33,6 +33,7 @@
 #include "net/gnrc/nettype.h"
 #include "thread.h"
 #include "net/ieee802154/radio.h"
+#include "bhp.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -156,14 +157,14 @@ void kw2xrf_setup(kw2xrf_t *dev, const kw2xrf_params_t *params, uint8_t index);
  * @param[out] dev          device descriptor
  * @param[in]  params       parameters for device initialization
  * @param[in]  hal          pointer to IEEE 802.15.4 Radio HAL descriptor
- * @param[in]  isr_cb       isr callback
- * @param[in]  cb_ctx       private context pointer handed to isr_cb
+ * @param[in]  cb           isr callback
+ * @param[in]  ctx          context pointer handed to isr
  *
  * @return                  0 on success
  * @return                  <0 on error
  */
 int kw2xrf_init(kw2xrf_t *dev, const kw2xrf_params_t *params, ieee802154_dev_t *hal,
-                gpio_cb_t isr_cb, void *cb_ctx);
+                gpio_cb_t cb, void *ctx);
 
 /**
  * @brief   Configure radio with default values
@@ -177,7 +178,7 @@ void kw2xrf_reset_phy(kw2xrf_t *dev);
  *
  * @param[in] dev           pointer to the IEEE 802.15.4 Radio HAL descriptor
  */
-void kw2xrf_radio_hal_irq_handler(ieee802154_dev_t *dev);
+void kw2xrf_radio_hal_irq_handler(void *dev);
 
 #ifdef __cplusplus
 }

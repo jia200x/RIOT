@@ -150,8 +150,9 @@ static void _start_tx(kw2xrf_t *kw_dev)
     kw2xrf_write_dreg(kw_dev, MKW2XDM_PHY_CTRL1, pctl1);
 }
 
-void kw2xrf_radio_hal_irq_handler(ieee802154_dev_t *dev)
+void kw2xrf_radio_hal_irq_handler(void *arg)
 {
+    ieee802154_dev_t *dev = arg;
     kw2xrf_t *kw_dev = dev->priv;
     kw2xrf_mask_irq_b(kw_dev);
 
@@ -290,7 +291,7 @@ void kw2xrf_radio_hal_irq_handler(ieee802154_dev_t *dev)
 }
 
 int kw2xrf_init(kw2xrf_t *dev, const kw2xrf_params_t *params, ieee802154_dev_t *hal,
-                     gpio_cb_t isr_cb, void *cb_ctx)
+                     gpio_cb_t cb, void *ctx)
 {
     /* initialize device descriptor */
     dev->params = params;
@@ -314,7 +315,7 @@ int kw2xrf_init(kw2xrf_t *dev, const kw2xrf_params_t *params, ieee802154_dev_t *
     kw2xrf_disable_interrupts(dev);
 
     /* set up GPIO-pin used for IRQ */
-    gpio_init_int(dev->params->int_pin, GPIO_IN, GPIO_FALLING, isr_cb, cb_ctx);
+    gpio_init_int(dev->params->int_pin, GPIO_IN, GPIO_FALLING, cb, ctx);
 
     kw2xrf_abort_sequence(dev);
     kw2xrf_update_overwrites(dev);
