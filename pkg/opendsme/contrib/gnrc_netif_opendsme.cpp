@@ -73,6 +73,7 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
     gnrc_netif_acquire(netif);
     int res = gnrc_netif_get_ipv6_common(netif, opt);
     if (res != -ENOTSUP) {
+        gnrc_netif_release(netif);
         return res;
     }
     network_uint16_t addr;
@@ -80,7 +81,7 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
     uint8_t *addr_ptr = static_cast<uint8_t*>(ext_addr.u8);
     switch (opt->opt) {
     case NETOPT_MAX_PDU_SIZE:
-        *((uint16_t *)opt->data) = IEEE802154_FRAME_LEN_MAX;
+        *((uint16_t *)opt->data) = IEEE802154_FRAME_LEN_MAX - IEEE802154_MAX_HDR_LEN;
         res = sizeof(uint16_t);
         break;
     case NETOPT_ADDR_LEN:
@@ -105,7 +106,8 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
         *((netopt_enable_t*) opt->data) = m_dsme.isAssociated() 
                                           ? NETOPT_ENABLE
                                           : NETOPT_DISABLE;
-        return sizeof(netopt_enable_t);
+        res = sizeof(netopt_enable_t);
+        break;
     case NETOPT_DEVICE_TYPE:
         assert(opt->data_len == sizeof(uint16_t));
         *((uint16_t *)opt->data) = NETDEV_TYPE_IEEE802154;
@@ -121,14 +123,17 @@ static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt)
         break;
     }
 
+    gnrc_netif_release(netif);
     return res;
 }
 
 static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
 {
     network_uint16_t addr;
+    gnrc_netif_acquire(netif);
     int res = gnrc_netif_set_ipv6_common(netif, opt);
     if (res != -ENOTSUP) {
+        gnrc_netif_release(netif);
         return res;
     }
     switch (opt->opt) {
@@ -184,6 +189,7 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
             assert(false);
             break;
     }
+    gnrc_netif_release(netif);
     return res;
 }
 
