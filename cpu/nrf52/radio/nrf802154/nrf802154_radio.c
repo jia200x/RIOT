@@ -160,7 +160,6 @@ static int _write(ieee802154_dev_t *dev, const iolist_t *iolist)
 
     assert(iolist);
 
-    puts("W");
     /* copy packet data into the transmit buffer */
     unsigned int len = 0;
 
@@ -207,7 +206,6 @@ static int _request_op(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx)
 
     int res = -EBUSY;
     int state = STATE_IDLE;
-    puts("Q");
 
     switch (op) {
     case IEEE802154_HAL_OP_TRANSMIT:
@@ -217,7 +215,6 @@ static int _request_op(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx)
         NRF_RADIO->SHORTS = cfg.cca_send ? CCA_SHORTS : DEFAULT_SHORTS;
         NRF_RADIO->TASKS_TXEN = 1;
         state = STATE_TX;
-        puts("X");
         break;
     case IEEE802154_HAL_OP_SET_RX:
         if (_state != STATE_IDLE && _state != STATE_RX) {
@@ -228,7 +225,6 @@ static int _request_op(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx)
         NRF_RADIO->PACKETPTR = (uint32_t) rxbuf;
         NRF_RADIO->SHORTS = DEFAULT_SHORTS;
         NRF_RADIO->TASKS_RXEN = 1;
-        puts("R");
         break;
     case IEEE802154_HAL_OP_SET_IDLE: {
         assert(ctx);
@@ -240,7 +236,6 @@ static int _request_op(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx)
         NRF_RADIO->SHORTS = DEFAULT_SHORTS;
         NRF_RADIO->PACKETPTR = (uint32_t) txbuf;
         state = STATE_IDLE;
-        puts("I");
         break;
     }
     case IEEE802154_HAL_OP_CCA:
@@ -281,15 +276,12 @@ static int _confirm_op(ieee802154_dev_t *dev, ieee802154_hal_op_t op, void *ctx)
         if (info) {
             info->status = (_state == STATE_CCA_BUSY) ? TX_STATUS_MEDIUM_BUSY : TX_STATUS_SUCCESS;
         }
-        puts("EX");
 
         break;
     case IEEE802154_HAL_OP_SET_RX:
-        puts("ER");
         eagain = (radio_state == RADIO_STATE_STATE_RxRu);
         break;
     case IEEE802154_HAL_OP_SET_IDLE:
-        puts ("EI");
         eagain = (radio_state == RADIO_STATE_STATE_TxDisable ||
                   radio_state == RADIO_STATE_STATE_RxDisable);
         break;
@@ -655,8 +647,7 @@ static int _config_phy(ieee802154_dev_t *dev, const ieee802154_phy_conf_t *conf)
      * and all channels have a bandwidth of 5 MHz. Thus, we subtract 10 to the
      * channel number and multiply by 5 to calculate the offset.
      */
-    //NRF_RADIO->FREQUENCY = (((uint8_t) conf->channel) - 10) * 5;
-    NRF_RADIO->FREQUENCY = 16 * 5;
+    NRF_RADIO->FREQUENCY = (((uint8_t) conf->channel) - 10) * 5;
 
     DEBUG("[nrf802154] setting channel to %i\n", conf->channel);
     DEBUG("[nrf802154] setting TX power to %i\n", conf->pow);
