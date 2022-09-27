@@ -5,5 +5,7 @@ FEATURES_OPTIONAL += periph_spi_gpio_mode
 USEMODULE += iolist
 USEMODULE += netdev_legacy_api
 USEMODULE += ztimer_msec
+USEMODULE += checksum
+USEMODULE += event_callback
 
 USEMODULE += lora

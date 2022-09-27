@@ -87,6 +87,8 @@ public:
     /* Get short address */
     void getShortAddress(network_uint16_t *addr);
 
+    void getExtendedAddress(uint8_t *addr);
+
     /* Set GTS or CAP transmission */
     void setGTSTransmission(bool gts);
 
