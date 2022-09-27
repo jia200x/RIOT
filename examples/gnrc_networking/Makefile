@@ -9,7 +9,7 @@ RIOTBASE ?= $(CURDIR)/../..
 
 # Include packages that pull up and auto-init the link layer.
 # NOTE: 6LoWPAN will be included if IEEE802.15.4 devices are present
-USEMODULE += netdev_default
+#USEMODULE += netdev_default
 USEMODULE += auto_init_gnrc_netif
 # Activate ICMPv6 error messages
 USEMODULE += gnrc_icmpv6_error
@@ -28,6 +28,7 @@ USEMODULE += ps
 USEMODULE += netstats_l2
 USEMODULE += netstats_ipv6
 USEMODULE += netstats_rpl
+USEMODULE += netdev_ieee802154
 
 # Optionally include DNS support. This includes resolution of names at an
 # upstream DNS server and the handling of RDNSS options in Router Advertisements
@@ -57,9 +58,10 @@ USEMODULE += gnrc_txtsnd
 USEMODULE += netopt
 USEMODULE += event_thread_lowest
 
-USEMODULE += netdev_default
+#USEMODULE += netdev_default
 USEMODULE += gnrc_pktbuf_cmd
 USEMODULE += iolist
+USEMODULE += sx1276
 
 #CFLAGS += -DCONFIG_IEEE802154_DSME_SUPERFRAME_ORDER=10
 #CFLAGS += -DCONFIG_IEEE802154_DSME_MULTISUPERFRAME_ORDER=10
@@ -69,6 +71,7 @@ CFLAGS += -DCONFIG_IEEE802154_DEFAULT_CSMA_CA_MAX_BE=5
 CFLAGS += -DCONFIG_IEEE802154_CCA_THRESH_DEFAULT=-40
 CFLAGS += -DCONFIG_IEEE802154_DSME_GTS_EXPIRATION=255
 export PKG_SOURCE_LOCAL_OPENDSME=/home/jialamos/Development/opendsme
+
 #CFLAGS += -DSTATISTICS_MONITOR_LATENESS
 
 # RIOT Configs

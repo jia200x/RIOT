@@ -65,6 +65,9 @@
 #include "net/netdev.h"
 #include "periph/gpio.h"
 #include "periph/spi.h"
+#include "net/ieee802154/radio.h"
+#include "event.h"
+#include "event/callback.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -244,6 +247,9 @@ typedef struct {
     sx127x_params_t params;             /**< Device driver parameters */
     sx127x_internal_t _internal;        /**< Internal sx127x data used within the driver */
     sx127x_flags_t irq;                 /**< Device IRQ flags */
+    bool cad_detected;
+    event_callback_t evc;
+    event_queue_t *evq;
 } sx127x_t;
 
 /**
@@ -259,14 +265,7 @@ typedef void (sx127x_dio_irq_handler_t)(sx127x_t *dev);
  * @param[in] index                    Index of @p params in a global parameter struct array.
  *                                     If initialized manually, pass a unique identifier instead.
  */
-void sx127x_setup(sx127x_t *dev, const sx127x_params_t *params, uint8_t index);
-
-/**
- * @brief   Resets the SX127X
- *
- * @param[in] dev                      The sx127x device descriptor
- */
-int sx127x_reset(const sx127x_t *dev);
+int sx127x_setup(sx127x_t *dev, const sx127x_params_t *params, ieee802154_dev_t *hal, event_queue_t *evq);
 
 /**
  * @brief   Initializes the transceiver.
@@ -275,7 +274,14 @@ int sx127x_reset(const sx127x_t *dev);
  *
  * @return result of initialization
  */
-int sx127x_init(sx127x_t *dev);
+int sx127x_init(sx127x_t *dev, ieee802154_dev_t *hal);
+
+/**
+ * @brief   Resets the SX127X
+ *
+ * @param[in] dev                      The sx127x device descriptor
+ */
+int sx127x_reset(const sx127x_t *dev);
 
 /**
  * @brief   Initialize radio settings with default values
@@ -679,6 +685,8 @@ void sx127x_set_iq_invert(sx127x_t *dev, bool iq_invert);
  * @param[in] freq_hop_on              The LoRa frequency hopping mode
  */
 void sx127x_set_freq_hop(sx127x_t *dev, bool freq_hop_on);
+
+void sx127x_isr(void *arg);
 
 #ifdef __cplusplus
 }

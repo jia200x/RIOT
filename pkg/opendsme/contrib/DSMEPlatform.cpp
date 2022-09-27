@@ -32,8 +32,9 @@
 #define OPENDSME_TPS_ALPHA (0.1)
 
 /* Used for symbol counter calculation */
-#define OPENDSME_TIMER_MASK   (0xF)
-#define OPENDSME_TIMER_OFFSET (4U)
+#define OPENDSME_TIMER        (ZTIMER_MSEC)
+#define OPENDSME_TIMER_MASK   (0)
+#define OPENDSME_TIMER_OFFSET (0)
 
 static void handler_event_data(event_t *event)
 {
@@ -542,6 +543,11 @@ void DSMEPlatform::start()
     this->dsmeAdaptionLayer.startAssociation();
 }
 
+void DSMEPlatform::getExtendedAddress(uint8_t* addr)
+{
+    addr << this->mac_pib.macExtendedAddress;
+}
+
 void DSMEPlatform::getShortAddress(network_uint16_t *addr)
 {
     addr->u8[0] = this->mac_pib.macExtendedAddress.getShortAddress() >> 8;
@@ -622,12 +628,12 @@ void DSMEPlatform::startTimer(uint32_t symbolCounterValue)
     int32_t delta = ((symbolCounterValue - getSymbolCounter()) << OPENDSME_TIMER_OFFSET)
                     - offset;
 
-    ztimer_set(ZTIMER_USEC, &timer, (uint32_t) delta - 1);
+    ztimer_set(OPENDSME_TIMER, &timer, (uint32_t) delta);
 }
 
 uint32_t DSMEPlatform::getSymbolCounter()
 {
-    return ztimer_now(ZTIMER_USEC) >> OPENDSME_TIMER_OFFSET;
+    return ztimer_now(OPENDSME_TIMER) >> OPENDSME_TIMER_OFFSET;
 }
 
 void DSMEPlatform::scheduleStartOfCFP()
