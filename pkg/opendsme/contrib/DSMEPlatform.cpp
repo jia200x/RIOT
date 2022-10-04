@@ -343,15 +343,19 @@ static void _timer_cb(void *arg)
 
 void DSMEPlatform::sendFrame(uint16_t addr, iolist_t *pkt)
 {
-    /* First 2 bytes are the ID */
-    if(!this->mac_pib.macAssociatedPANCoord) {
+    DSMEMessage* message = getEmptyMessage();
+    if (message->loadBuffer(pkt) < 0) {
+        /* If this function fails it means pkt was NULL. Then there's nothing
+         * to release */
         return;
     }
 
-    DSMEMessage* message = getEmptyMessage();
-    if (message->loadBuffer(pkt) < 0) {
+    if(!this->mac_pib.macAssociatedPANCoord) {
+        IDSMEMessage *m = static_cast<IDSMEMessage*>(message);
+        releaseMessage(m);
         return;
     }
+
 
     IEEE802154MacAddress dst;
     dst.setShortAddress(addr);
