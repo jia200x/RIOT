@@ -38,7 +38,7 @@
  */
 #define SX126X_STACKSIZE            (THREAD_STACKSIZE_DEFAULT)
 #ifndef SX126X_PRIO
-#define SX126X_PRIO                 (GNRC_NETIF_PRIO)
+#define SX126X_PRIO                 (GNRC_NETIF_PRIO-1)
 #endif
 
 /**
