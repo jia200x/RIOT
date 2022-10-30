@@ -140,7 +140,7 @@ config GCOAP_RECV_TIMEOUT
         Time, expressed in microseconds, that the event loop waits for an
         incoming CoAP message.
 
-config GCOAP_NON_TIMEOUT
+config GCOAP_NON_TIMEOUT_MSEC
     int "Non-confirmable response timeout"
     default 5000000
     help

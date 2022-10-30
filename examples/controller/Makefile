@@ -32,6 +32,7 @@ USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += ps
 USEMODULE += netdev_ieee802154
+USEMODULE += event_thread
 
 # Optionally include RPL as a routing protocol. When includede gnrc_uhcpc will
 # configure the node as a RPL DODAG root when receiving a prefix.
@@ -82,8 +83,9 @@ export PKG_SOURCE_LOCAL_OPENDSME=/home/jialamos/Development/opendsme
 
 #USEMODULE += netdev_default
 CFLAGS += -DCONFIG_IEEE802154_CCA_THRESH_DEFAULT=-30
-#CFLAGS += -DCONFIG_IEEE802154_DSME_MULTISUPERFRAME_ORDER=2
-#CFLAGS += -DCONFIG_IEEE802154_DSME_SUPERFRAME_ORDER=2
+CFLAGS += -DCONFIG_IEEE802154_DSME_MULTISUPERFRAME_ORDER=2
+CFLAGS += -DCONFIG_IEEE802154_DSME_SUPERFRAME_ORDER=2
+CFLAGS += -DCONFIG_IEEE802154_DSME_STATIC_GTS=1
 
 # RIOT Configs
 CFLAGS += -DDEBUG_ASSERT_VERBOSE

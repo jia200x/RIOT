@@ -163,7 +163,9 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
         case NETOPT_GTS_ALLOC: {
             ieee802154_dsme_alloc_t *alloc = (ieee802154_dsme_alloc_t*) opt->data;
             uint16_t _addr = byteorder_ntohs(alloc->addr);
-            m_dsme.allocateGTS(alloc->superframe_id, alloc->slot_id, alloc->channel, alloc->tx ? dsme::Direction::TX : dsme::Direction::RX, address);
+            /* WARNING: num_slots is only considered if using Negotiation!
+             * (see setNegotiateChannels)*/
+            m_dsme.allocateGTS(alloc->superframe_id, alloc->slot_id, alloc->channel_id, alloc->tx ? dsme::Direction::TX : dsme::Direction::RX, _addr, alloc->num_slots);
             res = sizeof(ieee802154_dsme_alloc_t);
             break;
         }
