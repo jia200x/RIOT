@@ -44,7 +44,7 @@
 
 #include "net/gcoap/forward_proxy.h"
 
-#define ENABLE_DEBUG 0
+#define ENABLE_DEBUG 1
 #include "debug.h"
 
 /* Sentinel value indicating that no immediate response is required */

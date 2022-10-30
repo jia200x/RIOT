@@ -71,6 +71,7 @@ typedef struct {
     uint8_t slot_id;        /* slot ID */
     uint8_t channel_id;     /* channel ID */
     bool tx;                /* whether the GTS is TX */
+    uint8_t num_slots;      /* number of slots to negotiate */
 } ieee802154_dsme_alloc_t;
 
 /**

@@ -36,6 +36,8 @@
 #define OPENDSME_TIMER_MASK   (0)
 #define OPENDSME_TIMER_OFFSET (0)
 
+static int mcps_err;
+
 static void handler_event_data(event_t *event)
 {
     puts("RX DATA!");
@@ -43,12 +45,13 @@ static void handler_event_data(event_t *event)
 
 static void handler_event_data_ok(event_t *event)
 {
-    puts("SUCCESS!");
+    puts("TX;SUCCESS");
 }
 
 static void handler_event_data_fail(event_t *event)
 {
-    puts("FAIL!");
+    puts("TX;FAIL");
+    printf("Data status: %i", mcps_err);
 }
 
 static void handler_event_tx_data(event_t *event)
@@ -241,9 +244,10 @@ void DSMEPlatform::processTXDoneEvent()
 void DSMEPlatform::processRxDone()
 {
     if (this->state != STATE_READY) {
-        printf("%i\n", this->state);
-        dump();
-        assert(false);
+        //printf("%i\n", this->state);
+        //dump();
+        ieee802154_radio_read(this->radio, NULL, 127, NULL);
+        //assert(false);
         return;
     }
 
@@ -275,6 +279,13 @@ void DSMEPlatform::processRxDone()
         DSME_ASSERT(res == 0);
         return;
     }
+
+    uint8_t *p = (uint8_t*) message->getPayload();
+    printf("RECV: ");
+    for (unsigned i=0;i<res;i++) {
+        printf("%02x ", p[i]);
+    }
+    printf("\n");
 
     message->messageLQI = info.lqi;
     message->messageRSSI = info.rssi;
@@ -512,7 +523,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     scanChannels.add(CONFIG_IEEE802154_DEFAULT_CHANNEL);
     if (IS_ACTIVE(CONFIG_IEEE802154_DSME_STATIC_GTS)) {
         StaticScheduling* staticScheduling = new StaticScheduling(this->dsmeAdaptionLayer);
-        staticScheduling->setNegotiateChannels(false);
+        staticScheduling->setNegotiateChannels(true);
         scheduling = staticScheduling;
     }
     else {
@@ -527,9 +538,9 @@ void DSMEPlatform::initialize(bool pan_coord)
 }
 
 #if IS_ACTIVE(CONFIG_IEEE802154_DSME_STATIC_GTS)
-void DSMEPlatform::allocateGTS(uint8_t superframeID, uint8_t slotID, uint8_t channelID, Direction direction, uint16_t address)
+void DSMEPlatform::allocateGTS(uint8_t superframeID, uint8_t slotID, uint8_t channelID, Direction direction, uint16_t address, uint16_t numSlots)
 {
-    static_cast<StaticScheduling*>(scheduling)->allocateGTS(superframeID, slotID, channelID, direction, address);
+    static_cast<StaticScheduling*>(scheduling)->allocateGTS(superframeID, slotID, channelID, direction, address, numSlots);
 }
 #endif
 
@@ -576,11 +587,12 @@ void DSMEPlatform::handleConfirmFromMCPSWrapper(IDSMEMessage* msg, DataStatus::D
 void DSMEPlatform::handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Status dataStatus) {
     if (dataStatus == DataStatus::Data_Status::SUCCESS) {
         /* TODO: Add to statistics */
-        //event_post(EVENT_PRIO_MEDIUM, &event_data_ok);
+        event_post(EVENT_PRIO_MEDIUM, &event_data_ok);
     }
     else {
         //dump();
-        //event_post(EVENT_PRIO_MEDIUM, &event_data_fail);
+        mcps_err = dataStatus;
+        event_post(EVENT_PRIO_MEDIUM, &event_data_fail);
     }
     IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
     releaseMessage(m);
@@ -656,15 +668,20 @@ void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmiss
  * Signal GTS allocation or deallocation
  */
 void DSMEPlatform::signalGTSChange(bool deallocation, IEEE802154MacAddress counterpart, uint16_t superframeID, uint8_t gtSlotID, uint8_t channel, Direction direction) {
+    if (!deallocation) {
+        printf("GTS;sID=%i,slotID=%i\n",superframeID, gtSlotID);
+    }
 }
 
 void DSMEPlatform::signalQueueLength(uint32_t length) {
+    printf("Q:%li\n", length);
 }
 
 /*
  * Number of packets sent per CAP
  */
 void DSMEPlatform::signalPacketsPerCAP(uint32_t packets) {
+    printf("[info];PCAP;%02x\n", packets);
 }
 
 /*
@@ -673,6 +690,7 @@ void DSMEPlatform::signalPacketsPerCAP(uint32_t packets) {
 void DSMEPlatform::signalFailedPacketsPerCAP(uint32_t packets)
 {
     /* Not used */
+    printf("[info];FPPCAP;%04x\n", packets);
 }
 
 void DSMEPlatform::updateVisual()
@@ -725,6 +743,15 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
         .iol_base = mhr,
         .iol_len = mhr_len,
     };
+
+    printf("[info];TX;");
+    for (iolist_t *io=&iol;io;io=io->iol_next) {
+        uint8_t *p = static_cast<uint8_t*>(io->iol_base);
+        for (unsigned i=0;i<io->iol_len;i++) {
+            printf("%02x ", p[i]);
+        }
+    }
+    printf("\n");
 
     if (mhr[0] & IEEE802154_FCF_ACK_REQ) {
         this->wait_for_ack = true;
@@ -837,11 +864,6 @@ void DSMEPlatform::turnTransceiverOff()
     post(26);
     int res = ieee802154_radio_off(this->radio);
     DSME_ASSERT(res == 0);
-    /* If there's an ongoing transmission, transmitted frame will be lost anyway */
-    if (this->state != DSMEPlatform::STATE_READY)
-    {
-        assert(false);
-    }
 }
 
 bool DSMEPlatform::isRxEnabledOnCap()

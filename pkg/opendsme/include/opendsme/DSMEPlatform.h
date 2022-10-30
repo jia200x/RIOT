@@ -81,7 +81,7 @@ public:
 
     /* Allocate a GTS slot */
 #if IS_ACTIVE(CONFIG_IEEE802154_DSME_STATIC_GTS)
-    void allocateGTS(uint8_t superframeID, uint8_t slotID, uint8_t channelID, Direction direction, uint16_t address);
+    void allocateGTS(uint8_t superframeID, uint8_t slotID, uint8_t channelID, Direction direction, uint16_t address, uint16_t numSlots);
 #endif
 
     /* Get short address */
