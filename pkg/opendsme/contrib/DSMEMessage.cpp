@@ -17,7 +17,6 @@
 #include "net/gnrc/pktdump.h"
 #include "net/gnrc.h"
 #include "opendsme/opendsme.h"
-#include "od.h"
 
 namespace dsme {
 

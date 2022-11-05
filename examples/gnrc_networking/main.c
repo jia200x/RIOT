@@ -22,12 +22,10 @@
 
 #include "shell.h"
 #include "msg.h"
-#include "event.h"
-#include "event/thread.h"
-#include "ztimer.h"
 
 #define MAIN_QUEUE_SIZE     (8)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
+
 int main(void)
 {
     /* we need a message queue for the thread running the shell in order to
@@ -38,7 +36,6 @@ int main(void)
     /* start shell */
     puts("All up, running the shell now");
     char line_buf[SHELL_DEFAULT_BUFSIZE];
-    //event_post(EVENT_PRIO_LOWEST, &ev);
     shell_run(NULL, line_buf, SHELL_DEFAULT_BUFSIZE);
 
     /* should be never reached */

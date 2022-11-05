@@ -22,7 +22,6 @@
 #include "net/gnrc/ipv6/nib.h"
 #include "net/gnrc/ipv6.h"
 #endif /* IS_USED(MODULE_GNRC_IPV6_NIB) */
-#include "board.h"
 
 dsme::DSMEPlatform m_dsme;
 
@@ -35,12 +34,14 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
      * user should not have control over it.
      * Given that, and the fact the current MAC does not communicate with
      * different PANs, we can always use the short address */
-    uint8_t bcast[2] = {0xFF, 0xFF};
+    uint8_t bcast[2] = { 0xFF, 0xFF };
     uint8_t *addr;
+
     pkt = gnrc_pktbuf_start_write(pkt);
-    gnrc_netif_hdr_t *hdr = (gnrc_netif_hdr_t*) pkt->data;
+    gnrc_netif_hdr_t *hdr = (gnrc_netif_hdr_t *)pkt->data;
+
     if (hdr->flags &= GNRC_NETIF_HDR_FLAGS_MULTICAST) {
-        addr = static_cast<uint8_t*>(&bcast[0]);
+        addr = static_cast<uint8_t *>(&bcast[0]);
     }
     else if (hdr->dst_l2addr_len == IEEE802154_LONG_ADDRESS_LEN) {
         addr = gnrc_netif_hdr_get_dst_addr(hdr)
