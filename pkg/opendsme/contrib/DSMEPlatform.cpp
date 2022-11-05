@@ -36,55 +36,7 @@
 #define OPENDSME_TIMER_MASK   (0)
 #define OPENDSME_TIMER_OFFSET (0)
 
-static int mcps_err;
-
-static void handler_event_data(event_t *event)
-{
-    puts("RX DATA!");
-}
-
-static void handler_event_data_ok(event_t *event)
-{
-    puts("TX;SUCCESS");
-}
-
-static void handler_event_data_fail(event_t *event)
-{
-    puts("TX;FAIL");
-    printf("Data status: %i", mcps_err);
-}
-
-static void handler_event_tx_data(event_t *event)
-{
-    puts("TX DATA");
-}
-
-static void handler_event_tx_ack(event_t *event)
-{
-    puts("TX ACK");
-}
-
-static void handler_event_tx_done(event_t *event)
-{
-    puts("TX DONE");
-}
-
-static void handler_event_rx_on(event_t *event)
-{
-    (void) event;
-    puts("RX ON");
-}
-
-static void handler_event_rx_fail(event_t *event)
-{
-    (void) event;
-    puts("RX FAIL");
-}
-
 static bool tx_data;
-static uint8_t evs[64];
-static uint8_t counter;
-static int puta_la_wea;
 static event_t event_data;
 static event_t event_data_ok;
 static event_t event_data_fail;
@@ -94,23 +46,6 @@ static event_t event_tx_done;
 static event_t event_rx_on;
 static event_t event_rx_fail;
 static int curr_len;
-static void post(int line)
-{
-    counter = (counter + 1) % sizeof(evs);
-    evs[counter] = line;
-}
-
-static void dump()
-{
-    printf("C:%i\n", counter);
-    for (int i=counter;i>=0;i--) {
-        printf("%i\n", evs[i] );
-    }
-    for (int i=sizeof(evs)-1;i>counter;i--) {
-        printf("%i\n", evs[i] );
-    }
-}
-
 namespace dsme {
 
 /* The one and only openDSME instance */
@@ -120,52 +55,44 @@ DSMEPlatform* DSMEPlatform::instance = nullptr;
 
 static void _handle_rx_offload(event_t *ev)
 {
-    post(0);
     dsme::DSMEPlatform::instance->processRxOffload();
 }
 
 static void _start_of_cfp_handler(event_t *ev)
 {
-    post(1);
     dsme::DSMEPlatform::instance->getDSME().handleStartOfCFP();
     dsme::DSMEPlatform::instance->updateVisual();
 }
 
 static void _cca_ev_handler(event_t *ev)
 {
-    post(2);
     dsme::DSMEPlatform::instance->processCCAEvent();
 }
 
 static void _acktimer_ev_handler(event_t *ev)
 {
-    post(3);
     //event_post(EVENT_PRIO_MEDIUM, &event_tx_ack);
     dsme::DSMEPlatform::instance->sendNow();
 }
 
 static void _acktimer_cb(void *arg)
 {
-    post(4);
     dsme::DSMEPlatform::instance->offloadACKTimer();
 }
 
 static void _timer_ev_handler(event_t *ev)
 {
-    post(5);
     LED1_TOGGLE;
     dsme::DSMEPlatform::instance->getDSME().getEventDispatcher().timerInterrupt();
 }
 
 static void _tx_done_handler(event_t *ev)
 {
-    post(6);
     dsme::DSMEPlatform::instance->processTXDoneEvent();
 }
 
 static void _rx_done_handler(event_t *ev)
 {
-    post(7);
     dsme::DSMEPlatform::instance->processRxDone();
 }
 
@@ -173,25 +100,19 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
 {
     switch (status) {
         case IEEE802154_RADIO_CONFIRM_TX_DONE:
-            post(8);
             dsme::DSMEPlatform::instance->offloadTXDoneEvent();
             break;
         case IEEE802154_RADIO_INDICATION_RX_START:
-            post(9);
             dsme::DSMEPlatform::instance->indicateRxStart();
             break;
         case IEEE802154_RADIO_INDICATION_CRC_ERROR:
-            post(10);
             break;
         case IEEE802154_RADIO_INDICATION_TX_START:
-            post(11);
             break;
         case IEEE802154_RADIO_INDICATION_RX_DONE:
-            post(12);
             dsme::DSMEPlatform::instance->offloadRXDoneEvent();
             break;
         case IEEE802154_RADIO_CONFIRM_CCA:
-            post(13);
             dsme::DSMEPlatform::instance->offloadCCAEvent();
             break;
         default:
@@ -203,7 +124,6 @@ static void _hal_radio_cb(ieee802154_dev_t *dev, ieee802154_trx_ev_t status)
 
 void DSMEPlatform::processRxOffload()
 {
-    post(14);
     IDSMEMessage *message = this->message;
     this->message = nullptr;
     receiveFromAckLayerDelegate(message);
@@ -263,7 +183,6 @@ void DSMEPlatform::processRxDone()
         ieee802154_radio_read(this->radio, NULL, 127, NULL);
         //event_post(EVENT_PRIO_MEDIUM, &event_rx_fail);
         res = ieee802154_radio_set_rx(this->radio);
-        printf("%i\n", len);
         DSME_ASSERT(res == 0);
         return;
     }
@@ -279,13 +198,6 @@ void DSMEPlatform::processRxDone()
         DSME_ASSERT(res == 0);
         return;
     }
-
-    uint8_t *p = (uint8_t*) message->getPayload();
-    printf("RECV: ");
-    for (unsigned i=0;i<res;i++) {
-        printf("%02x ", p[i]);
-    }
-    printf("\n");
 
     message->messageLQI = info.lqi;
     message->messageRSSI = info.rssi;
@@ -315,13 +227,11 @@ void DSMEPlatform::processRxDone()
 void DSMEPlatform::offloadCCAEvent()
 {
     event_post(this->getEventQueue(), &this->cca_ev);
-    post(15);
 }
 
 void DSMEPlatform::offloadTXDoneEvent()
 {
     event_post(this->getEventQueue(), &this->tx_done_event);
-    post(16);
 }
 
 void DSMEPlatform::indicateRxStart()
@@ -332,19 +242,16 @@ void DSMEPlatform::indicateRxStart()
 void DSMEPlatform::offloadRXDoneEvent()
 {
     event_post(this->getEventQueue(), &this->rx_done_event);
-    post(17);
 }
 
 void DSMEPlatform::offloadTimerEvent()
 {
     event_post(this->getEventQueue(), &this->timer_event);
-    post(18);
 }
 
 void DSMEPlatform::offloadACKTimer()
 {
     event_post(this->getEventQueue(), &this->acktimer_ev);
-    post(19);
 }
 
 static void _timer_cb(void *arg)
@@ -405,15 +312,6 @@ DSMEPlatform::DSMEPlatform() :
     this->rx_done_event.handler = _rx_done_handler;
     this->rx_offload_ev.handler = _handle_rx_offload;
     this->start_of_cfp_ev.handler = _start_of_cfp_handler;
-    event_data.handler = handler_event_data;
-    event_data_ok.handler = handler_event_data_ok;
-    event_data_fail.handler = handler_event_data_fail;
-    event_tx_data.handler = handler_event_tx_data;
-    event_tx_ack.handler = handler_event_tx_ack;
-    event_tx_done.handler = handler_event_tx_done;
-    event_rx_on.handler = handler_event_rx_on;
-    event_rx_fail.handler = handler_event_rx_fail;
-
 }
 
 DSMEPlatform::~DSMEPlatform()
@@ -591,7 +489,6 @@ void DSMEPlatform::handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Stat
     }
     else {
         //dump();
-        mcps_err = dataStatus;
         event_post(EVENT_PRIO_MEDIUM, &event_data_fail);
     }
     IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
@@ -614,7 +511,6 @@ void DSMEPlatform::handleReceivedMessageFromAckLayer(IDSMEMessage* message)
     DSME_ASSERT(!this->message);
     this->message = message;
     event_post(this->getEventQueue(), &rx_offload_ev);
-    post(20);
 }
 
 DSMEMessage *DSMEPlatform::getEmptyMessage()
@@ -656,7 +552,6 @@ uint32_t DSMEPlatform::getSymbolCounter()
 void DSMEPlatform::scheduleStartOfCFP()
 {
     event_post(this->getEventQueue(), &start_of_cfp_ev);
-    post(21);
 }
 
 void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmissionAttempts, IEEE802154MacAddress receiver)
@@ -669,19 +564,16 @@ void DSMEPlatform::signalAckedTransmissionResult(bool success, uint8_t transmiss
  */
 void DSMEPlatform::signalGTSChange(bool deallocation, IEEE802154MacAddress counterpart, uint16_t superframeID, uint8_t gtSlotID, uint8_t channel, Direction direction) {
     if (!deallocation) {
-        printf("GTS;sID=%i,slotID=%i\n",superframeID, gtSlotID);
     }
 }
 
 void DSMEPlatform::signalQueueLength(uint32_t length) {
-    printf("Q:%li\n", length);
 }
 
 /*
  * Number of packets sent per CAP
  */
 void DSMEPlatform::signalPacketsPerCAP(uint32_t packets) {
-    printf("[info];PCAP;%02x\n", packets);
 }
 
 /*
@@ -690,7 +582,6 @@ void DSMEPlatform::signalPacketsPerCAP(uint32_t packets) {
 void DSMEPlatform::signalFailedPacketsPerCAP(uint32_t packets)
 {
     /* Not used */
-    printf("[info];FPPCAP;%04x\n", packets);
 }
 
 void DSMEPlatform::updateVisual()
@@ -706,7 +597,6 @@ bool DSMEPlatform::setChannelNumber(uint8_t channel)
         .page = 0,
         .pow = CONFIG_IEEE802154_DEFAULT_TXPOWER,
     };
-    post(27);
     int res;
     res = ieee802154_radio_set_idle(this->radio,true);
     DSME_ASSERT(res == 0);
@@ -730,7 +620,6 @@ uint8_t DSMEPlatform::getChannelNumber()
 
 bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> txEndCallback)
 {
-    post(22);
     DSMEMessage *m = (DSMEMessage*) msg;
     this->state = DSMEPlatform::STATE_SEND;
     this->txEndCallback = txEndCallback;
@@ -743,15 +632,6 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
         .iol_base = mhr,
         .iol_len = mhr_len,
     };
-
-    printf("[info];TX;");
-    for (iolist_t *io=&iol;io;io=io->iol_next) {
-        uint8_t *p = static_cast<uint8_t*>(io->iol_base);
-        for (unsigned i=0;i<io->iol_len;i++) {
-            printf("%02x ", p[i]);
-        }
-    }
-    printf("\n");
 
     if (mhr[0] & IEEE802154_FCF_ACK_REQ) {
         this->wait_for_ack = true;
@@ -770,17 +650,12 @@ bool DSMEPlatform::prepareSendingCopy(IDSMEMessage* msg, Delegate<void(bool)> tx
     res = ieee802154_radio_write(this->radio, &iol);
     DSME_ASSERT(res == 0);
     curr_len = iolist_size(&iol);
-    if (curr_len > 120) {
-        printf("%i\n", iolist_size((iolist_t*) m->getIolPayload()));
-        printf("%i\n", curr_len);
-    }
 
     return true;
 }
 
 bool DSMEPlatform::sendNow()
 {
-    post(23);
     int res = ieee802154_radio_request_transmit(this->radio);
     DSME_ASSERT(res == 0);
     this->pending_tx = true;
@@ -792,12 +667,10 @@ void DSMEPlatform::abortPreparedTransmission()
      /* Nothing to do here, since the Radio HAL will drop the frame if
       * the write function is called again */
     this->setPlatformState(DSMEPlatform::STATE_READY);
-    printf("PUTA LA WEA: %i\n",puta_la_wea++);
 }
 
 bool DSMEPlatform::sendDelayedAck(IDSMEMessage* ackMsg, IDSMEMessage* receivedMsg, Delegate<void(bool)> txEndCallback)
 {
-    post(24);
     DSMEMessage *m = (DSMEMessage*) ackMsg;
     DSME_ASSERT(m != nullptr);
 
@@ -851,7 +724,6 @@ bool DSMEPlatform::startCCA()
 
 void DSMEPlatform::turnTransceiverOn()
 {
-    post(25);
     int res = ieee802154_radio_request_on(this->radio);
     DSME_ASSERT(res == 0);
     res = ieee802154_radio_confirm_on(this->radio);
@@ -861,7 +733,6 @@ void DSMEPlatform::turnTransceiverOn()
 
 void DSMEPlatform::turnTransceiverOff()
 {
-    post(26);
     int res = ieee802154_radio_off(this->radio);
     DSME_ASSERT(res == 0);
 }
