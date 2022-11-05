@@ -39,7 +39,7 @@ constexpr uint8_t macSIFSPeriod = 12; /* fixed value, see 8.1.3 of IEEE 802.15.4
 constexpr uint8_t macLIFSPeriod = 40; /* fixed value, see 8.1.3 of IEEE 802.15.4-2011 (assuming no UWB PHY) */
 }
 
-constexpr uint8_t PRE_EVENT_SHIFT = const_redefines::macLIFSPeriod;
+constexpr uint8_t PRE_EVENT_SHIFT = const_redefines::macLIFSPeriod+20;
 constexpr uint8_t MIN_CSMA_SLOTS = 0; /* 0 for CAP reduction */
 constexpr uint8_t MAX_GTSLOTS = const_redefines::aNumSuperframeSlots - MIN_CSMA_SLOTS - 1;
 constexpr uint8_t MAX_CHANNELS = 16;

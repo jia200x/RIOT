@@ -13,7 +13,11 @@ ifneq (,$(filter nrf802154,$(USEMODULE)))
   FEATURES_REQUIRED += radio_nrf802154
   USEMODULE += luid
   ifneq (,$(filter netdev,$(USEMODULE)))
-    USEMODULE += netdev_ieee802154_submac
+    ifneq (,$(filter opendsme,$(USEMODULE)))
+      USEMODULE += netdev_ieee802154
+    else
+      USEMODULE += netdev_ieee802154_submac
+    endif
   endif
 endif
 

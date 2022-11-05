@@ -17,6 +17,7 @@
 #include "net/gnrc/pktdump.h"
 #include "net/gnrc.h"
 #include "opendsme/opendsme.h"
+#include "od.h"
 
 namespace dsme {
 
@@ -131,17 +132,17 @@ void DSMEMessage::dispatchMessage()
     uint16_t addr = getHeader().getSrcAddr().getShortAddress();
     uint8_t _addr[IEEE802154_SHORT_ADDRESS_LEN] = { addr >> 8, addr & 0xFF };
     uint16_t dst_addr = getHeader().getDestAddr().getShortAddress();
-    uint8_t _dst_addr[IEEE802154_SHORT_ADDRESS_LEN] = { dst_addr >> 8, dst_addr & 0xFF };
-    gnrc_pktsnip_t *netif_hdr = gnrc_netif_hdr_build((uint8_t *)_addr, IEEE802154_SHORT_ADDRESS_LEN,
-                                                     (uint8_t *)_dst_addr,
+    uint8_t _dst_addr[IEEE802154_SHORT_ADDRESS_LEN] = {dst_addr >> 8, dst_addr & 0xFF};
+    gnrc_pktsnip_t *netif_hdr = gnrc_netif_hdr_build((uint8_t*) _addr,
+                                                     IEEE802154_SHORT_ADDRESS_LEN,
+                                                     (uint8_t*) _dst_addr,
                                                      IEEE802154_SHORT_ADDRESS_LEN);
-    size_t mhr_len = ieee802154_get_frame_hdr_len(static_cast<uint8_t *>(pkt->data));
-
+    size_t mhr_len = ieee802154_get_frame_hdr_len(static_cast<uint8_t*>(pkt->data));
     pkt->type = CONFIG_OPENDSME_GNRC_PKTSNIP_TYPE;
-    gnrc_netif_hdr_t *hdr = static_cast<gnrc_netif_hdr_t *>(netif_hdr->data);
-
+    gnrc_netif_hdr_t *hdr = static_cast<gnrc_netif_hdr_t*>(netif_hdr->data);
     gnrc_netif_hdr_set_netif(hdr, this->netif);
     pkt = gnrc_pkt_append(pkt, netif_hdr);
+
     if (gnrc_netapi_dispatch_receive(CONFIG_OPENDSME_GNRC_PKTSNIP_TYPE, GNRC_NETREG_DEMUX_CTX_ALL,
                                      pkt)) {
         /* Pass packet to GNRC */

@@ -660,6 +660,9 @@ int gnrc_netif_get_from_netdev(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt);
 int gnrc_netif_set_from_netdev(gnrc_netif_t *netif,
                                const gnrc_netapi_opt_t *opt);
 
+int gnrc_netif_set_ipv6_common(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt);
+int gnrc_netif_get_ipv6_common(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt);
+
 /**
  * @brief Gets an interface by the netdev type (and index)
  *
