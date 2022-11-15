@@ -29,6 +29,9 @@ USEMODULE += netstats_l2
 USEMODULE += netstats_ipv6
 USEMODULE += netstats_rpl
 
+USEPKG = opendsme
+CFLAGS += -DISR_STACKSIZE=1024
+
 # Optionally include DNS support. This includes resolution of names at an
 # upstream DNS server and the handling of RDNSS options in Router Advertisements
 # to auto-configure that upstream DNS server.
@@ -43,6 +46,7 @@ DEVELHELP ?= 1
 # Instead of simulating an Ethernet connection, we can also simulate
 # an IEEE 802.15.4 radio using ZEP
 USE_ZEP ?= 0
+export PKG_SOURCE_LOCAL_OPENDSME=/home/jialamos/Development/opendsme
 
 # set the ZEP port for native
 ZEP_PORT_BASE ?= 17754
