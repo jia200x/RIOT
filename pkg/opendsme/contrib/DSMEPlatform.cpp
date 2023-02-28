@@ -485,11 +485,11 @@ void DSMEPlatform::handleConfirmFromMCPSWrapper(IDSMEMessage* msg, DataStatus::D
 void DSMEPlatform::handleConfirmFromMCPS(DSMEMessage* msg, DataStatus::Data_Status dataStatus) {
     if (dataStatus == DataStatus::Data_Status::SUCCESS) {
         /* TODO: Add to statistics */
-        event_post(EVENT_PRIO_MEDIUM, &event_data_ok);
+        //event_post(EVENT_PRIO_MEDIUM, &event_data_ok);
     }
     else {
         //dump();
-        event_post(EVENT_PRIO_MEDIUM, &event_data_fail);
+        //event_post(EVENT_PRIO_MEDIUM, &event_data_fail);
     }
     IDSMEMessage *m = static_cast<IDSMEMessage*>(msg);
     releaseMessage(m);

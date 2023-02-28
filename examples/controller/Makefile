@@ -2,7 +2,7 @@
 APPLICATION = controller
 
 # If no BOARD is found in the environment, use this default:
-BOARD ?= nrf52840dk
+BOARD ?= nucleo-wl55jc
 
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
@@ -78,7 +78,7 @@ USEMODULE += l2util
 USEMODULE += gnrc_pktdump
 USEMODULE += gnrc_txtsnd
 USEMODULE += netopt
-USEMODULE += sx1276
+USEMODULE += sx126x_stm32wl
 export PKG_SOURCE_LOCAL_OPENDSME=/home/jialamos/Development/opendsme
 
 #USEMODULE += netdev_default

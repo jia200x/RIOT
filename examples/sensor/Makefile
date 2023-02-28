@@ -2,7 +2,7 @@
 APPLICATION = sensor
 
 # If no BOARD is found in the environment, use this default:
-BOARD ?= nrf52840dk
+BOARD ?= nucleo-wl55jc
 
 # This has to be the absolute path to the RIOT base directory:
 RIOTBASE ?= $(CURDIR)/../..
@@ -31,6 +31,7 @@ USEMODULE += netstats_rpl
 USEMODULE += netdev_ieee802154
 USEMODULE += gcoap
 USEMODULE += cord_ep_standalone
+USEMODULE += sx126x_stm32wl
 
 # Optionally include DNS support. This includes resolution of names at an
 # upstream DNS server and the handling of RDNSS options in Router Advertisements
@@ -63,7 +64,6 @@ USEMODULE += event_thread_lowest
 #USEMODULE += netdev_default
 USEMODULE += gnrc_pktbuf_cmd
 USEMODULE += iolist
-USEMODULE += sx1276
 
 #CFLAGS += -DCONFIG_IEEE802154_DSME_SUPERFRAME_ORDER=10
 #CFLAGS += -DCONFIG_IEEE802154_DSME_MULTISUPERFRAME_ORDER=10

@@ -30,16 +30,6 @@ const uint8_t sx126x_max_sf = LORA_SF12;
 
 #include "checksum/ucrc16.h"
 
-
-#define MAC_TIMER_CHAN_ACK  (0U)    /**< MAC timer channel for transmitting an ACK frame */
-#define MAC_TIMER_CHAN_IFS  (1U)    /**< MAC timer channel for handling IFS logic */
-#define LORA_LIFS_SYMS          5
-#define LORA_ACK_REPLY          1
-
-static uint8_t sx126x_short_addr[IEEE802154_SHORT_ADDRESS_LEN];
-static uint8_t sx126x_long_addr[IEEE802154_LONG_ADDRESS_LEN];
-static uint16_t sx126x_pan_id;
-
 static const ieee802154_radio_ops_t sx126x_ops;
 static ieee802154_dev_t *_sx126x_hal_dev;
 
@@ -53,7 +43,6 @@ void sx126x_hal_setup(sx126x_t *dev, ieee802154_dev_t *hal)
     hal->priv = dev;
 
     _sx126x_hal_dev = hal;
-
 }
 
 #if IS_USED(MODULE_SX126X_STM32WL)
@@ -70,75 +59,20 @@ event_t sx126x_ev = {.handler = _sx126x_handler};
 void isr_subghz_radio(void)
 {
     /* Disable NVIC to avoid ISR conflict in CPU. */
+    ieee802154_dev_t *hal = _sx126x_hal_dev;
+    sx126x_t *dev = hal->priv;
     NVIC_DisableIRQ(SUBGHZ_Radio_IRQn);
     NVIC_ClearPendingIRQ(SUBGHZ_Radio_IRQn);
-    event_post(EVENT_PRIO_HIGHEST, &sx126x_ev);
+    event_post(dev->evq, &sx126x_ev);
+    puts("I");
     cortexm_isr_end();
 }
 #endif 
-
-static void ack_timer_cb(void *arg)
-{
-    sx126x_t *dev = arg;
-    (void)dev;
-    _set_state(dev, STATE_IDLE);
-    ztimer_remove(ZTIMER_USEC, &dev->ack_timer);
-    uint8_t ack[3] = {
-        IEEE802154_FCF_TYPE_ACK,
-        0x00, 
-        dev->seq_num
-    };
-    sx126x_set_buffer_base_address(dev, 0x80, 0x00);
-    sx126x_write_buffer(dev, 0x80, ack, IEEE802154_ACK_FRAME_LEN-2);
-    sx126x_set_lora_payload_length(dev, IEEE802154_ACK_FRAME_LEN-2);
-    _set_state(dev, STATE_TX);
-    dev->ack_filter = true;
-    
-    
-}
 
 void sx126x_setup(sx126x_t *dev, uint8_t index)
 {
     (void)dev;
     (void)index;
-
-    dev->ack_timer.arg = dev;
-    dev->ack_timer.callback = ack_timer_cb;
-    
-    dev->ack_filter = false;
-}
-
-static bool _l2filter(uint8_t *mhr)
-{
-    uint8_t dst_addr[IEEE802154_LONG_ADDRESS_LEN];
-    le_uint16_t dst_pan;
-    uint8_t pan_bcast[] = IEEE802154_PANID_BCAST;
-
-    int addr_len = ieee802154_get_dst(mhr, dst_addr, &dst_pan);
-
-    if ((mhr[0] & IEEE802154_FCF_TYPE_MASK) == IEEE802154_FCF_TYPE_BEACON) {
-        if ((memcmp(&sx126x_pan_id, pan_bcast, 2) == 0)) {
-            return true;
-        }
-    }
-    /* filter PAN ID */
-    /* Will only work on little endian platform (all?) */
-
-    if ((memcmp(pan_bcast, dst_pan.u8, 2) != 0) &&
-        (memcmp(&sx126x_pan_id, dst_pan.u8, 2) != 0)) {
-        return false;
-    }
-
-    /* check destination address */
-    if (((addr_len == IEEE802154_SHORT_ADDRESS_LEN) &&
-          (memcmp(sx126x_short_addr, dst_addr, addr_len) == 0 ||
-           memcmp(ieee802154_addr_bcast, dst_addr, addr_len) == 0)) ||
-        ((addr_len == IEEE802154_LONG_ADDRESS_LEN) &&
-          (memcmp(sx126x_long_addr, dst_addr, addr_len) == 0))) {
-        return true;
-    }
-
-    return false;
 }
 
 static int _set_state(sx126x_t *dev, sx126x_state_t state)
@@ -158,13 +92,7 @@ static int _set_state(sx126x_t *dev, sx126x_state_t state)
         }
 #endif
         sx126x_cfg_rx_boosted(dev, true);
-        int _timeout = (sx126x_symbol_to_msec(dev, dev->rx_timeout));
-        if (_timeout != 0) {
-            sx126x_set_rx(dev, _timeout);
-        }
-        else {
-            sx126x_set_rx(dev, SX126X_RX_SINGLE_MODE);
-        }
+        sx126x_set_rx(dev, SX126X_RX_SINGLE_MODE);
         break;
 
     case STATE_TX:
@@ -224,67 +152,18 @@ void sx126x_hal_task_handler(ieee802154_dev_t *hal)
 
     sx126x_get_and_clear_irq_status(dev, &irq_mask);
 
+    printf("%02x\n", irq_mask);
     if (sx126x_is_stm32wl(dev)) {
 
     if (irq_mask & SX126X_IRQ_TX_DONE) {
-        if(dev->ack_filter == false){
         DEBUG("[sx126x] netdev: SX126X_IRQ_TX_DONE\n");
-        ztimer_remove(ZTIMER_USEC, &dev->ack_timer);
+        puts("TXD");
         hal->cb(hal, IEEE802154_RADIO_CONFIRM_TX_DONE);
-        }
-        else {
-            dev->ack_filter = false;
-            DEBUG("[sx126x] TX ACK done.\n");
-            ztimer_remove(ZTIMER_USEC, &dev->ack_timer);
-            hal->cb(hal, IEEE802154_RADIO_INDICATION_RX_DONE);
-        }
-        }
+    }
     else if (irq_mask & SX126X_IRQ_RX_DONE) {
         DEBUG("[sx126x] netdev: SX126X_IRQ_RX_DONE\n");
     
-    uint8_t rxbuf[127];
-    sx126x_rx_buffer_status_t rx_buffer_status;
-    sx126x_get_rx_buffer_status(dev, &rx_buffer_status);
-    dev->size = rx_buffer_status.pld_len_in_bytes;
- 
-    sx126x_read_buffer(dev, rx_buffer_status.buffer_start_pointer, (uint8_t*)rxbuf, dev->size);
-        bool l2filter_passed = _l2filter(rxbuf);
-        bool is_auto_ack_en = !IS_ACTIVE(CONFIG_IEEE802154_AUTO_ACK_DISABLE);
-        bool is_ack = (rxbuf[0] & IEEE802154_FCF_TYPE_ACK)&&(rxbuf[1] == 0x00);
-        bool ack_req = rxbuf[0] & IEEE802154_FCF_ACK_REQ;
-    /* If radio is in promiscuos mode, indicate packet and
-            * don't event think of sending an ACK frame :) */
-            if (dev->promisc) {
-                DEBUG("[sx126x] Promiscuous mode is enabled.\n");
-                hal->cb(hal, IEEE802154_RADIO_INDICATION_RX_DONE);
-            }
-        
-    /* If the L2 filter passes, device if the frame is indicated
-            * directly or if the driver should send an ACK frame before
-            * the indication */
-            else if (l2filter_passed) {
-                    if (ack_req && is_auto_ack_en) {
-                        dev->seq_num = rxbuf[2];
-                       DEBUG("Received valid frame, need ack\n");
-                       ztimer_set(ZTIMER_USEC, &dev->ack_timer, LORA_ACK_REPLY);
-                    }
-                    else {
-                        DEBUG("[sx126x] RX frame doesn't require ACK frame.\n");
-                        hal->cb(hal, IEEE802154_RADIO_INDICATION_RX_DONE);
-                    }
-                }
-            else if (is_ack && !(dev->ack_filter)) {
-                    DEBUG("[sx126x] Received ACK.\n");
-                    hal->cb(hal, IEEE802154_RADIO_INDICATION_RX_DONE);
-                }
-                /* If all failed, simply drop the frame and continue listening
-                 * to incoming frames */
-                else {
-                    DEBUG("[sx126x] Addr filter failed or ACK filter on.\n");
-                    _set_state(dev, STATE_RX);
-                   
-                }        
-           
+        hal->cb(hal, IEEE802154_RADIO_INDICATION_RX_DONE);
     }
     else if (irq_mask & SX126X_IRQ_PREAMBLE_DETECTED) {
         DEBUG("[sx126x] netdev: SX126X_IRQ_PREAMBLE_DETECTED\n");
@@ -311,7 +190,6 @@ void sx126x_hal_task_handler(ieee802154_dev_t *hal)
         }
         DEBUG("[sx126x] netdev: SX126X_IRQ_CAD_DONE\n");
         hal->cb(hal, IEEE802154_RADIO_CONFIRM_CCA);
-        _set_state(dev, STATE_RX);
         
     }
     else if (irq_mask & SX126X_IRQ_TIMEOUT) {
@@ -356,7 +234,7 @@ static int _request_op(ieee802154_dev_t *hal, ieee802154_hal_op_t op, void *ctx)
     (void)ctx;
     switch (op) {
         case IEEE802154_HAL_OP_TRANSMIT:
-        dev->ack_filter = false;
+        puts("TX");
         _set_state(dev, STATE_TX);
 
         break;
@@ -368,6 +246,7 @@ static int _request_op(ieee802154_dev_t *hal, ieee802154_hal_op_t op, void *ctx)
 
         case IEEE802154_HAL_OP_SET_IDLE:
 
+        puts("OP_SET_IDLE");
         _set_state(dev, STATE_IDLE);
 
         break;
@@ -401,12 +280,12 @@ static int _confirm_op(ieee802154_dev_t *hal, ieee802154_hal_op_t op, void *ctx)
 switch (op){
     case IEEE802154_HAL_OP_TRANSMIT:
        if (info) {
-            info->status = (dev->cad_detected) ? TX_STATUS_MEDIUM_BUSY : TX_STATUS_SUCCESS;
+            info->status = TX_STATUS_SUCCESS;
         }
-    while(state == STATE_TX)
-        _get_state(dev, &state);
+        while(state == STATE_TX)
+            _get_state(dev, &state);
         
-    break;
+        break;
 
     case IEEE802154_HAL_OP_SET_RX:
         if(state!=STATE_RX) 
@@ -527,20 +406,6 @@ static int _config_addr_filter(ieee802154_dev_t *hal, ieee802154_af_cmd_t cmd, c
     (void)hal;
     (void)cmd;
     (void)value;
-    const uint16_t *pan_id = value;
-    switch(cmd) {
-        case IEEE802154_AF_SHORT_ADDR:
-            memcpy(sx126x_short_addr, value, IEEE802154_SHORT_ADDRESS_LEN);
-            break;
-        case IEEE802154_AF_EXT_ADDR:
-            memcpy(sx126x_long_addr, value, IEEE802154_LONG_ADDRESS_LEN);
-            break;
-        case IEEE802154_AF_PANID:
-            sx126x_pan_id = *pan_id;
-            break;
-        case IEEE802154_AF_PAN_COORD:
-            return -ENOTSUP;
-    }
     return 0;
 }
 
@@ -548,6 +413,7 @@ static int _request_on(ieee802154_dev_t *hal)
 {
     (void)hal;
     sx126x_t *dev = hal->priv;
+    puts("ON");
     _set_state(dev, STATE_IDLE);
     return 0;
 }
@@ -556,7 +422,7 @@ static int _confirm_on(ieee802154_dev_t *hal)
 {
     (void)hal;
 
-    return -ENOTSUP;
+    return 0;
 }
 
 static int _set_cca_mode(ieee802154_dev_t *hal, ieee802154_cca_mode_t mode)
@@ -585,29 +451,8 @@ static int _config_src_addr_match(ieee802154_dev_t *hal, ieee802154_src_match_t 
 
 static int _set_frame_filter_mode(ieee802154_dev_t *hal, ieee802154_filter_mode_t mode)
 {
-    sx126x_t* dev = hal->priv;
-
-    bool ackf = true;
-    bool _promisc = false;
-
-    switch (mode) {
-        case IEEE802154_FILTER_ACCEPT:
-            DEBUG("Filter_accept_all\n");
-            break;
-        case IEEE802154_FILTER_PROMISC:
-            _promisc = true;
-            break;
-        case IEEE802154_FILTER_ACK_ONLY:
-            ackf = false;
-            DEBUG("Filter_ack_only\n");
-            break;
-        default:
-            return -ENOTSUP;
-    }
-
-    dev->ack_filter = ackf;
-    dev->promisc = _promisc;
-
+    (void) hal;
+    (void) mode;
     return 0;
 }
 
@@ -622,13 +467,10 @@ static int _set_csma_params(ieee802154_dev_t *hal, const ieee802154_csma_be_t *b
 
 
 static const ieee802154_radio_ops_t sx126x_ops = {
-    .caps =  IEEE802154_CAP_24_GHZ
-          | IEEE802154_CAP_IRQ_CRC_ERROR
+    .caps = IEEE802154_CAP_IRQ_CRC_ERROR
           | IEEE802154_CAP_IRQ_RX_START
           | IEEE802154_CAP_IRQ_TX_DONE
-          | IEEE802154_CAP_IRQ_CCA_DONE
-          //| IEEE802154_CAP_IRQ_ACK_TIMEOUT
-          | IEEE802154_CAP_PHY_BPSK,
+          | IEEE802154_CAP_IRQ_CCA_DONE,
     .write = _write,
     .read = _read,
     .request_on = _request_on,
