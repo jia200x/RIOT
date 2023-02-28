@@ -29,10 +29,13 @@
 #include "include/init_devs.h"
 
 #include "include/init_devs.h"
-#include "bhp/event.h"
 
 #include "sx126x.h"
 #include "sx126x_params.h"
+
+#if IS_USED(MODULE_OPENDSME)
+#include "opendsme/opendsme.h"
+#endif
 
 /**
  * @brief   Calculate the number of configured SX126X devices
@@ -42,9 +45,9 @@
 /**
  * @brief   Define stack parameters for the MAC layer thread
  */
-#define SX126X_STACKSIZE            (IEEE802154_STACKSIZE_DEFAULT)
+#define SX126X_STACKSIZE            (THREAD_STACKSIZE_LARGE)
 #ifndef SX126X_PRIO
-#define SX126X_PRIO                 (GNRC_NETIF_PRIO-1)
+#define SX126X_PRIO                 (GNRC_NETIF_PRIO)
 #endif
 
 /**
@@ -52,7 +55,7 @@
  */
 static sx126x_t sx126x_devs[SX126X_NUMOF];
 static char sx126x_stacks[SX126X_NUMOF][SX126X_STACKSIZE];
-static netdev_ieee802154_submac_t sx126x_netdev[SX126X_NUMOF];
+static ieee802154_dev_t sx126x_hal[SX126X_NUMOF];
 static gnrc_netif_t _netif[SX126X_NUMOF];
 void auto_init_sx126x(void)
 {
@@ -60,17 +63,13 @@ void auto_init_sx126x(void)
         LOG_DEBUG("[auto_init_netif] initializing sx126x #%u\n", i);
         
 
-        netdev_register(&sx126x_netdev[i].dev.netdev, NETDEV_SX126X, i);
-        netdev_ieee802154_submac_init(&sx126x_netdev[i]);
-        
-        sx126x_hal_setup(&sx126x_devs[i], &sx126x_netdev[i].submac.dev);
-        sx126x_init(&sx126x_devs[i], &sx126x_params[i]);
+        sx126x_hal_setup(&sx126x_devs[i], &sx126x_hal[i]);
+        sx126x_init(&sx126x_devs[i], &sx126x_params[i], &_netif->evq);
         sx126x_setup(&sx126x_devs[i], i);
-        
-            gnrc_netif_ieee802154_create(&_netif[i], sx126x_stacks[i],
-                                  SX126X_STACKSIZE, SX126X_PRIO,
-                                  "sx126x", &sx126x_netdev[i].dev.netdev);
-
+        gnrc_netif_opendsme_create(&_netif[i], sx126x_stacks[i],
+                                 SX126X_STACKSIZE,
+                                 SX126X_PRIO, "sx126x",
+                                 (netdev_t*) &sx126x_hal[i]);
     }
 }
 /** @} */

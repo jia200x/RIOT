@@ -33,6 +33,7 @@
 #include "periph/spi.h"
 
 #include "kernel_defines.h"
+#include "event.h"
 
 #include "ztimer.h"
 #ifdef __cplusplus
@@ -128,17 +129,11 @@ struct sx126x {
     sx126x_cad_params_t cad_params;         /**< Radio Channel Activity Detection parametres */
     bool cad_detected;                      /**< Channel Activity Detected Flag*/
 
-    bool ifs        : 1;    /**< if true, the device is currently inside the IFS period */
-    bool cca_send   : 1;    /**< whether the next transmission uses CCA or not */
-    bool ack_filter : 1;    /**< whether the ACK filter is activated or not */
-    bool promisc    : 1;    /**< whether the device is in promiscuous mode or not */
-    bool pending    : 1;    /**< whether there pending bit should be set in the ACK frame or not */
-
     uint8_t size;                           /**< size of the last received packet */
     sx126x_state_t state;
 
-    ztimer_t ack_timer;
     uint8_t seq_num;
+    event_queue_t *evq;
 };
 
 /**
@@ -161,7 +156,7 @@ void sx126x_hal_task_handler(ieee802154_dev_t* hal);
  *
  * @return                  0 on success
  */
-int sx126x_init(sx126x_t *dev, const sx126x_params_t *params);
+int sx126x_init(sx126x_t *dev, const sx126x_params_t *params, event_queue_t *evq);
 
 /**
  * @brief   Converts symbol value to time in milliseconds.
