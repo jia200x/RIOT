@@ -37,8 +37,8 @@
 #include "test_utils/expect.h"
 #include "xtimer.h"
 
-#define SYMBOL_TIME (16U) /**< 16 us */
-#define ACK_TIMEOUT_TIME (40 * SYMBOL_TIME)
+#define SYMBOL_TIME (1024U) /**< 16 us */
+#define ACK_TIMEOUT_TIME (54 * SYMBOL_TIME)
 #define TX_RX_TURNAROUND (12 * SYMBOL_TIME)
 
 /* the CC2538 takes 193 us to put the transceiver in RX_ON, which officially
@@ -67,6 +67,7 @@ static void _print_packet(size_t size, uint8_t lqi, int16_t rssi)
 {
     if (buffer[0] & IEEE802154_FCF_TYPE_ACK && ((seq-1) == buffer[2])) {
         printf("Received valid ACK with sqn %i\n", buffer[2]);
+        od_hex_dump(buffer, size, 0);
     }
     else {
         puts("Frame received:");
@@ -141,6 +142,7 @@ void _rx_done_handler(event_t *event)
      * length. Since the buffer is fixed in this test, we don't use it
      */
     int size = ieee802154_radio_read(&_radio, buffer, 127, &info);
+
     if (size > 0) {
         /* Print packet while we wait for the state transition */
         _print_packet(size, info.lqi, info.rssi);
@@ -267,6 +269,9 @@ static ieee802154_dev_t *_reg_callback(ieee802154_dev_type_t type, void *opaque)
             break;
         case IEEE802154_DEV_TYPE_MRF24J40:
             printf("mrf24j40");
+            break;
+        case IEEE802154_DEV_TYPE_SX126X:
+            printf("sx126x");
             break;
     }
 
@@ -737,6 +742,7 @@ static const shell_command_t shell_commands[] = {
     { "promisc", "Set promiscuos mode", promisc },
     { "tx_mode", "Enable CSMA-CA, CCA or direct transmission", txmode_cmd },
     { "caps", "Get a list of caps supported by the device", _caps_cmd },
+    
     { NULL, NULL, NULL }
 };
 
