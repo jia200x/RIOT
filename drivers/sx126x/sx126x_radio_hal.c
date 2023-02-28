@@ -56,15 +56,16 @@ void _sx126x_handler(event_t *event)
 
 event_t sx126x_ev = {.handler = _sx126x_handler};
 
+void sx126x_hal_task_handler(ieee802154_dev_t *hal);
 void isr_subghz_radio(void)
 {
     /* Disable NVIC to avoid ISR conflict in CPU. */
     ieee802154_dev_t *hal = _sx126x_hal_dev;
-    sx126x_t *dev = hal->priv;
+    //sx126x_t *dev = hal->priv;
     NVIC_DisableIRQ(SUBGHZ_Radio_IRQn);
     NVIC_ClearPendingIRQ(SUBGHZ_Radio_IRQn);
-    event_post(dev->evq, &sx126x_ev);
-    puts("I");
+    //event_post(dev->evq, &sx126x_ev);
+    sx126x_hal_task_handler(hal);
     cortexm_isr_end();
 }
 #endif 
@@ -152,62 +153,61 @@ void sx126x_hal_task_handler(ieee802154_dev_t *hal)
 
     sx126x_get_and_clear_irq_status(dev, &irq_mask);
 
-    printf("%02x\n", irq_mask);
     if (sx126x_is_stm32wl(dev)) {
-
-    if (irq_mask & SX126X_IRQ_TX_DONE) {
-        DEBUG("[sx126x] netdev: SX126X_IRQ_TX_DONE\n");
-        puts("TXD");
-        hal->cb(hal, IEEE802154_RADIO_CONFIRM_TX_DONE);
-    }
-    else if (irq_mask & SX126X_IRQ_RX_DONE) {
-        DEBUG("[sx126x] netdev: SX126X_IRQ_RX_DONE\n");
-    
-        hal->cb(hal, IEEE802154_RADIO_INDICATION_RX_DONE);
-    }
-    else if (irq_mask & SX126X_IRQ_PREAMBLE_DETECTED) {
-        DEBUG("[sx126x] netdev: SX126X_IRQ_PREAMBLE_DETECTED\n");
-    }
-    else if (irq_mask & SX126X_IRQ_SYNC_WORD_VALID) {
-        DEBUG("[sx126x] netdev: SX126X_IRQ_SYNC_WORD_VALID\n");
-        
-    }
-    else if (irq_mask & SX126X_IRQ_HEADER_VALID) {
-        DEBUG("[sx126x] netdev: SX126X_IRQ_HEADER_VALID\n");
-        hal->cb(hal, IEEE802154_RADIO_INDICATION_RX_START);
-    }
-    else if (irq_mask & SX126X_IRQ_HEADER_ERROR) {
-        DEBUG("[sx126x] netdev: SX126X_IRQ_HEADER_ERROR\n");
-    }
-    else if (irq_mask & SX126X_IRQ_CRC_ERROR) {
-        DEBUG("[sx126x] netdev: SX126X_IRQ_CRC_ERROR\n");
-        hal->cb(hal, IEEE802154_RADIO_INDICATION_CRC_ERROR);
-    }
-    else if (irq_mask & SX126X_IRQ_CAD_DONE) {
-        if (irq_mask & SX126X_IRQ_CAD_DETECTED){
-            DEBUG("[sx126x] netdev: SX126X_IRQ_CAD_DETECTED \n");
-            dev->cad_detected = true;
+        if (irq_mask & SX126X_IRQ_TX_DONE) {
+            DEBUG("[sx126x] netdev: SX126X_IRQ_TX_DONE\n");
+            hal->cb(hal, IEEE802154_RADIO_CONFIRM_TX_DONE);
         }
-        DEBUG("[sx126x] netdev: SX126X_IRQ_CAD_DONE\n");
-        hal->cb(hal, IEEE802154_RADIO_CONFIRM_CCA);
+        if (irq_mask & SX126X_IRQ_RX_DONE) {
+            DEBUG("[sx126x] netdev: SX126X_IRQ_RX_DONE\n");
         
-    }
-    else if (irq_mask & SX126X_IRQ_TIMEOUT) {
-        DEBUG("[sx126x] netdev: SX126X_IRQ_TIMEOUT\n");
-    }
-    else {
-        DEBUG("[sx126x] netdev: SX126X_IRQ_NONE\n");
-    }
+            hal->cb(hal, IEEE802154_RADIO_INDICATION_RX_DONE);
+        }
+        if (irq_mask & SX126X_IRQ_PREAMBLE_DETECTED) {
+            DEBUG("[sx126x] netdev: SX126X_IRQ_PREAMBLE_DETECTED\n");
+        }
+        if (irq_mask & SX126X_IRQ_SYNC_WORD_VALID) {
+            DEBUG("[sx126x] netdev: SX126X_IRQ_SYNC_WORD_VALID\n");
+            
+        }
+        if (irq_mask & SX126X_IRQ_HEADER_VALID) {
+            DEBUG("[sx126x] netdev: SX126X_IRQ_HEADER_VALID\n");
+            hal->cb(hal, IEEE802154_RADIO_INDICATION_RX_START);
+        }
+        if (irq_mask & SX126X_IRQ_HEADER_ERROR) {
+            DEBUG("[sx126x] netdev: SX126X_IRQ_HEADER_ERROR\n");
+        }
+        if (irq_mask & SX126X_IRQ_CRC_ERROR) {
+            DEBUG("[sx126x] netdev: SX126X_IRQ_CRC_ERROR\n");
+            hal->cb(hal, IEEE802154_RADIO_INDICATION_CRC_ERROR);
+        }
+        if (irq_mask & SX126X_IRQ_CAD_DONE) {
+            if (irq_mask & SX126X_IRQ_CAD_DETECTED){
+                DEBUG("[sx126x] netdev: SX126X_IRQ_CAD_DETECTED \n");
+                dev->cad_detected = true;
+            }
+            DEBUG("[sx126x] netdev: SX126X_IRQ_CAD_DONE\n");
+            hal->cb(hal, IEEE802154_RADIO_CONFIRM_CCA);
+            
+        }
+        if (irq_mask & SX126X_IRQ_TIMEOUT) {
+            DEBUG("[sx126x] netdev: SX126X_IRQ_TIMEOUT\n");
+        }
 
-    #if IS_USED(MODULE_SX126X_STM32WL)
-        NVIC_EnableIRQ(SUBGHZ_Radio_IRQn);
-    #endif  
-}
+        if (!irq_mask) {
+            DEBUG("[sx126x] netdev: SX126X_IRQ_NONE\n");
+        }
+
+        #if IS_USED(MODULE_SX126X_STM32WL)
+            NVIC_EnableIRQ(SUBGHZ_Radio_IRQn);
+        #endif  
+    }
 }
 
                         /*RADIO HAL FUNCTIONS*/
 
 static int _write(ieee802154_dev_t *hal, const iolist_t *iolist){
+
 
     sx126x_t *dev = hal->priv;
     (void)dev;
@@ -232,9 +232,9 @@ static int _request_op(ieee802154_dev_t *hal, ieee802154_hal_op_t op, void *ctx)
     sx126x_t *dev = hal->priv;
     (void)dev;
     (void)ctx;
+    DEBUG("[sx126x] request_op\n");
     switch (op) {
         case IEEE802154_HAL_OP_TRANSMIT:
-        puts("TX");
         _set_state(dev, STATE_TX);
 
         break;
@@ -246,7 +246,6 @@ static int _request_op(ieee802154_dev_t *hal, ieee802154_hal_op_t op, void *ctx)
 
         case IEEE802154_HAL_OP_SET_IDLE:
 
-        puts("OP_SET_IDLE");
         _set_state(dev, STATE_IDLE);
 
         break;
@@ -268,6 +267,7 @@ static int _request_op(ieee802154_dev_t *hal, ieee802154_hal_op_t op, void *ctx)
 }
 
 static int _confirm_op(ieee802154_dev_t *hal, ieee802154_hal_op_t op, void *ctx){
+    DEBUG("[sx126x] confirm_op\n");
     sx126x_t *dev = hal->priv;
     (void)op;
     (void)ctx;
@@ -285,19 +285,23 @@ switch (op){
         while(state == STATE_TX)
             _get_state(dev, &state);
         
+        DEBUG("[sx126x] confirm_op: TRANSMIT\n");
         break;
 
     case IEEE802154_HAL_OP_SET_RX:
         if(state!=STATE_RX) 
             eagain = true;
+        DEBUG("[sx126x] confirm_op: RX\n");
     break;
 
     case IEEE802154_HAL_OP_SET_IDLE:
         eagain = (state != STATE_IDLE);
+        DEBUG("[sx126x] confirm_op: IDLE\n");
         break;
 
     case IEEE802154_HAL_OP_CCA:
             *((bool*) ctx) = !dev->cad_detected;
+        DEBUG("[sx126x] confirm_op: CCA\n");
     break;
 
     default:
@@ -317,6 +321,7 @@ switch (op){
 
 static int _len(ieee802154_dev_t *hal){
     (void)hal;
+    DEBUG("[sx126x] _len\n");
     sx126x_t *dev = hal->priv;
     sx126x_rx_buffer_status_t rx_buffer_status;
     sx126x_get_rx_buffer_status(dev, &rx_buffer_status);
@@ -330,6 +335,7 @@ static int _read(ieee802154_dev_t *hal, void *buf, size_t max_size, ieee802154_r
     (void)buf;
     (void)info;
 
+    DEBUG("[sx126x] _read\n");
     sx126x_t* dev = hal->priv;
 
         /* Getting information about last received packet */
@@ -374,6 +380,7 @@ static int _set_cca_threshold(ieee802154_dev_t *hal, int8_t threshold)
 static int _config_phy(ieee802154_dev_t *hal, const ieee802154_phy_conf_t *conf){
     (void)hal;
     (void)conf;
+    DEBUG("[sx126x] _config_phy\n");
     sx126x_t *dev = hal->priv;
     uint8_t channel = conf->channel;
     int8_t pow = conf->pow;
@@ -396,8 +403,10 @@ static int _config_phy(ieee802154_dev_t *hal, const ieee802154_phy_conf_t *conf)
 static int _off(ieee802154_dev_t *hal)
 {
     (void)hal;
+    DEBUG("[sx126x] _off\n");
     sx126x_t *dev = hal->priv;
-    sx126x_set_sleep(dev, SX126X_SLEEP_CFG_COLD_START);
+    (void) dev;
+    //sx126x_set_sleep(dev, SX126X_SLEEP_CFG_COLD_START);
     return 0;
 }
 
@@ -413,7 +422,7 @@ static int _request_on(ieee802154_dev_t *hal)
 {
     (void)hal;
     sx126x_t *dev = hal->priv;
-    puts("ON");
+    DEBUG("[sx126x] _request_on\n");
     _set_state(dev, STATE_IDLE);
     return 0;
 }
@@ -421,6 +430,7 @@ static int _request_on(ieee802154_dev_t *hal)
 static int _confirm_on(ieee802154_dev_t *hal)
 {
     (void)hal;
+    DEBUG("[sx126x] _confirm_on\n");
 
     return 0;
 }
@@ -430,11 +440,12 @@ static int _set_cca_mode(ieee802154_dev_t *hal, ieee802154_cca_mode_t mode)
     (void)hal;
     sx126x_t* dev = hal->priv;
     DEBUG("[sx126x] netdev: set_cca_mode \n");
-        dev->cad_params.cad_exit_mode = SX126X_CAD_ONLY,
-        dev->cad_params.cad_detect_min = 10,
-        dev->cad_params.cad_detect_peak = 22,
-        dev->cad_params.cad_symb_nb = SX126X_CAD_02_SYMB,
-        dev->cad_params.cad_timeout = 0x000F00;
+    dev->cad_params.cad_exit_mode = SX126X_CAD_ONLY,
+    dev->cad_params.cad_detect_min = 10,
+    dev->cad_params.cad_detect_peak = 22,
+    dev->cad_params.cad_symb_nb = SX126X_CAD_02_SYMB,
+    dev->cad_params.cad_timeout = 0x000001;
+    sx126x_set_cad_params(dev, &dev->cad_params);
     (void)mode;
 
     return 0;

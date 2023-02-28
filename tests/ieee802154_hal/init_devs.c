@@ -36,10 +36,10 @@
 #include "socket_zep_params.h"
 #endif
 
+#include "event/thread.h"
 #ifdef MODULE_KW2XRF
 #include "kw2xrf.h"
 #include "kw2xrf_params.h"
-#include "event/thread.h"
 #define KW2XRF_NUM   ARRAY_SIZE(kw2xrf_params)
 extern void auto_init_event_thread(void);
 static kw2xrf_t kw2xrf_dev[KW2XRF_NUM];
@@ -100,7 +100,7 @@ void ieee802154_hal_test_init_devs(ieee802154_dev_cb_t cb, void *opaque)
     if((radio = cb(IEEE802154_DEV_TYPE_SX126X, opaque))){
         for (unsigned i = 0; i < SX126X_NUMOF; ++i) {
         sx126x_hal_setup(&sx126x_devs[i], radio);
-        sx126x_init(&sx126x_devs[i], &sx126x_params[i]);
+        sx126x_init(&sx126x_devs[i], &sx126x_params[i], EVENT_PRIO_HIGHEST);
         sx126x_setup(&sx126x_devs[i],  i);
         }
     };

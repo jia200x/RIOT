@@ -30,6 +30,7 @@
 #include "net/l2util.h"
 #include "net/ieee802154.h"
 #include "net/ieee802154/radio.h"
+#include "event/thread.h"
 
 #include "shell.h"
 

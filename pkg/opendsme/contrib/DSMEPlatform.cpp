@@ -729,6 +729,7 @@ void DSMEPlatform::turnTransceiverOn()
     res = ieee802154_radio_confirm_on(this->radio);
     DSME_ASSERT(res == 0);
     ieee802154_radio_set_cca_threshold(this->radio, CONFIG_IEEE802154_CCA_THRESH_DEFAULT);
+    ieee802154_radio_set_cca_mode(this->radio, IEEE802154_CCA_MODE_ED_THRESHOLD);
 }
 
 void DSMEPlatform::turnTransceiverOff()
