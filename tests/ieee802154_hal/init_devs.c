@@ -36,6 +36,26 @@
 #include "socket_zep_params.h"
 #endif
 
+#ifdef MODULE_KW2XRF
+#include "kw2xrf.h"
+#include "kw2xrf_params.h"
+#include "event/thread.h"
+#define KW2XRF_NUM   ARRAY_SIZE(kw2xrf_params)
+extern void auto_init_event_thread(void);
+static kw2xrf_t kw2xrf_dev[KW2XRF_NUM];
+static bhp_event_t kw2xrf_bhp[KW2XRF_NUM];
+
+#endif
+
+#ifdef MODULE_SX126X
+#include "sx126x.h"
+#include "sx126x_params.h"
+
+#define SX126X_NUMOF                ARRAY_SIZE(sx126x_params)
+
+static sx126x_t sx126x_devs[SX126X_NUMOF];
+#endif
+
 void ieee802154_hal_test_init_devs(ieee802154_dev_cb_t cb, void *opaque)
 {
     /* Call the init function of the device (this should be handled by
@@ -56,11 +76,33 @@ void ieee802154_hal_test_init_devs(ieee802154_dev_cb_t cb, void *opaque)
     }
 #endif
 
+#ifdef MODULE_KW2XRF
+    auto_init_event_thread();
+    if ((radio = cb(IEEE802154_DEV_TYPE_KW2XRF, opaque)) ){
+        for (unsigned i = 0; i < KW2XRF_NUM; i++) {
+            const kw2xrf_params_t *p = &kw2xrf_params[i];
+            bhp_event_init(&kw2xrf_bhp[i], EVENT_PRIO_HIGHEST, &kw2xrf_radio_hal_irq_handler, radio);
+            kw2xrf_init(&kw2xrf_dev[i], p, radio, bhp_event_isr_cb, &kw2xrf_bhp[i]);
+            break;
+        }
+    }
+#endif
+
 #ifdef MODULE_SOCKET_ZEP
     static socket_zep_t _socket_zeps[SOCKET_ZEP_MAX];
     if ((radio = cb(IEEE802154_DEV_TYPE_SOCKET_ZEP, opaque)) ){
         socket_zep_hal_setup(&_socket_zeps[0], radio);
         socket_zep_setup(&_socket_zeps[0], &socket_zep_params[0]);
     }
+#endif
+
+#ifdef MODULE_SX126X
+    if((radio = cb(IEEE802154_DEV_TYPE_SX126X, opaque))){
+        for (unsigned i = 0; i < SX126X_NUMOF; ++i) {
+        sx126x_hal_setup(&sx126x_devs[i], radio);
+        sx126x_init(&sx126x_devs[i], &sx126x_params[i]);
+        sx126x_setup(&sx126x_devs[i],  i);
+        }
+    };
 #endif
 }

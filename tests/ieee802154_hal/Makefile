@@ -16,9 +16,12 @@ BOARD_WHITELIST :=  \
 					remote-pa \
 					remote-reva \
 					remote-revb \
+					pba-d-01-kw2x \
+					nucleo-wl55jc \
+					rak3172 \
 					#
 
-DISABLE_MODULE += auto_init_at86rf2xx auto_init_nrf802154
+DISABLE_MODULE += auto_init_at86rf2xx auto_init_nrf802154 auto_init_sx126x
 
 ifeq ($(BOARD), native)
   ZEP_PORT_BASE ?= 17754
@@ -41,7 +44,8 @@ USEMODULE += event_thread
 USEMODULE += event_callback
 USEMODULE += xtimer
 USEMODULE += netdev_default
-
+USEMODULE += od_string
+USEMODULE += sx126x_stm32wl
 CFLAGS += -DEVENT_THREAD_MEDIUM_STACKSIZE=1024
 
 include $(RIOTBASE)/Makefile.include
