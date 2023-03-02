@@ -395,6 +395,8 @@ static void _receive(gnrc_pktsnip_t *pkt)
         pkt = tmp;
         if (gnrc_pktbuf_realloc_data(pkt, pkt->size + 1)) {
             DEBUG("schc: Unable resize payload to prepend FPort\n");
+            gnrc_pktbuf_release(pkt);
+            return;
         }
         data = pkt->data;
 
