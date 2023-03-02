@@ -130,7 +130,8 @@ void gnrc_lorawan_mcps_indication(gnrc_lorawan_t *mac, mcps_indication_t *ind)
     }
 
     if (!gnrc_netapi_dispatch_receive(nettype, demux, pkt)) {
-        DEBUG("gnrc_lorawan_netif: unable to forward packet\n");
+        printf("%i %i\n", nettype, demux);
+        puts("gnrc_lorawan_netif: unable to forward packet\n");
         goto release;
     }
 
@@ -753,6 +754,11 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
                 mlme_request.mib.activation = MLME_ACTIVATION_ABP;
                 gnrc_lorawan_mlme_request(&netif->lorawan.mac,
                                           &mlme_request, &mlme_confirm);
+                DEBUG("gnrc_lorawan: join succeeded %d\n", netif->pid);
+                if (mlme_confirm.status == 0 && netif->dev) {
+                    netif->flags |= GNRC_NETIF_FLAGS_HAS_L2ADDR;
+                    netif->dev->event_callback(netif->dev, NETDEV_EVENT_LINK_UP);
+                }
             }
         }
         else {
