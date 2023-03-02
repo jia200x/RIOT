@@ -86,9 +86,20 @@ static inline void _set_be_addr(gnrc_lorawan_t *mac, uint8_t *be_addr)
 void gnrc_lorawan_mcps_indication(gnrc_lorawan_t *mac, mcps_indication_t *ind)
 {
     gnrc_netif_t *netif = container_of(mac, gnrc_netif_t, lorawan.mac);
-    gnrc_nettype_t nettype = IS_ACTIVE(CONFIG_GNRC_NETIF_LORAWAN_NETIF_HDR)
-                     ? GNRC_NETTYPE_UNDEF
-                     : GNRC_NETTYPE_LORAWAN;
+    gnrc_nettype_t nettype;
+
+    if (IS_ACTIVE(CONFIG_GNRC_NETIF_LORAWAN_NETIF_HDR)) {
+#if IS_ACTIVE(MODULE_GNRC_NETTYPE_SCHC)
+        /* TODO if both LoRaWAN and SCHC are required on top, this needs to be implemented in SCHC:
+         * If FPort, i.e. SCHC RuleID, unknown, send to LoRaWAN */
+        nettype = GNRC_NETTYPE_SCHC
+#else
+        nettype = GNRC_NETTYPE_UNDEF;
+#endif
+    }
+    else {
+        nettype = GNRC_NETTYPE_LORAWAN;
+    }
     uint32_t demux = IS_ACTIVE(CONFIG_GNRC_NETIF_LORAWAN_NETIF_HDR)
                      ? GNRC_NETREG_DEMUX_CTX_ALL
                      : ind->data.port;
