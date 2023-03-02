@@ -92,7 +92,7 @@ void gnrc_lorawan_mcps_indication(gnrc_lorawan_t *mac, mcps_indication_t *ind)
 #if IS_ACTIVE(MODULE_GNRC_NETTYPE_SCHC)
         /* TODO if both LoRaWAN and SCHC are required on top, this needs to be implemented in SCHC:
          * If FPort, i.e. SCHC RuleID, unknown, send to LoRaWAN */
-        nettype = GNRC_NETTYPE_SCHC
+        nettype = GNRC_NETTYPE_SCHC;
 #else
         nettype = GNRC_NETTYPE_UNDEF;
 #endif

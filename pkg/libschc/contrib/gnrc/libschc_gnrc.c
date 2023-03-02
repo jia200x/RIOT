@@ -37,6 +37,12 @@
 #define GNRC_SCHC_TIMER_CB_MSG  0x02FA
 #define MAX_PACKET_LENGTH       128
 
+static_assert(
+    IS_ACTIVE(CONFIG_GNRC_NETIF_LORAWAN_NETIF_HDR),
+    "SCHC assumes LoRaWAN port to be encoded in GNRC netif header "
+    "(CONFIG_GNRC_NETIF_LORAWAN_NETIF_HDR = 1)"
+);
+
 typedef struct {
     void (*callback)(void *arg);
     void *arg;
@@ -314,13 +320,8 @@ static uint8_t send_callback(uint8_t* data, uint16_t length, uint32_t device_id)
 #endif
 #ifdef MODULE_GNRC_NETIF_LORAWAN
     case NETDEV_TYPE_LORA:
-        if (IS_ACTIVE(CONFIG_GNRC_NETIF_LORAWAN_NETIF_HDR)) {
-            dst[0] = data[0];
-            dst_len = sizeof(dst[0]);
-        }
-        else {
-            netif->lorawan.port = data[0];
-        }
+        dst[0] = data[0];
+        dst_len = sizeof(dst[0]);
         data++;
         length--;
         break;
@@ -372,6 +373,35 @@ static void _receive(gnrc_pktsnip_t *pkt)
         return;
     } else {
         netif = gnrc_netif_hdr_get_netif(netif_snip->data);
+    }
+
+    if (IS_USED(MODULE_GNRC_NETIF_LORAWAN) && (netif->device_type == NETDEV_TYPE_LORA)) {
+        gnrc_netif_hdr_t *netif_hdr = netif_snip->data;
+        gnrc_pktsnip_t *tmp;
+        uint8_t *data;
+
+        if (netif_hdr->dst_l2addr_len != 1) {
+            DEBUG("schc: Unexpected FPort length\n");
+            gnrc_pktbuf_release(pkt);
+            return;
+        }
+
+        tmp = gnrc_pktbuf_start_write(pkt);
+        if (!tmp) {
+            DEBUG("schc: Unable to write protect packet\n");
+            gnrc_pktbuf_release(pkt);
+            return;
+        }
+        pkt = tmp;
+        if (gnrc_pktbuf_realloc_data(pkt, pkt->size + 1)) {
+            DEBUG("schc: Unable resize payload to prepend FPort\n");
+        }
+        data = pkt->data;
+
+        for (int i = (pkt->size - 2); i >= 0; i--) {
+            data[i + 1] = data[i];
+        }
+        data[0] = *gnrc_netif_hdr_get_dst_addr(netif_hdr);
     }
 
     uint32_t device_id = _get_device_id(netif);
