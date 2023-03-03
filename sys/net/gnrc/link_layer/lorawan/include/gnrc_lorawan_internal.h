@@ -254,6 +254,15 @@ typedef struct gnrc_lorawan gnrc_lorawan_t;
 typedef gnrc_lorawan_fsm_status_t (*gnrc_lorawan_state_t)(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev);
 
 /**
+ * @brief GNRC LoRaWAN RX state
+ */
+typedef enum {
+    GNRC_LORAWAN_RXW_1,
+    GNRC_LORAWAN_RXW_2,
+    GNRC_LORAWAN_RX_PENDING,
+} gnrc_lorawan_rx_state_t;
+
+/**
  * @brief GNRC LoRaWAN mac descriptor */
 struct gnrc_lorawan {
     gnrc_lorawan_mcps_t mcps;                       /**< MCPS descriptor */
@@ -275,7 +284,7 @@ struct gnrc_lorawan {
     uint8_t last_dr;                                /**< datarate of the last transmission */
     uint8_t last_chan_idx;                          /**< channel index used for last transmission */
     gnrc_lorawan_state_t curr_state;                /**< current FSM state */
-    uint8_t rx_window;                              /** the current RX window */
+    gnrc_lorawan_rx_state_t rx_state;               /** the current RX state */
     iolist_t *psdu;                                 /** pointer to PSDU */
     event_timeout_t evt;                            /**< Main event timeout */
     event_timeout_t evt_aloha;                      /**< Aloha event timeout */

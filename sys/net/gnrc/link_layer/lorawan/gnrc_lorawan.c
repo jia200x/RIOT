@@ -275,14 +275,14 @@ static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lora
     netopt_state_t state = NETOPT_STATE_RX;
     switch(ev) {
         case GNRC_LORAWAN_EV_ENTRY:
-            if (mac->rx_window == 0) {
-                event_timeout_set(&mac->evt, MS_PER_SEC);
+            if (mac->rx_state == GNRC_LORAWAN_RXW_1) {
                 uint8_t dr_offset = (mac->dl_settings & GNRC_LORAWAN_DL_DR_OFFSET_MASK) >>
                                     GNRC_LORAWAN_DL_DR_OFFSET_POS;
 
                 _configure_rx_window(mac, mac->channel[mac->last_chan_idx],
                                      gnrc_lorawan_rx1_get_dr_offset(mac->last_dr,
                                                                     dr_offset));
+                event_timeout_set(&mac->evt, MS_PER_SEC);
             }
             else {
                 _configure_rx_window(mac, CONFIG_LORAMAC_DEFAULT_RX2_FREQ,
@@ -293,14 +293,29 @@ static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lora
             dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
             return GNRC_LORAWAN_FSM_HANDLED;
         case GNRC_LORAWAN_EV_EXIT:
-            mac->rx_window++;
+            mac->rx_state = GNRC_LORAWAN_RXW_2;
             return GNRC_LORAWAN_FSM_HANDLED;
         case GNRC_LORAWAN_EV_RX_TO:
             _sleep_radio(mac);
-            if (mac->rx_window == 0) {
+            if (mac->rx_state == GNRC_LORAWAN_RXW_1) {
                 return _state_transition(mac, _state_wait_rx_window);
             }
             else {
+                gnrc_lorawan_event_no_rx(mac);
+                return _state_transition(mac, _state_idle);
+            }
+            break;
+        case GNRC_LORAWAN_EV_TO:
+            /* This occurs when the packet is longer than the RX window duration.
+             * We set a maximum timeout in case the device does not trigger RX_DONE
+             */
+            if (mac->rx_state != GNRC_LORAWAN_RX_PENDING) {
+                mac->rx_state = GNRC_LORAWAN_RX_PENDING;
+                event_timeout_set(&mac->evt, 2000);
+            }
+            else {
+                /* If we get here again, go back to IDLE */
+                _sleep_radio(mac);
                 gnrc_lorawan_event_no_rx(mac);
                 return _state_transition(mac, _state_idle);
             }
@@ -336,7 +351,7 @@ static gnrc_lorawan_fsm_status_t _state_wait_rx_window(gnrc_lorawan_t *mac, gnrc
 {
     switch(ev) {
         case GNRC_LORAWAN_EV_ENTRY:
-            if (mac->rx_window == 0) {
+            if (mac->rx_state == GNRC_LORAWAN_RXW_1) {
                 /* Configure timeout */
                 /* if the MAC is not activated, then this is a Join Request */
                 int rx_1 = mac->mlme.activation == MLME_ACTIVATION_NONE ?
@@ -377,7 +392,7 @@ static gnrc_lorawan_fsm_status_t _state_tx(gnrc_lorawan_t *mac, gnrc_lorawan_eve
             return _state_transition(mac, _state_wait_rx_window);
         }
         case GNRC_LORAWAN_EV_EXIT:
-            mac->rx_window = 0;
+            mac->rx_state = GNRC_LORAWAN_RXW_1;
             return GNRC_LORAWAN_FSM_HANDLED;
         default:
             assert(false);
