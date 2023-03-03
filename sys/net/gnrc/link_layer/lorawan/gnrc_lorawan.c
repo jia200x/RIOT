@@ -328,15 +328,18 @@ static gnrc_lorawan_fsm_status_t _state_wait_rx_window(gnrc_lorawan_t *mac, gnrc
                        CONFIG_LORAMAC_DEFAULT_JOIN_DELAY1 : mac->rx_delay;
 
                 event_timeout_set(&mac->evt, rx_1 * MS_PER_SEC);
+
                 uint8_t dr_offset = (mac->dl_settings & GNRC_LORAWAN_DL_DR_OFFSET_MASK) >>
                                     GNRC_LORAWAN_DL_DR_OFFSET_POS;
 
                 _configure_rx_window(mac, 0,
                                      gnrc_lorawan_rx1_get_dr_offset(mac->last_dr,
                                                                     dr_offset));
-
             }
             else {
+                _configure_rx_window(mac, CONFIG_LORAMAC_DEFAULT_RX2_FREQ,
+                                 mac->dl_settings &
+                                 GNRC_LORAWAN_DL_RX2_DR_MASK);
                 event_timeout_set(&mac->evt, MS_PER_SEC);
             }
             _sleep_radio(mac);
