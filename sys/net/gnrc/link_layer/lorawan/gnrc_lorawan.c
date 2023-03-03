@@ -136,6 +136,9 @@ void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *joineui, const gnrc_lorawan
     }
 
     event_timeout_set(&mac->evt_toa, GNRC_LORAWAN_BACKOFF_WINDOW_TICK);
+
+    /* Trigger the entry state of IDLE */
+    _state_idle(mac, GNRC_LORAWAN_EV_ENTRY);
 }
 
 void gnrc_lorawan_reset(gnrc_lorawan_t *mac)
