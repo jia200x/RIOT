@@ -31,7 +31,7 @@
 
 #include "net/gnrc/schc.h"
 
-#define ENABLE_DEBUG            1
+#define ENABLE_DEBUG            0
 #include "debug.h"
 
 #define GNRC_SCHC_TIMER_CB_MSG  0x02FA
