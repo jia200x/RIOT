@@ -435,8 +435,7 @@ static void _handle_retransmissions(gnrc_lorawan_t *mac)
     }
     else {
         /* Schedule a retransmission */
-        /* TODO */
-        //gnrc_lorawan_set_timer(mac, 1000000 + random_uint32_range(0, 2000000));
+        event_timeout_set(&mac->evt_aloha, 1000 + random_uint32_range(0, 2000));
     }
 }
 

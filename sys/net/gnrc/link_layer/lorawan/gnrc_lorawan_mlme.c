@@ -96,11 +96,7 @@ static int gnrc_lorawan_send_join_request(gnrc_lorawan_t *mac, uint8_t *deveui,
     /* Use the buffer for MHDR */
     _build_join_req_pkt(eui, deveui, key, mac->mlme.dev_nonce, (uint8_t *)mac->mcps.mhdr_mic);
 
-    /* We need a random delay for join request. Otherwise there might be
-     * network congestion if a group of nodes start at the same time */
-    //gnrc_lorawan_set_timer(mac, random_uint32() & GNRC_LORAWAN_JOIN_DELAY_U32_MASK);
-    /* TODO */
-    gnrc_lorawan_trigger_join(mac);
+    event_timeout_set(&mac->evt_aloha, (random_uint32() & GNRC_LORAWAN_JOIN_DELAY_U32_MASK) / 1000);
 
     mac->mlme.backoff_budget -= mac->toa;
 

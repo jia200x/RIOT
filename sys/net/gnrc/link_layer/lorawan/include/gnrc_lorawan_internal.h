@@ -26,6 +26,7 @@
 #include "net/gnrc/pktbuf.h"
 #include "net/netdev.h"
 #include "net/loramac.h"
+#include "event/timeout.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,7 +64,7 @@ extern "C" {
 #define GNRC_LORAWAN_DIR_UPLINK (0U)                    /**< uplink frame direction */
 #define GNRC_LORAWAN_DIR_DOWNLINK (1U)                  /**< downlink frame direction */
 
-#define GNRC_LORAWAN_BACKOFF_WINDOW_TICK (3600000000LL) /**< backoff expire tick in usecs (set to 1 second) */
+#define GNRC_LORAWAN_BACKOFF_WINDOW_TICK (3600000LL) /**< backoff expire tick in usecs (set to 1 second) */
 
 #define GNRC_LORAWAN_BACKOFF_BUDGET_1   (36000000LL)    /**< budget of time on air during the first hour */
 #define GNRC_LORAWAN_BACKOFF_BUDGET_2   (36000000LL)    /**< budget of time on air between 1-10 hours after boot */
@@ -276,6 +277,12 @@ struct gnrc_lorawan {
     gnrc_lorawan_state_t curr_state;                /**< current FSM state */
     uint8_t rx_window;                              /** the current RX window */
     iolist_t *psdu;                                 /** pointer to PSDU */
+    event_timeout_t evt;                            /**< Main event timeout */
+    event_timeout_t evt_aloha;                      /**< Aloha event timeout */
+    event_timeout_t evt_toa;                        /**< Time on Air event timeout */
+    event_t ev_timer;                               /**< Main timer event */
+    event_t ev_aloha;                               /**< Aloha event */
+    event_t ev_toa;                                 /**< Time on Air event */
 };
 
 /**

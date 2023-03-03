@@ -45,6 +45,9 @@ static gnrc_lorawan_fsm_status_t _state_idle(gnrc_lorawan_t *mac, gnrc_lorawan_e
 static gnrc_lorawan_fsm_status_t _state_wait_rx_window(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev);
 static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev);
 static gnrc_lorawan_fsm_status_t _state_tx(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev);
+static void _ev_timer(event_t *ev);
+static void _ev_aloha(event_t *ev);
+static void _ev_toa(event_t *ev);
 
 static inline void gnrc_lorawan_mlme_reset(gnrc_lorawan_t *mac)
 {
@@ -109,7 +112,7 @@ static void _load_persistent_state(gnrc_lorawan_t *mac)
 #endif
 }
 
-void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *joineui, const gnrc_lorawan_key_ctx_t *ctx)
+void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *joineui, const gnrc_lorawan_key_ctx_t *ctx, event_queue_t *evq)
 {
     DEBUG("Lorawan init !\n");
     mac->joineui = joineui;
@@ -117,12 +120,22 @@ void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *joineui, const gnrc_lorawan
     memcpy(&mac->ctx, ctx, sizeof(gnrc_lorawan_key_ctx_t));
 
     mac->busy = false;
+    mac->ev_timer.handler = _ev_timer;
+    mac->ev_aloha.handler = _ev_aloha;
+    mac->ev_toa.handler = _ev_toa;
+
+    event_timeout_ztimer_init(&mac->evt, ZTIMER_MSEC, evq, &mac->ev_timer);
+    event_timeout_ztimer_init(&mac->evt_aloha, ZTIMER_MSEC, evq, &mac->ev_aloha);
+    event_timeout_ztimer_init(&mac->evt_toa, ZTIMER_MSEC, evq, &mac->ev_toa);
+
     gnrc_lorawan_mlme_backoff_init(mac);
     gnrc_lorawan_reset(mac);
 
     if (IS_USED(MODULE_GNRC_LORAWAN_1_1)) {
         _load_persistent_state(mac);
     }
+
+    event_timeout_set(&mac->evt_toa, GNRC_LORAWAN_BACKOFF_WINDOW_TICK);
 }
 
 void gnrc_lorawan_reset(gnrc_lorawan_t *mac)
@@ -213,13 +226,30 @@ void gnrc_lorawan_dispatch_event(gnrc_lorawan_t *mac, gnrc_lorawan_event_t event
         assert(res != GNRC_LORAWAN_FSM_TRANSITION);
         last_event = GNRC_LORAWAN_EV_ENTRY;
     }
-
-    return 0;
 }
 
-
-void gnrc_lorawan_timeout_cb(gnrc_lorawan_t *mac)
+static void _ev_toa(event_t *ev)
 {
+    gnrc_lorawan_t *mac = container_of(ev, gnrc_lorawan_t, ev_toa);
+    gnrc_lorawan_mlme_backoff_expire_cb(mac);
+    event_timeout_set(&mac->evt_toa, GNRC_LORAWAN_BACKOFF_WINDOW_TICK);
+}
+
+static void _ev_aloha(event_t *ev)
+{
+    gnrc_lorawan_t *mac = container_of(ev, gnrc_lorawan_t, ev_aloha);
+    if (mac->mlme.activation == MLME_ACTIVATION_NONE) {
+        /* Send join request */
+        gnrc_lorawan_trigger_join(mac);
+    }
+    else {
+        gnrc_lorawan_event_retrans_timeout(mac);
+    }
+}
+
+static void _ev_timer(event_t *ev)
+{
+    gnrc_lorawan_t *mac = container_of(ev, gnrc_lorawan_t, ev_timer);
     gnrc_lorawan_dispatch_event(mac, GNRC_LORAWAN_EV_TO);
 }
 
@@ -261,7 +291,7 @@ static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lora
             }
             break;
         case GNRC_LORAWAN_EV_RX_DONE:
-            gnrc_lorawan_remove_timer(mac);
+            event_timeout_clear(&mac->evt);
             _sleep_radio(mac);
             uint8_t *psdu = mac->psdu->iol_base;
             uint8_t size = mac->psdu->iol_len;
@@ -297,7 +327,7 @@ static gnrc_lorawan_fsm_status_t _state_wait_rx_window(gnrc_lorawan_t *mac, gnrc
                 int rx_1 = mac->mlme.activation == MLME_ACTIVATION_NONE ?
                        CONFIG_LORAMAC_DEFAULT_JOIN_DELAY1 : mac->rx_delay;
 
-                gnrc_lorawan_set_timer(mac, rx_1 * US_PER_SEC);
+                event_timeout_set(&mac->evt, rx_1 * MS_PER_SEC);
                 uint8_t dr_offset = (mac->dl_settings & GNRC_LORAWAN_DL_DR_OFFSET_MASK) >>
                                     GNRC_LORAWAN_DL_DR_OFFSET_POS;
 
@@ -307,7 +337,7 @@ static gnrc_lorawan_fsm_status_t _state_wait_rx_window(gnrc_lorawan_t *mac, gnrc
 
             }
             else {
-                gnrc_lorawan_set_timer(mac, US_PER_SEC);
+                event_timeout_set(&mac->evt, MS_PER_SEC);
             }
             _sleep_radio(mac);
             return GNRC_LORAWAN_FSM_HANDLED;

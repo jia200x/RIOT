@@ -203,20 +203,14 @@ static inline void gnrc_lorawan_radio_rx_error_cb(gnrc_lorawan_t *mac)
 }
 
 /**
- * @brief Indicate the MAC layer that the timer was fired
- *
- * @param[in] mac pointer to the MAC descriptor
- */
-void gnrc_lorawan_timeout_cb(gnrc_lorawan_t *mac);
-
-/**
  * @brief Init GNRC LoRaWAN
  *
  * @param[in] mac pointer to the MAC descriptor
  * @param[in] joineui pointer to Join EUI
  * @param[in] ctx pointer to LoRaWAN context
+ * @param[in] evq the event queue to post events to
  */
-void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *joineui, const gnrc_lorawan_key_ctx_t *ctx);
+void gnrc_lorawan_init(gnrc_lorawan_t *mac, uint8_t *joineui, const gnrc_lorawan_key_ctx_t *ctx, event_queue_t *evq);
 
 /**
  * @brief Perform a MLME request
@@ -322,23 +316,6 @@ netdev_t *gnrc_lorawan_get_netdev(gnrc_lorawan_t *mac);
  *         enable an undefined channel
  */
 int gnrc_lorawan_phy_set_channel_mask(gnrc_lorawan_t *mac, uint16_t channel_mask);
-
-/**
- * @brief Set a timer with the given time
- * @note Supposed to be implemented by the user of GNRC LoRaWAN
- *
- * @param[in] mac pointer to the MAC descriptor
- * @param us timeout microseconds
- */
-void gnrc_lorawan_set_timer(gnrc_lorawan_t *mac, uint32_t us);
-
-/**
- * @brief Remove the current timer
- * @note Supposed to be implemented by the user of GNRC LoRaWAN
- *
- * @param[in] mac pointer to the MAC descriptor
- */
-void gnrc_lorawan_remove_timer(gnrc_lorawan_t *mac);
 
 /**
  * @brief Set unconfirmed uplink redundancy
