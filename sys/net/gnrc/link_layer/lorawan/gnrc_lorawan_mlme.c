@@ -59,9 +59,8 @@ void gnrc_lorawan_trigger_join(gnrc_lorawan_t *mac)
     iolist_t pkt = { .iol_base = mac->mcps.mhdr_mic, .iol_len =
                          sizeof(lorawan_join_request_t), .iol_next = NULL };
 
-    mac->last_chan_idx = gnrc_lorawan_pick_channel(mac);
     gnrc_lorawan_send_pkt(mac, &pkt, mac->last_dr,
-                          mac->channel[mac->last_chan_idx]);
+                          gnrc_lorawan_pick_channel(mac));
 }
 
 static int gnrc_lorawan_send_join_request(gnrc_lorawan_t *mac, uint8_t *deveui,
@@ -93,14 +92,15 @@ static int gnrc_lorawan_send_join_request(gnrc_lorawan_t *mac, uint8_t *deveui,
     }
 
     mac->last_dr = dr;
-    mac->state = LORAWAN_STATE_JOIN;
 
     /* Use the buffer for MHDR */
     _build_join_req_pkt(eui, deveui, key, mac->mlme.dev_nonce, (uint8_t *)mac->mcps.mhdr_mic);
 
     /* We need a random delay for join request. Otherwise there might be
      * network congestion if a group of nodes start at the same time */
-    gnrc_lorawan_set_timer(mac, random_uint32() & GNRC_LORAWAN_JOIN_DELAY_U32_MASK);
+    //gnrc_lorawan_set_timer(mac, random_uint32() & GNRC_LORAWAN_JOIN_DELAY_U32_MASK);
+    /* TODO */
+    gnrc_lorawan_trigger_join(mac);
 
     mac->mlme.backoff_budget -= mac->toa;
 

@@ -164,18 +164,32 @@ typedef struct {
 } mlme_indication_t;
 
 /**
+ * @brief Dispatch a GNRC LoRaWAN FSM event.
+ *
+ * @param[in] mac pointer to the MAC descriptor
+ * @param[in] event event to be dispatched.
+ */
+void gnrc_lorawan_dispatch_event(gnrc_lorawan_t *mac, gnrc_lorawan_event_t event);
+
+/**
  * @brief Indicate the MAC layer there was a timeout event
  *
  * @param[in] mac pointer to the MAC descriptor
  */
-void gnrc_lorawan_radio_rx_timeout_cb(gnrc_lorawan_t *mac);
+static inline void gnrc_lorawan_radio_rx_timeout_cb(gnrc_lorawan_t *mac)
+{
+    gnrc_lorawan_dispatch_event(mac, GNRC_LORAWAN_EV_RX_TO);
+}
 
 /**
  * @brief Indicate the MAC layer when the transmission finished
  *
  * @param[in] mac pointer to the MAC descriptor
  */
-void gnrc_lorawan_radio_tx_done_cb(gnrc_lorawan_t *mac);
+static inline void gnrc_lorawan_radio_tx_done_cb(gnrc_lorawan_t *mac)
+{
+    gnrc_lorawan_dispatch_event(mac, GNRC_LORAWAN_EV_TX_DONE);
+}
 
 /**
  * @brief Indicate the MAC layer reception of a frame went wrong.
@@ -243,8 +257,13 @@ void gnrc_lorawan_mcps_request(gnrc_lorawan_t *mac,
  *            not successful.
  * @param[in] size size of the PSDU
  */
-void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *data,
-                                   size_t size);
+static inline void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *psdu, size_t size)
+{
+    assert(psdu);
+    iolist_t iol = {.iol_base = psdu, .iol_len = size};
+    mac->psdu = &iol;
+    gnrc_lorawan_dispatch_event(mac, GNRC_LORAWAN_EV_RX_DONE);
+}
 
 /**
  * @brief MCPS indication callback

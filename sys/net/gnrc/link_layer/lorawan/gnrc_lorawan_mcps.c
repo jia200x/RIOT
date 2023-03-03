@@ -380,8 +380,6 @@ static void _transmit_pkt(gnrc_lorawan_t *mac)
         last_snip = last_snip->iol_next;
     }
 
-    mac->last_chan_idx = gnrc_lorawan_pick_channel(mac);
-
     uint16_t conf_fcnt = 0;
 
     if (IS_USED(MODULE_GNRC_LORAWAN_1_1)) {
@@ -401,7 +399,7 @@ static void _transmit_pkt(gnrc_lorawan_t *mac)
 
     last_snip->iol_next = &footer;
     gnrc_lorawan_send_pkt(mac, &header, mac->last_dr,
-                          mac->channel[mac->last_chan_idx]);
+                          gnrc_lorawan_pick_channel(mac));
 
     /* cppcheck-suppress redundantAssignment
      * (reason: cppcheck bug. The pointer is temporally modified to add a footer.
@@ -437,7 +435,8 @@ static void _handle_retransmissions(gnrc_lorawan_t *mac)
     }
     else {
         /* Schedule a retransmission */
-        gnrc_lorawan_set_timer(mac, 1000000 + random_uint32_range(0, 2000000));
+        /* TODO */
+        //gnrc_lorawan_set_timer(mac, 1000000 + random_uint32_range(0, 2000000));
     }
 }
 

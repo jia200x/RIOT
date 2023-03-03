@@ -216,12 +216,47 @@ typedef struct {
 } gnrc_lorawan_key_ctx_t;
 
 /**
+ * @brief GNRC LoRaWAN FSM Event type
+ */
+typedef enum {
+    GNRC_LORAWAN_EV_ENTRY,
+    GNRC_LORAWAN_EV_EXIT,
+    GNRC_LORAWAN_EV_REQUEST_TX,
+    GNRC_LORAWAN_EV_TX_DONE,
+    GNRC_LORAWAN_EV_TO,
+    GNRC_LORAWAN_EV_RX_TO,
+    GNRC_LORAWAN_EV_RX_DONE,
+} gnrc_lorawan_event_t;
+
+/**
+ * @brief GNRC LoRaWAN FSM Status
+ */
+typedef enum {
+    GNRC_LORAWAN_FSM_TRANSITION,
+    GNRC_LORAWAN_FSM_IGNORED,
+    GNRC_LORAWAN_FSM_HANDLED,
+} gnrc_lorawan_fsm_status_t;
+
+/**
+ * @brief Forward declaration of GNRC LoRaWAN MAC descriptor.
+ */
+typedef struct gnrc_lorawan gnrc_lorawan_t;
+
+/**
+ * @brief Prototype declaration of a GNRC LoRaWAN FSM state
+ *
+ * @param[in] pointer to the MAC descriptor
+ * @param[in] ev event to be procesed.
+ *
+ * @return the status of the FSM transaction
+ */
+typedef gnrc_lorawan_fsm_status_t (*gnrc_lorawan_state_t)(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev);
+
+/**
  * @brief GNRC LoRaWAN mac descriptor */
-typedef struct {
+struct gnrc_lorawan {
     gnrc_lorawan_mcps_t mcps;                       /**< MCPS descriptor */
     gnrc_lorawan_mlme_t mlme;                       /**< MLME descriptor */
-    void *mlme_buf;                                 /**< pointer to MLME buffer */
-    void *mcps_buf;                                 /**< pointer to MCPS buffer */
     uint8_t *joineui;                               /**< pointer to Join EUI */
     gnrc_lorawan_key_ctx_t ctx;                     /**< GNRC LoRaWAN key context struct */
 #if IS_USED(MODULE_GNRC_LORAWAN_1_1)
@@ -233,13 +268,15 @@ typedef struct {
     int busy;                                       /**< MAC busy  */
     int shutdown_req;                               /**< MAC Shutdown request */
     le_uint32_t dev_addr;                           /**< Device address */
-    int state;                                      /**< state of MAC layer */
     uint8_t dl_settings;                            /**< downlink settings */
     uint8_t rx_delay;                               /**< Delay of first reception window */
     uint8_t dr_range[GNRC_LORAWAN_MAX_CHANNELS];    /**< Datarate Range for all channels */
     uint8_t last_dr;                                /**< datarate of the last transmission */
-    uint8_t last_chan_idx;                          /**< index of channel used for last transmission */
-} gnrc_lorawan_t;
+    uint8_t last_chan_idx;                          /**< channel index used for last transmission */
+    gnrc_lorawan_state_t curr_state;                /**< current FSM state */
+    uint8_t rx_window;                              /** the current RX window */
+    iolist_t *psdu;                                 /** pointer to PSDU */
+};
 
 /**
  * @brief LoRaWAN state that needs to be preserved across reboots

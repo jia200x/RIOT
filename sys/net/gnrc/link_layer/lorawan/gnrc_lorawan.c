@@ -41,6 +41,11 @@
 #define GNRC_LORAWAN_DL_DR_OFFSET_MASK    (0x70)    /**< DL Settings RX2 DR mask */
 #define GNRC_LORAWAN_DL_DR_OFFSET_POS     (4)       /**< DL Settings RX2 DR pos */
 
+static gnrc_lorawan_fsm_status_t _state_idle(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev);
+static gnrc_lorawan_fsm_status_t _state_wait_rx_window(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev);
+static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev);
+static gnrc_lorawan_fsm_status_t _state_tx(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev);
+
 static inline void gnrc_lorawan_mlme_reset(gnrc_lorawan_t *mac)
 {
     mac->mlme.activation = MLME_ACTIVATION_NONE;
@@ -143,6 +148,7 @@ void gnrc_lorawan_reset(gnrc_lorawan_t *mac)
     gnrc_lorawan_mcps_reset(mac);
     gnrc_lorawan_mlme_reset(mac);
     gnrc_lorawan_channels_init(mac);
+    mac->curr_state = _state_idle;
 }
 
 void gnrc_lorawan_store_dev_nonce(uint8_t *dev_nonce)
@@ -195,125 +201,169 @@ static void _configure_rx_window(gnrc_lorawan_t *mac, uint32_t channel_freq,
     _config_radio(mac, channel_freq, dr, true);
 }
 
-void gnrc_lorawan_open_rx_window(gnrc_lorawan_t *mac)
+void gnrc_lorawan_dispatch_event(gnrc_lorawan_t *mac, gnrc_lorawan_event_t event)
 {
-    netdev_t *dev = gnrc_lorawan_get_netdev(mac);
+    gnrc_lorawan_state_t last_state = mac->curr_state;
+    int last_event = event;
+    int res;
 
-    /* Switch to RX state */
-    if (mac->state == LORAWAN_STATE_RX_1) {
-        gnrc_lorawan_set_timer(mac, US_PER_SEC);
+    /* This line may update the state if there's a state transition */
+    while ((res = mac->curr_state(mac, last_event)) == GNRC_LORAWAN_FSM_TRANSITION) {
+        res = last_state(mac, GNRC_LORAWAN_EV_EXIT);
+        assert(res != GNRC_LORAWAN_FSM_TRANSITION);
+        last_event = GNRC_LORAWAN_EV_ENTRY;
     }
-    netopt_state_t state = NETOPT_STATE_RX;
 
-    dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
+    return 0;
 }
+
 
 void gnrc_lorawan_timeout_cb(gnrc_lorawan_t *mac)
 {
-    switch (mac->state) {
-    case LORAWAN_STATE_RX_1:
-    case LORAWAN_STATE_RX_2:
-        gnrc_lorawan_open_rx_window(mac);
-        break;
-    case LORAWAN_STATE_JOIN:
-        gnrc_lorawan_trigger_join(mac);
-        break;
-    case LORAWAN_STATE_IDLE:
-        gnrc_lorawan_event_retrans_timeout(mac);
-        break;
-    default:
-        assert(false);
-        break;
-    }
-}
-
-void gnrc_lorawan_radio_tx_done_cb(gnrc_lorawan_t *mac)
-{
-    mac->state = LORAWAN_STATE_RX_1;
-
-    int rx_1;
-
-    /* if the MAC is not activated, then this is a Join Request */
-    rx_1 = mac->mlme.activation == MLME_ACTIVATION_NONE ?
-           CONFIG_LORAMAC_DEFAULT_JOIN_DELAY1 : mac->rx_delay;
-
-    gnrc_lorawan_set_timer(mac, rx_1 * US_PER_SEC);
-
-    uint8_t dr_offset = (mac->dl_settings & GNRC_LORAWAN_DL_DR_OFFSET_MASK) >>
-                        GNRC_LORAWAN_DL_DR_OFFSET_POS;
-
-    _configure_rx_window(mac, 0,
-                         gnrc_lorawan_rx1_get_dr_offset(mac->last_dr,
-                                                        dr_offset));
-
-    _sleep_radio(mac);
-}
-
-void gnrc_lorawan_radio_rx_timeout_cb(gnrc_lorawan_t *mac)
-{
-    (void)mac;
-    switch (mac->state) {
-    case LORAWAN_STATE_RX_1:
-        DEBUG("gnrc_lorawan: RX1 timeout.\n");
-        _configure_rx_window(mac, CONFIG_LORAMAC_DEFAULT_RX2_FREQ,
-                             mac->dl_settings &
-                             GNRC_LORAWAN_DL_RX2_DR_MASK);
-        mac->state = LORAWAN_STATE_RX_2;
-        break;
-    case LORAWAN_STATE_RX_2:
-        DEBUG("gnrc_lorawan: RX2 timeout.\n");
-        gnrc_lorawan_event_no_rx(mac);
-        mac->state = LORAWAN_STATE_IDLE;
-        break;
-    default:
-        assert(false);
-        break;
-    }
-    _sleep_radio(mac);
+    gnrc_lorawan_dispatch_event(mac, GNRC_LORAWAN_EV_TO);
 }
 
 void gnrc_lorawan_send_pkt(gnrc_lorawan_t *mac, iolist_t *psdu, uint8_t dr,
-                           uint32_t chan)
-{
-    netdev_t *dev = gnrc_lorawan_get_netdev(mac);
-
-    mac->state = LORAWAN_STATE_TX;
-
-    DEBUG("gnrc_lorawan: Channel: %" PRIu32 "Hz \n", chan);
-
-    _config_radio(mac, chan, dr, false);
-
-    uint8_t cr;
-
-    dev->driver->get(dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
-
-    mac->toa = lora_time_on_air(iolist_size(psdu), dr, cr);
-
-    if (dev->driver->send(dev, psdu) == -ENOTSUP) {
-        DEBUG("gnrc_lorawan: Cannot send: radio is still transmitting");
-    }
-
-}
-
-void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *psdu,
-                                   size_t size)
+                           uint32_t chan_idx)
 {
     assert(psdu);
-    _sleep_radio(mac);
-    mac->state = LORAWAN_STATE_IDLE;
-    gnrc_lorawan_remove_timer(mac);
+    mac->last_dr = dr;
+    mac->last_chan_idx = chan_idx;
+    mac->psdu = psdu;
+    gnrc_lorawan_dispatch_event(mac, GNRC_LORAWAN_EV_REQUEST_TX);
+}
 
-    uint8_t mtype = (*psdu & MTYPE_MASK) >> 5;
+static gnrc_lorawan_fsm_status_t _state_transition(gnrc_lorawan_t *mac, gnrc_lorawan_state_t next_state)
+{
+    mac->curr_state = next_state;
+    return GNRC_LORAWAN_FSM_TRANSITION;
+}
 
-    switch (mtype) {
-    case MTYPE_JOIN_ACCEPT:
-        gnrc_lorawan_mlme_process_join(mac, psdu, size);
-        break;
-    case MTYPE_CNF_DOWNLINK:
-    case MTYPE_UNCNF_DOWNLINK:
-        gnrc_lorawan_mcps_process_downlink(mac, psdu, size);
-        break;
-    default:
-        break;
+static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev)
+{
+    netdev_t *dev = gnrc_lorawan_get_netdev(mac);
+    netopt_state_t state = NETOPT_STATE_RX;
+    switch(ev) {
+        case GNRC_LORAWAN_EV_ENTRY:
+            mac->rx_window++;
+            dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
+            return GNRC_LORAWAN_FSM_HANDLED;
+        case GNRC_LORAWAN_EV_EXIT:
+            return GNRC_LORAWAN_FSM_IGNORED;
+        case GNRC_LORAWAN_EV_RX_TO:
+            _sleep_radio(mac);
+            if (mac->rx_window == 0) {
+                return _state_transition(mac, _state_wait_rx_window);
+            }
+            else {
+                gnrc_lorawan_event_no_rx(mac);
+                return _state_transition(mac, _state_idle);
+            }
+            break;
+        case GNRC_LORAWAN_EV_RX_DONE:
+            gnrc_lorawan_remove_timer(mac);
+            _sleep_radio(mac);
+            uint8_t *psdu = mac->psdu->iol_base;
+            uint8_t size = mac->psdu->iol_len;
+            uint8_t mtype = (*(psdu) & MTYPE_MASK) >> 5;
+
+            switch (mtype) {
+            case MTYPE_JOIN_ACCEPT:
+                gnrc_lorawan_mlme_process_join(mac, psdu, size);
+                break;
+            case MTYPE_CNF_DOWNLINK:
+            case MTYPE_UNCNF_DOWNLINK:
+                gnrc_lorawan_mcps_process_downlink(mac, psdu, size);
+                break;
+            default:
+                break;
+            }
+            return _state_transition(mac, _state_idle);
+        default:
+            assert(false);
+            break;
     }
+
+    return GNRC_LORAWAN_FSM_IGNORED;
+}
+
+static gnrc_lorawan_fsm_status_t _state_wait_rx_window(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev)
+{
+    switch(ev) {
+        case GNRC_LORAWAN_EV_ENTRY:
+            if (mac->rx_window == 0) {
+                /* Configure timeout */
+                /* if the MAC is not activated, then this is a Join Request */
+                int rx_1 = mac->mlme.activation == MLME_ACTIVATION_NONE ?
+                       CONFIG_LORAMAC_DEFAULT_JOIN_DELAY1 : mac->rx_delay;
+
+                gnrc_lorawan_set_timer(mac, rx_1 * US_PER_SEC);
+                uint8_t dr_offset = (mac->dl_settings & GNRC_LORAWAN_DL_DR_OFFSET_MASK) >>
+                                    GNRC_LORAWAN_DL_DR_OFFSET_POS;
+
+                _configure_rx_window(mac, 0,
+                                     gnrc_lorawan_rx1_get_dr_offset(mac->last_dr,
+                                                                    dr_offset));
+
+            }
+            else {
+                gnrc_lorawan_set_timer(mac, US_PER_SEC);
+            }
+            _sleep_radio(mac);
+            return GNRC_LORAWAN_FSM_HANDLED;
+        case GNRC_LORAWAN_EV_EXIT:
+            return GNRC_LORAWAN_FSM_IGNORED;
+        case GNRC_LORAWAN_EV_TO:
+            return _state_transition(mac, _state_rx_window);
+        default:
+            assert(false);
+            break;
+    }
+    return GNRC_LORAWAN_FSM_IGNORED;
+}
+
+static gnrc_lorawan_fsm_status_t _state_tx(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev)
+{
+    netdev_t *dev = gnrc_lorawan_get_netdev(mac);
+    switch(ev) {
+        case GNRC_LORAWAN_EV_ENTRY:
+            /* Send packet */
+            _config_radio(mac, mac->channel[mac->last_chan_idx], mac->last_dr, false);
+            uint8_t cr;
+
+            dev->driver->get(dev, NETOPT_CODING_RATE, &cr, sizeof(cr));
+            mac->toa = lora_time_on_air(iolist_size(mac->psdu), mac->last_dr, cr);
+            if (dev->driver->send(dev, mac->psdu) == -ENOTSUP) {
+                DEBUG("gnrc_lorawan: Cannot send: radio is still transmitting");
+            }
+            return GNRC_LORAWAN_FSM_HANDLED;
+        case GNRC_LORAWAN_EV_TX_DONE: {
+            return _state_transition(mac, _state_wait_rx_window);
+        }
+        case GNRC_LORAWAN_EV_EXIT:
+            mac->rx_window = 0;
+            return GNRC_LORAWAN_FSM_HANDLED;
+        default:
+            assert(false);
+            break;
+    }
+    return GNRC_LORAWAN_FSM_IGNORED;
+}
+
+static gnrc_lorawan_fsm_status_t _state_idle(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev)
+{
+    switch(ev) {
+        case GNRC_LORAWAN_EV_ENTRY:
+        case GNRC_LORAWAN_EV_EXIT:
+            return GNRC_LORAWAN_FSM_IGNORED;
+        case GNRC_LORAWAN_EV_REQUEST_TX: {
+            return _state_transition(mac, _state_tx);
+        }
+        break;
+        default:
+            printf("%i\n", ev);
+            assert(false);
+            break;
+    }
+    return GNRC_LORAWAN_FSM_IGNORED;
 }
