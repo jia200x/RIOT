@@ -101,6 +101,7 @@ typedef struct {
         mlme_activation_t activation;   /**< holds activation mechanism */
         void *dev_addr;                 /**< pointer to the dev_addr */
         uint8_t rx2_dr;                 /** datarate of second rx window */
+        bool link_check;                /**< whether link check is enabled or not */
     };
 } mlme_mib_t;
 
@@ -132,7 +133,6 @@ typedef struct {
     int16_t status;                         /**< status of the MLME confirm */
     mlme_type_t type;                       /**< type of the MLME confirm */
     union {
-        mlme_link_req_confirm_t link_req;   /**< Link Check confirmation data */
         mlme_mib_t mib;                     /**< MIB confirmation data */
     };
 } mlme_confirm_t;
@@ -161,6 +161,7 @@ typedef struct {
  */
 typedef struct {
     mlme_type_t type; /**< type of the MLME indication */
+    mlme_link_req_ind_t link_req;   /**< Link Check confirmation data */
 } mlme_indication_t;
 
 /**

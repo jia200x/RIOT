@@ -290,9 +290,15 @@ void gnrc_lorawan_mlme_request(gnrc_lorawan_t *mac,
                                                               mlme_request->join.dr);
         break;
     case MLME_LINK_CHECK:
-        mac->mlme.pending_mlme_opts |=
-            GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ;
-        mlme_confirm->status = GNRC_LORAWAN_REQ_STATUS_DEFERRED;
+        if (mlme_request->mib.link_check) {
+            mac->mlme.pending_mlme_opts |=
+                GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ;
+        }
+        else {
+            mac->mlme.pending_mlme_opts &=
+                ~GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ;
+        }
+        mlme_confirm->status = GNRC_LORAWAN_REQ_STATUS_SUCCESS;
         break;
     case MLME_SET:
         _mlme_set(mac, mlme_request, mlme_confirm);
@@ -321,16 +327,13 @@ static int _fopts_mlme_link_check_req(lorawan_buffer_t *buf)
 
 static void _mlme_link_check_ans(gnrc_lorawan_t *mac, uint8_t *p)
 {
-    mlme_confirm_t mlme_confirm;
+    mlme_indication_t mlme_indication;
 
-    mlme_confirm.link_req.margin = p[1];
-    mlme_confirm.link_req.num_gateways = p[2];
+    mlme_indication.link_req.margin = p[1];
+    mlme_indication.link_req.num_gateways = p[2];
 
-    mlme_confirm.type = MLME_LINK_CHECK;
-    mlme_confirm.status = GNRC_LORAWAN_REQ_STATUS_SUCCESS;
-    gnrc_lorawan_mlme_confirm(mac, &mlme_confirm);
-
-    mac->mlme.pending_mlme_opts &= ~GNRC_LORAWAN_MLME_OPTS_LINK_CHECK_REQ;
+    mlme_indication.type = MLME_LINK_CHECK;
+    gnrc_lorawan_mlme_indication(mac, &mlme_indication);
 }
 
 static int _fopts_mlme_link_rekey_ind(lorawan_buffer_t *buf)

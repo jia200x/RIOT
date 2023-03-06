@@ -156,12 +156,12 @@ typedef enum {
 } mlme_join_req_type_t;
 
 /**
- * @brief MLME Link Check confirmation data
+ * @brief MLME Link Check indication data
  */
 typedef struct {
     uint8_t margin;         /**< demodulation margin (in dB) */
     uint8_t num_gateways;   /**< number of gateways */
-} mlme_link_req_confirm_t;
+} mlme_link_req_ind_t;
 
 /**
  * @brief MCPS data

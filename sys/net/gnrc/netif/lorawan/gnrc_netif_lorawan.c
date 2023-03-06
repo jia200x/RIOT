@@ -60,9 +60,6 @@ static const gnrc_netif_ops_t lorawan_ops = {
 
 void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm)
 {
-    gnrc_netif_lorawan_t *lw_netif =
-        container_of(mac, gnrc_netif_lorawan_t, mac);
-
     if (confirm->type == MLME_JOIN) {
         if (confirm->status == 0) {
             gnrc_netif_lorawan_t *lw_netif = container_of(mac, gnrc_netif_lorawan_t, mac);
@@ -77,11 +74,6 @@ void gnrc_lorawan_mlme_confirm(gnrc_lorawan_t *mac, mlme_confirm_t *confirm)
         else {
             DEBUG("gnrc_lorawan: join failed\n");
         }
-    }
-    else if (confirm->type == MLME_LINK_CHECK) {
-        lw_netif->flags &= ~GNRC_NETIF_LORAWAN_FLAGS_LINK_CHECK;
-        lw_netif->demod_margin = confirm->link_req.margin;
-        lw_netif->num_gateways = confirm->link_req.num_gateways;
     }
 }
 
@@ -148,8 +140,14 @@ release:
 
 void gnrc_lorawan_mlme_indication(gnrc_lorawan_t *mac, mlme_indication_t *ind)
 {
-    (void)mac;
-    (void)ind;
+    gnrc_netif_lorawan_t *lw_netif =
+        container_of(mac, gnrc_netif_lorawan_t, mac);
+
+    if (ind->type == MLME_LINK_CHECK) {
+        lw_netif->flags &= ~GNRC_NETIF_LORAWAN_FLAGS_LINK_CHECK;
+        lw_netif->demod_margin = ind->link_req.margin;
+        lw_netif->num_gateways = ind->link_req.num_gateways;
+    }
 }
 
 void gnrc_lorawan_mcps_confirm(gnrc_lorawan_t *mac, mcps_confirm_t *confirm)
@@ -576,7 +574,12 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
         _set_be_addr(&netif->lorawan.mac, opt->data);
         break;
     case NETOPT_LINK_CHECK:
+        assert(opt->data_len == sizeof(netopt_enable_t));
         netif->lorawan.flags |= GNRC_NETIF_LORAWAN_FLAGS_LINK_CHECK;
+        mlme_request.type = MLME_SET;
+        mlme_request.mib.link_check = *((bool*) opt->data);
+        gnrc_lorawan_mlme_request(&netif->lorawan.mac,
+                                  &mlme_request, &mlme_confirm);
         break;
     case NETOPT_LORAWAN_RX2_DR:
         assert(opt->data_len == sizeof(uint8_t));
