@@ -167,9 +167,10 @@ typedef struct {
  * @brief Dispatch a GNRC LoRaWAN FSM event.
  *
  * @param[in] mac pointer to the MAC descriptor
+ * @param[in] fsm pointer to the FSM
  * @param[in] event event to be dispatched.
  */
-void gnrc_lorawan_dispatch_event(gnrc_lorawan_t *mac, gnrc_lorawan_event_t event);
+void gnrc_lorawan_dispatch_event(gnrc_lorawan_t *mac, gnrc_lorawan_state_t *fsm, gnrc_lorawan_event_t event);
 
 /**
  * @brief Indicate the MAC layer there was a timeout event
@@ -178,7 +179,7 @@ void gnrc_lorawan_dispatch_event(gnrc_lorawan_t *mac, gnrc_lorawan_event_t event
  */
 static inline void gnrc_lorawan_radio_rx_timeout_cb(gnrc_lorawan_t *mac)
 {
-    gnrc_lorawan_dispatch_event(mac, GNRC_LORAWAN_EV_RX_TO);
+    gnrc_lorawan_dispatch_event(mac, &mac->phy_fsm, GNRC_LORAWAN_EV_RX_TO);
 }
 
 /**
@@ -188,7 +189,7 @@ static inline void gnrc_lorawan_radio_rx_timeout_cb(gnrc_lorawan_t *mac)
  */
 static inline void gnrc_lorawan_radio_tx_done_cb(gnrc_lorawan_t *mac)
 {
-    gnrc_lorawan_dispatch_event(mac, GNRC_LORAWAN_EV_TX_DONE);
+    gnrc_lorawan_dispatch_event(mac, &mac->phy_fsm, GNRC_LORAWAN_EV_TX_DONE);
 }
 
 /**
@@ -256,7 +257,7 @@ static inline void gnrc_lorawan_radio_rx_done_cb(gnrc_lorawan_t *mac, uint8_t *p
     assert(psdu);
     iolist_t iol = {.iol_base = psdu, .iol_len = size};
     mac->psdu = &iol;
-    gnrc_lorawan_dispatch_event(mac, GNRC_LORAWAN_EV_RX_DONE);
+    gnrc_lorawan_dispatch_event(mac, &mac->phy_fsm, GNRC_LORAWAN_EV_RX_DONE);
 }
 
 /**
@@ -331,6 +332,24 @@ static inline void gnrc_lorawan_set_uncnf_redundancy(gnrc_lorawan_t *mac,
     assert(redundancy <= (0xF - 1));
     mac->mcps.redundancy = redundancy;
 }
+
+/**
+ * @brief Check whether GNRC LoRaWAN is busy
+ *
+ * @param[in] mac pointer to the MAC descriptor
+ *
+ * @return whether the state machine is busy or not
+ */
+bool gnrc_lorawan_is_busy(gnrc_lorawan_t *mac);
+
+/**
+ * @brief Check whether GNRC LoRaWAN has joined a network
+ *
+ * @param[in] mac pointer to the MAC descriptor
+ *
+ * @return whether the device is joined or not
+ */
+bool gnrc_lorawan_is_joined(gnrc_lorawan_t *mac);
 
 #ifdef __cplusplus
 }

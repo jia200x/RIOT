@@ -227,6 +227,9 @@ typedef enum {
     GNRC_LORAWAN_EV_TO,
     GNRC_LORAWAN_EV_RX_TO,
     GNRC_LORAWAN_EV_RX_DONE,
+    GNRC_LORAWAN_EV_PHY_READY,
+    GNRC_LORAWAN_EV_RX_ERROR,
+    GNRC_LORAWAN_EV_LINK_UP,
 } gnrc_lorawan_event_t;
 
 /**
@@ -275,7 +278,6 @@ struct gnrc_lorawan {
     uint32_t channel[GNRC_LORAWAN_MAX_CHANNELS];    /**< channel array */
     uint16_t channel_mask;                          /**< channel mask */
     uint32_t toa;                                   /**< Time on Air of the last transmission */
-    int busy;                                       /**< MAC busy  */
     int shutdown_req;                               /**< MAC Shutdown request */
     le_uint32_t dev_addr;                           /**< Device address */
     uint8_t dl_settings;                            /**< downlink settings */
@@ -283,14 +285,15 @@ struct gnrc_lorawan {
     uint8_t dr_range[GNRC_LORAWAN_MAX_CHANNELS];    /**< Datarate Range for all channels */
     uint8_t last_dr;                                /**< datarate of the last transmission */
     uint8_t last_chan_idx;                          /**< channel index used for last transmission */
-    gnrc_lorawan_state_t curr_state;                /**< current FSM state */
+    gnrc_lorawan_state_t phy_fsm;                   /**< PHY FSM state */
     gnrc_lorawan_rx_state_t rx_state;               /** the current RX state */
+    gnrc_lorawan_state_t mac_fsm;                   /**< the MAC state */
     iolist_t *psdu;                                 /** pointer to PSDU */
     event_timeout_t evt;                            /**< Main event timeout */
-    event_timeout_t evt_aloha;                      /**< Aloha event timeout */
+    event_timeout_t evt_mac;                        /**< MAC event timeout */
     event_timeout_t evt_toa;                        /**< Time on Air event timeout */
     event_t ev_timer;                               /**< Main timer event */
-    event_t ev_aloha;                               /**< Aloha event */
+    event_t ev_mac;                                 /**< MAC event */
     event_t ev_toa;                                 /**< Time on Air event */
 };
 
@@ -619,32 +622,6 @@ void gnrc_lorawan_open_rx_window(gnrc_lorawan_t *mac);
  * @param mac
  */
 void gnrc_lorawan_perform_save(gnrc_lorawan_t *mac);
-
-/**
- * @brief Acquire the MAC layer
- *
- * @param[in] mac pointer to the MAC descriptor
- *
- * @return true on success
- * @return false if MAC is already acquired
- */
-static inline int gnrc_lorawan_mac_acquire(gnrc_lorawan_t *mac)
-{
-    int _c = mac->busy;
-
-    mac->busy = true;
-    return !_c;
-}
-
-/**
- * @brief Release the MAC layer
- *
- * @param[in] mac pointer to the MAC descriptor
- */
-static inline void gnrc_lorawan_mac_release(gnrc_lorawan_t *mac)
-{
-    mac->busy = false;
-}
 
 /**
  * @brief Set the datarate of the second reception window
