@@ -34,16 +34,6 @@
 #define ENABLE_DEBUG 0
 #include "debug.h"
 
-static uint8_t _appskey[LORAMAC_APPSKEY_LEN];
-static uint8_t _appkey[LORAMAC_APPKEY_LEN];
-static uint8_t _snwksintkey[LORAMAC_SNWKSINTKEY_LEN];
-static uint8_t _nwksenckey[LORAMAC_NWKSENCKEY_LEN];
-static uint8_t _nwkkey[LORAMAC_NWKKEY_LEN];
-static uint8_t _joineui[LORAMAC_JOINEUI_LEN];
-static uint8_t _fnwksintkey[LORAMAC_FNWKSINTKEY_LEN];
-static uint8_t _deveui[LORAMAC_DEVEUI_LEN];
-static uint8_t _devaddr[LORAMAC_DEVADDR_LEN];
-
 static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt);
 static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif);
 static int _get(gnrc_netif_t *netif, gnrc_netapi_opt_t *opt);
@@ -266,6 +256,15 @@ netdev_t *gnrc_lorawan_get_netdev(gnrc_lorawan_t *mac)
     return netif->dev;
 }
 
+static void _reverse_array(uint8_t *arr, size_t len)
+{
+    for (unsigned i = 0; i < len/2; i++) {
+        uint8_t p = arr[i];
+        arr[i] = arr[len - i - 1];
+        arr[len - i - 1] = p;
+    }
+}
+
 static int _init(gnrc_netif_t *netif)
 {
     DEBUG("netif init ! \n");
@@ -278,39 +277,38 @@ static int _init(gnrc_netif_t *netif)
     netif->dev->event_callback = _driver_cb;
     _reset(netif);
 
+    uint8_t buf[LORAMAC_APPSKEY_LEN];
+
     /* Convert default keys, address and EUIs to hex */
-    fmt_hex_bytes(_appskey, CONFIG_LORAMAC_APP_SKEY_DEFAULT);
+    fmt_hex_bytes(netif->lorawan.appskey, CONFIG_LORAMAC_APP_SKEY_DEFAULT);
     if (IS_USED(MODULE_GNRC_LORAWAN_1_1)) {
-        fmt_hex_bytes(_joineui, CONFIG_LORAMAC_JOIN_EUI_DEFAULT);
-        fmt_hex_bytes(_appkey, CONFIG_LORAMAC_APP_KEY_DEFAULT);
-        fmt_hex_bytes(_nwkkey, CONFIG_LORAMAC_NWK_KEY_DEFAULT);
-        fmt_hex_bytes(_fnwksintkey, CONFIG_LORAMAC_FNWKSINT_KEY_DEFAULT);
-        fmt_hex_bytes(_snwksintkey, CONFIG_LORAMAC_SNWKSINT_KEY_DEFAULT);
-        fmt_hex_bytes(_nwksenckey, CONFIG_LORAMAC_NWKSENC_KEY_DEFAULT);
+        fmt_hex_bytes(netif->lorawan.joineui, CONFIG_LORAMAC_JOIN_EUI_DEFAULT);
+        fmt_hex_bytes(netif->lorawan.nwkkey, CONFIG_LORAMAC_NWK_KEY_DEFAULT);
+        fmt_hex_bytes(netif->lorawan.fnwksintkey, CONFIG_LORAMAC_FNWKSINT_KEY_DEFAULT);
     }
     else {
-        fmt_hex_bytes(_joineui, CONFIG_LORAMAC_APP_EUI_DEFAULT);
-        fmt_hex_bytes(_nwkkey, CONFIG_LORAMAC_APP_KEY_DEFAULT);
-        fmt_hex_bytes(_fnwksintkey, CONFIG_LORAMAC_NWK_SKEY_DEFAULT);
+        fmt_hex_bytes(netif->lorawan.joineui, CONFIG_LORAMAC_APP_EUI_DEFAULT);
+        fmt_hex_bytes(netif->lorawan.nwkkey, CONFIG_LORAMAC_APP_KEY_DEFAULT);
+        fmt_hex_bytes(netif->lorawan.fnwksintkey, CONFIG_LORAMAC_NWK_SKEY_DEFAULT);
     }
 
-    fmt_hex_bytes(_deveui, CONFIG_LORAMAC_DEV_EUI_DEFAULT);
-    fmt_hex_bytes(_devaddr, CONFIG_LORAMAC_DEV_ADDR_DEFAULT);
+    fmt_hex_bytes(netif->lorawan.deveui, CONFIG_LORAMAC_DEV_EUI_DEFAULT);
 
     /* Initialize default keys, address and EUIs */
-    memcpy(netif->lorawan.appskey, _appskey, sizeof(_appskey));
-    _memcpy_reversed(netif->lorawan.deveui, _deveui, sizeof(_deveui));
-    _memcpy_reversed(netif->lorawan.joineui, _joineui, sizeof(_joineui));
-    memcpy(netif->lorawan.nwkkey, _nwkkey, sizeof(_nwkkey));
-    memcpy(netif->lorawan.fnwksintkey, _fnwksintkey, sizeof(_fnwksintkey));
+    _reverse_array(netif->lorawan.deveui, LORAMAC_DEVEUI_LEN);
+    _reverse_array(netif->lorawan.joineui, LORAMAC_JOINEUI_LEN);
 
     if (IS_USED(MODULE_GNRC_LORAWAN_1_1)) {
-        gnrc_netif_lorawan_set_appkey(&netif->lorawan, _appkey, sizeof(_appkey));
-        gnrc_netif_lorawan_set_snwksintkey(&netif->lorawan, _snwksintkey, sizeof(_snwksintkey));
-        gnrc_netif_lorawan_set_nwksenckey(&netif->lorawan, _nwksenckey, sizeof(_nwksenckey));
+        fmt_hex_bytes(buf, CONFIG_LORAMAC_APP_KEY_DEFAULT);
+        gnrc_netif_lorawan_set_appkey(&netif->lorawan, buf, LORAMAC_APPSKEY_LEN);
+        fmt_hex_bytes(buf, CONFIG_LORAMAC_SNWKSINT_KEY_DEFAULT);
+        gnrc_netif_lorawan_set_snwksintkey(&netif->lorawan, buf, LORAMAC_SNWKSINTKEY_LEN);
+        fmt_hex_bytes(buf, CONFIG_LORAMAC_NWKSENC_KEY_DEFAULT);
+        gnrc_netif_lorawan_set_nwksenckey(&netif->lorawan, buf, LORAMAC_NWKSENCKEY_LEN);
     }
 
-    _set_be_addr(&netif->lorawan.mac, _devaddr);
+    fmt_hex_bytes(buf, CONFIG_LORAMAC_DEV_ADDR_DEFAULT);
+    _set_be_addr(&netif->lorawan.mac, buf);
 
     const gnrc_lorawan_key_ctx_t ctx = {
         .appskey = netif->lorawan.appskey,
