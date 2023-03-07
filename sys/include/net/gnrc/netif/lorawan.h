@@ -61,6 +61,7 @@ typedef struct {
     uint8_t deveui[LORAMAC_DEVEUI_LEN];             /**< Device EUI buffer */
     uint8_t joineui[LORAMAC_JOINEUI_LEN];           /**< Join EUI buffer */
     gnrc_lorawan_t mac;                             /**< gnrc lorawan mac descriptor */
+    msg_t msg_sched;                                /**< Message used for scheduling uplinks */
     uint8_t flags;                                  /**< flags for the LoRaWAN interface */
     uint8_t demod_margin;                           /**< value of last demodulation margin */
     uint8_t num_gateways;                           /**< number of gateways of last link check */

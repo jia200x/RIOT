@@ -231,7 +231,10 @@ void gnrc_lorawan_mcps_process_downlink(gnrc_lorawan_t *mac, uint8_t *psdu,
         gnrc_lorawan_process_fopts(mac, fopts->iol_base, fopts->iol_len);
     }
 
-    if (_pkt.frame_pending) {
+    /* In class C we do not need to request an uplink for frame pending,
+     * as the server can send a downlink at any time */
+    if ((_pkt.frame_pending && !IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C))
+        || _pkt.ack_req) {
         mlme_indication_t mlme_indication;
         mlme_indication.type = MLME_SCHEDULE_UPLINK;
         gnrc_lorawan_mlme_indication(mac, &mlme_indication);

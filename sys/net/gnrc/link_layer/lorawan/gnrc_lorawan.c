@@ -359,6 +359,8 @@ static gnrc_lorawan_fsm_status_t _state_mac_state_link_down(gnrc_lorawan_t *mac,
         else {
             return _state_transition(&mac->mac_fsm, _state_mac_state_tx_join_req);
         }
+    case GNRC_LORAWAN_EV_PHY_READY:
+        return GNRC_LORAWAN_FSM_IGNORED;
     default:
         assert(false);
         return GNRC_LORAWAN_FSM_IGNORED;
@@ -373,7 +375,6 @@ static gnrc_lorawan_fsm_status_t _state_mac_state_wait_join_req(gnrc_lorawan_t *
     case GNRC_LORAWAN_EV_ENTRY:
         return GNRC_LORAWAN_FSM_IGNORED;
 
-    case GNRC_LORAWAN_EV_TX_DONE:
     case GNRC_LORAWAN_EV_EXIT:
         return GNRC_LORAWAN_FSM_IGNORED;
 
@@ -486,7 +487,7 @@ static gnrc_lorawan_fsm_status_t _state_mac_state_tx(gnrc_lorawan_t *mac, gnrc_l
         /* Transmit packet on entry */
         _transmit_pkt(mac);
         break;
-    case GNRC_LORAWAN_EV_TX_DONE:
+    case GNRC_LORAWAN_EV_PHY_READY:
         /* Check whether this is a confirmed transmission or not */
         if (mac->mcps.waiting_for_ack) {
             return _state_transition(&mac->mac_fsm, _state_mac_state_wait_ack_req);
@@ -555,42 +556,37 @@ static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lora
                 _configure_rx_window(mac, mac->channel[mac->last_chan_idx],
                                      gnrc_lorawan_rx1_get_dr_offset(mac->last_dr, dr_offset),
                                      true);
-                event_timeout_set(&mac->evt, MS_PER_SEC);
+                /* Set timeout for RX2 */
+                if (!IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C)) {
+                    event_timeout_set(&mac->evt, MS_PER_SEC);
+                }
             }
             else {
+                assert(!IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C));
                 _configure_rx_window(mac, CONFIG_LORAMAC_DEFAULT_RX2_FREQ,
                                  mac->dl_settings &
                                  GNRC_LORAWAN_DL_RX2_DR_MASK,
-                                 !IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C));
+                                 true);
             }
             /* Open RX Window */
             dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
-            if (IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C)
-                && mac->mlme.activation != MLME_ACTIVATION_NONE
-                && mac->rx_state == GNRC_LORAWAN_RXW_2) {
-                return _state_transition(&mac->phy_fsm, _state_idle);
-            }
             return GNRC_LORAWAN_FSM_HANDLED;
         case GNRC_LORAWAN_EV_EXIT:
             mac->rx_state = GNRC_LORAWAN_RXW_2;
             return GNRC_LORAWAN_FSM_HANDLED;
         case GNRC_LORAWAN_EV_RX_TO:
-            if (!IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C)) {
-                _sleep_radio(mac);
-            }
-
-            if (mac->rx_state == GNRC_LORAWAN_RXW_1) {
-                return _state_transition(&mac->phy_fsm, _state_wait_rx_window);
-            }
-            else {
-                /* In class C the second reception window will never trigger
-                 * this event */
-                assert(!IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C));
-                gnrc_lorawan_dispatch_event(mac, &mac->mac_fsm, GNRC_LORAWAN_EV_PHY_READY);
+            if (IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C)
+                || mac->rx_state == GNRC_LORAWAN_RXW_2) {
+                /* In class A the device will go to Idle at the end of RX2 */
+                /* In class C the device goes as soon as possible to Idle */
                 return _state_transition(&mac->phy_fsm, _state_idle);
+            }
+            else if (mac->rx_state == GNRC_LORAWAN_RXW_1) {
+                return _state_transition(&mac->phy_fsm, _state_wait_rx_window);
             }
             break;
         case GNRC_LORAWAN_EV_TO:
+            assert(!IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C));
             /* This occurs when the packet is longer than the RX window duration.
              * We set a maximum timeout in case the device does not trigger RX_DONE
              */
@@ -600,10 +596,6 @@ static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lora
             }
             else {
                 /* If we get here again, go back to IDLE */
-                if (!IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C)) {
-                    _sleep_radio(mac);
-                }
-                gnrc_lorawan_dispatch_event(mac, &mac->mac_fsm, GNRC_LORAWAN_EV_PHY_READY);
                 return _state_transition(&mac->phy_fsm, _state_idle);
             }
             break;
@@ -673,7 +665,6 @@ static gnrc_lorawan_fsm_status_t _state_tx(gnrc_lorawan_t *mac, gnrc_lorawan_eve
             return GNRC_LORAWAN_FSM_HANDLED;
         case GNRC_LORAWAN_EV_TX_DONE: {
             /* Indicate upper layer */
-            gnrc_lorawan_dispatch_event(mac, &mac->mac_fsm, GNRC_LORAWAN_EV_TX_DONE);
             return _state_transition(&mac->phy_fsm, _state_wait_rx_window);
         }
         case GNRC_LORAWAN_EV_EXIT:
@@ -698,6 +689,10 @@ static gnrc_lorawan_fsm_status_t _state_idle(gnrc_lorawan_t *mac, gnrc_lorawan_e
                 netopt_state_t state = NETOPT_STATE_RX;
                 dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
             }
+            else {
+                _sleep_radio(mac);
+            }
+            gnrc_lorawan_dispatch_event(mac, &mac->mac_fsm, GNRC_LORAWAN_EV_PHY_READY);
             return GNRC_LORAWAN_FSM_HANDLED;
         case GNRC_LORAWAN_EV_EXIT:
             return GNRC_LORAWAN_FSM_IGNORED;

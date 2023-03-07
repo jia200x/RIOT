@@ -144,9 +144,19 @@ void gnrc_lorawan_mlme_indication(gnrc_lorawan_t *mac, mlme_indication_t *ind)
         container_of(mac, gnrc_netif_lorawan_t, mac);
 
     if (ind->type == MLME_LINK_CHECK) {
-        lw_netif->flags &= ~GNRC_NETIF_LORAWAN_FLAGS_LINK_CHECK;
         lw_netif->demod_margin = ind->link_req.margin;
         lw_netif->num_gateways = ind->link_req.num_gateways;
+    }
+    else if (ind->type == MLME_SCHEDULE_UPLINK) {
+        /* In the future this may schedule pending packets from the netif queue */
+        lw_netif->msg_sched.type = GNRC_NETAPI_MSG_TYPE_SND;
+        gnrc_pktsnip_t *pkt, *hdr;
+        uint8_t port = 1;
+        pkt = gnrc_pktbuf_add(NULL, NULL, 0, GNRC_NETTYPE_UNDEF);
+        hdr = gnrc_netif_hdr_build(NULL, 0, &port, sizeof(port));
+        pkt = gnrc_pkt_prepend(pkt, hdr);
+        lw_netif->msg_sched.content.ptr = pkt;
+        msg_send(&lw_netif->msg_sched, thread_getpid());
     }
 }
 
@@ -337,9 +347,6 @@ static gnrc_pktsnip_t *_recv(gnrc_netif_t *netif)
 
 static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
 {
-    mlme_request_t mlme_request;
-    mlme_confirm_t mlme_confirm;
-
     uint8_t port;
     int res = -EINVAL;
 
@@ -364,12 +371,6 @@ static int _send(gnrc_netif_t *netif, gnrc_pktsnip_t *payload)
     }
     else {
         port = netif->lorawan.port;
-    }
-
-    if (netif->lorawan.flags & GNRC_NETIF_LORAWAN_FLAGS_LINK_CHECK) {
-        mlme_request.type = MLME_LINK_CHECK;
-        gnrc_lorawan_mlme_request(&netif->lorawan.mac, &mlme_request,
-                                  &mlme_confirm);
     }
 
     mcps_request_t req =
