@@ -201,7 +201,7 @@ static inline void gnrc_lorawan_radio_tx_done_cb(gnrc_lorawan_t *mac)
 static inline void gnrc_lorawan_radio_rx_error_cb(gnrc_lorawan_t *mac)
 {
     /* The failed reception is seen by the MAC layer as an RX timeout */
-    gnrc_lorawan_radio_rx_timeout_cb(mac);
+    gnrc_lorawan_dispatch_event(mac, &mac->phy_fsm, GNRC_LORAWAN_EV_RX_ERROR);
 }
 
 /**

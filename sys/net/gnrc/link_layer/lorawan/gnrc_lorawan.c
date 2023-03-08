@@ -599,6 +599,9 @@ static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lora
                 return _state_transition(&mac->phy_fsm, _state_idle);
             }
             break;
+        case GNRC_LORAWAN_EV_RX_ERROR:
+            event_timeout_clear(&mac->evt);
+            return _state_transition(&mac->phy_fsm, _state_idle);
         case GNRC_LORAWAN_EV_RX_DONE:
             event_timeout_clear(&mac->evt);
             _process_rx_done(mac);
@@ -637,6 +640,15 @@ static gnrc_lorawan_fsm_status_t _state_wait_rx_window(gnrc_lorawan_t *mac, gnrc
                 _sleep_radio(mac);
             }
             return GNRC_LORAWAN_FSM_HANDLED;
+
+        case GNRC_LORAWAN_EV_RX_ERROR:
+            assert(IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C));
+            return GNRC_LORAWAN_FSM_IGNORED;
+        case GNRC_LORAWAN_EV_RX_DONE:
+            assert(IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C));
+            _process_rx_done(mac);
+            return GNRC_LORAWAN_FSM_HANDLED;
+            break;
         case GNRC_LORAWAN_EV_EXIT:
             return GNRC_LORAWAN_FSM_IGNORED;
         case GNRC_LORAWAN_EV_TO:
@@ -700,6 +712,9 @@ static gnrc_lorawan_fsm_status_t _state_idle(gnrc_lorawan_t *mac, gnrc_lorawan_e
             return _state_transition(&mac->phy_fsm, _state_tx);
         }
         break;
+        case GNRC_LORAWAN_EV_RX_ERROR:
+            assert(IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C));
+            return GNRC_LORAWAN_FSM_HANDLED;
         case GNRC_LORAWAN_EV_RX_DONE:
             assert(IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C));
             _process_rx_done(mac);
