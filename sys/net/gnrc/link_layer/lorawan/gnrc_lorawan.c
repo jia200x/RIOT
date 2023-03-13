@@ -592,10 +592,12 @@ static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lora
              */
             if (mac->rx_state != GNRC_LORAWAN_RX_PENDING) {
                 mac->rx_state = GNRC_LORAWAN_RX_PENDING;
-                event_timeout_set(&mac->evt, 1700);
+                event_timeout_set(&mac->evt, 2000);
             }
             else {
                 /* If we get here again, go back to IDLE */
+                netopt_state_t state = NETOPT_STATE_STANDBY;
+                dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
                 return _state_transition(&mac->phy_fsm, _state_idle);
             }
             break;
