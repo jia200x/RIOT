@@ -39,13 +39,15 @@ const uint8_t sx126x_max_sf = LORA_SF12;
 
 #if IS_USED(MODULE_SX126X_STM32WL)
 static netdev_t *_dev;
+static void _isr(netdev_t *netdev);
 
 void isr_subghz_radio(void)
 {
     /* Disable NVIC to avoid ISR conflict in CPU. */
     NVIC_DisableIRQ(SUBGHZ_Radio_IRQn);
     NVIC_ClearPendingIRQ(SUBGHZ_Radio_IRQn);
-    netdev_trigger_event_isr(_dev);
+    /* HACK! */
+    _isr(_dev);
     cortexm_isr_end();
 }
 #endif
@@ -181,6 +183,7 @@ static void _isr(netdev_t *netdev)
         netdev->event_callback(netdev, NETDEV_EVENT_RX_STARTED);
     }
     else if (irq_mask & SX126X_IRQ_HEADER_ERROR) {
+        netdev->event_callback(netdev, NETDEV_EVENT_CRC_ERROR);
         DEBUG("[sx126x] netdev: SX126X_IRQ_HEADER_ERROR\n");
     }
     else if (irq_mask & SX126X_IRQ_CRC_ERROR) {
@@ -329,7 +332,9 @@ static int _set_state(sx126x_t *dev, netopt_state_t state)
             sx126x_set_rx(dev, _timeout);
         }
         else {
-            sx126x_set_rx(dev, SX126X_RX_SINGLE_MODE);
+            /* Set RX Continuous */
+            /* HACK! */
+            sx126x_set_rx(dev, 0xFFFFFF);
         }
         break;
 

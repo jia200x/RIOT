@@ -218,7 +218,8 @@ int sx126x_init(sx126x_t *dev)
     }
 
     /* Radio Rx timeout timer stopped on preamble detection */
-    sx126x_stop_timer_on_preamble(dev, true);
+    /* HACK */
+    sx126x_stop_timer_on_preamble(dev, false);
 
     return res;
 }
