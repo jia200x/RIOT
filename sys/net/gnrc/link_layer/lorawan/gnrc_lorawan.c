@@ -234,17 +234,90 @@ static void _configure_rx_window(gnrc_lorawan_t *mac, uint32_t channel_freq,
     _config_radio(mac, channel_freq, dr, true, rx_single);
 }
 
+
+void print_state(gnrc_lorawan_state_t state)
+{
+    if (_state_wait_rx_window == state) {
+        printf("wrw");
+    }
+    else if (_state_rx_window == state) {
+        printf("rw");
+    }
+    else if (_state_tx == state) {
+        printf("tx");
+    }
+    else if (_state_idle == state) {
+        printf("idle");
+    }
+    else {
+        assert(false);
+    }
+}
+
+void print_event(gnrc_lorawan_event_t event)
+{
+    switch (event) {
+        case GNRC_LORAWAN_EV_RX_TO:
+            printf("RX_TO");
+            break;
+        case GNRC_LORAWAN_EV_TO:
+            printf("TO");
+            break;
+        case GNRC_LORAWAN_EV_TX_DONE:
+            printf("TXD");
+            break;
+        case GNRC_LORAWAN_EV_RX_DONE:
+            printf("RXD");
+            break;
+        case GNRC_LORAWAN_EV_RX_ERROR:
+            printf("RXE");
+            break;
+        case GNRC_LORAWAN_EV_ENTRY:
+            printf("ENT");
+            break;
+        case GNRC_LORAWAN_EV_EXIT:
+            printf("EXI");
+            break;
+        case GNRC_LORAWAN_EV_REQUEST_TX:
+            printf("REQ");
+            break;
+        case GNRC_LORAWAN_EV_LINK_UP:
+            printf("LU");
+            break;
+        case GNRC_LORAWAN_EV_PHY_READY:
+            printf("PR");
+            break;
+    }
+}
+
 void gnrc_lorawan_dispatch_event(gnrc_lorawan_t *mac, gnrc_lorawan_state_t *fsm, gnrc_lorawan_event_t event)
 {
     gnrc_lorawan_state_t last_state = *fsm;
     int last_event = event;
     int res;
+    bool print = false;
+
+#if 0
+    if (*fsm == mac->phy_fsm) {
+        print_state(*fsm);
+        printf(" [");
+        print_event(event);
+        printf(" ]\n");
+        print = true;
+    }
+#endif
 
     /* This line may update the state if there's a state transition */
     while ((res = (*fsm)(mac, last_event)) == GNRC_LORAWAN_FSM_TRANSITION) {
         res = last_state(mac, GNRC_LORAWAN_EV_EXIT);
         assert(res != GNRC_LORAWAN_FSM_TRANSITION);
         last_event = GNRC_LORAWAN_EV_ENTRY;
+        if (print) {
+            print_state(last_state);
+            printf("->");
+            print_state(*fsm);
+            puts("");
+        }
     }
 }
 
