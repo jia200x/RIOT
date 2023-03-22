@@ -28,10 +28,12 @@ USEMODULE += ps
 USEMODULE += netstats_l2
 USEMODULE += netstats_ipv6
 USEMODULE += netstats_rpl
-USEMODULE += netdev_ieee802154
+#USEMODULE += netdev_ieee802154
 USEMODULE += gcoap
 USEMODULE += cord_ep_standalone
 USEMODULE += sx126x_stm32wl
+
+CFLAGS += -DCONFIG_SX126X_HAL
 
 # Optionally include DNS support. This includes resolution of names at an
 # upstream DNS server and the handling of RDNSS options in Router Advertisements

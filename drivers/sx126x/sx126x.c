@@ -19,8 +19,11 @@
  */
 
 #include <errno.h>
+#include "kernel_defines.h"
 
-//#include "sx126x_netdev.h"
+#if !IS_ACTIVE(CONFIG_SX126X_HAL)
+#include "sx126x_netdev.h"
+#endif
 
 #include "net/lora.h"
 #include "periph/spi.h"
@@ -42,7 +45,7 @@
 #endif
 
 #ifndef CONFIG_SX126X_TX_POWER_DEFAULT
-#define CONFIG_SX126X_TX_POWER_DEFAULT          (22U)           /* in dBm */
+#define CONFIG_SX126X_TX_POWER_DEFAULT          (14U)           /* in dBm */
 #endif
 
 #ifndef CONFIG_SX126X_RAMP_TIME_DEFAULT
@@ -71,7 +74,16 @@ const sx126x_pa_cfg_params_t hpa_cfg = {
     .pa_lut = 0x01
 };
 
+#if !IS_ACTIVE(CONFIG_SX126X_HAL)
+void sx126x_setup(sx126x_t *dev, const sx126x_params_t *params, uint8_t index)
+{
+    netdev_t *netdev = &dev->netdev;
 
+    netdev->driver = &sx126x_driver;
+    dev->params = (sx126x_params_t *)params;
+    netdev_register(&dev->netdev, NETDEV_SX126X, index);
+}
+#endif
 
 static const uint16_t _bw_khz[3] = {
     [LORA_BW_125_KHZ] = 125,
@@ -119,9 +131,15 @@ static void sx126x_init_default_config(sx126x_t *dev)
 #endif
     sx126x_set_tx_params(dev, CONFIG_SX126X_TX_POWER_DEFAULT, CONFIG_SX126X_RAMP_TIME_DEFAULT);
 
+#if IS_ACTIVE(CONFIG_SX126X_HAL)
     dev->mod_params.bw = (sx126x_lora_bw_t)(SX126X_LORA_BW_125);
     dev->mod_params.sf = (sx126x_lora_sf_t) LORA_SF7;
     dev->mod_params.cr = (sx126x_lora_cr_t)(LORA_CR_4_5);
+#else
+    dev->mod_params.bw = (sx126x_lora_bw_t)(CONFIG_LORA_BW_DEFAULT + SX126X_LORA_BW_125);
+    dev->mod_params.sf = (sx126x_lora_sf_t)CONFIG_LORA_SF_DEFAULT;
+    dev->mod_params.cr = (sx126x_lora_cr_t)CONFIG_LORA_CR_DEFAULT;
+#endif
     dev->mod_params.ldro = _compute_ldro(dev);
     sx126x_set_lora_mod_params(dev, &dev->mod_params);
 
@@ -146,10 +164,17 @@ static void _dio1_isr(void *arg)
 }
 #endif
 
+#if IS_ACTIVE(CONFIG_SX126X_HAL)
 int sx126x_init(sx126x_t *dev, const sx126x_params_t *params, event_queue_t *evq)
+#else
+int sx126x_init(sx126x_t *dev)
+#endif
 {
-    /* Setup SPI for SX126X */
+
+#if IS_ACTIVE(CONFIG_SX126X_HAL)
     dev->params = (sx126x_params_t *)params;
+#endif
+    /* Setup SPI for SX126X */
     int res = spi_init_cs(dev->params->spi, dev->params->nss_pin);
 
     if (res != SPI_OK) {
@@ -186,7 +211,10 @@ int sx126x_init(sx126x_t *dev, const sx126x_params_t *params, event_queue_t *evq
     /* Initialize radio with the default parameters */
     sx126x_init_default_config(dev);
     
+#if IS_ACTIVE(CONFIG_SX126X_HAL)
     dev->evq = evq;
+#endif
+
     /* Configure available IRQs */
     const uint16_t irq_mask = (
         SX126X_IRQ_TX_DONE |
@@ -215,8 +243,11 @@ int sx126x_init(sx126x_t *dev, const sx126x_params_t *params, event_queue_t *evq
     }
 
     /* Radio Rx timeout timer stopped on preamble detection */
-    /* HACK */
+#if IS_ACTIVE(CONFIG_SX126X_HAL)
+    sx126x_stop_timer_on_preamble(dev, true);
+#else
     sx126x_stop_timer_on_preamble(dev, false);
+#endif
 
     return res;
 }

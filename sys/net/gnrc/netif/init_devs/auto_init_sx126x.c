@@ -24,7 +24,9 @@
 #include "net/gnrc/netif/lorawan_base.h"
 #include "net/gnrc/netif/raw.h"
 #include "net/gnrc/netif/ieee802154.h"
+#if !IS_USED(MODULE_OPENDSME)
 #include "net/netdev/ieee802154_submac.h"
+#endif
 #include "net/gnrc.h"
 #include "include/init_devs.h"
 
@@ -53,12 +55,16 @@
 /**
  * @brief   Allocate memory for device descriptors, stacks, and GNRC adaption
  */
+#if IS_USED(CONFIG_SX126X_HAL)
+static ieee802154_dev_t sx126x_hal[SX126X_NUMOF];
+#endif
 static sx126x_t sx126x_devs[SX126X_NUMOF];
 static char sx126x_stacks[SX126X_NUMOF][SX126X_STACKSIZE];
-static ieee802154_dev_t sx126x_hal[SX126X_NUMOF];
 static gnrc_netif_t _netif[SX126X_NUMOF];
+
 void auto_init_sx126x(void)
 {
+#if IS_USED(CONFIG_SX126X_HAL)
     for (unsigned i = 0; i < SX126X_NUMOF; ++i) {
         LOG_DEBUG("[auto_init_netif] initializing sx126x #%u\n", i);
         
@@ -71,5 +77,24 @@ void auto_init_sx126x(void)
                                  SX126X_PRIO, "sx126x",
                                  (netdev_t*) &sx126x_hal[i]);
     }
+#else
+    for (unsigned i = 0; i < SX126X_NUMOF; ++i) {
+        LOG_DEBUG("[auto_init_netif] initializing sx126x #%u\n", i);
+        sx126x_setup(&sx126x_devs[i], &sx126x_params[i], i);
+        if (IS_USED(MODULE_GNRC_NETIF_LORAWAN)) {
+            /* Currently only one lora device is supported */
+            assert(SX126X_NUMOF == 1);
+
+            gnrc_netif_lorawan_create(&_netif[i], sx126x_stacks[i],
+                                      SX126X_STACKSIZE, SX126X_PRIO,
+                                      "sx126x", &sx126x_devs[i].netdev);
+        }
+        else {
+            gnrc_netif_raw_create(&_netif[i], sx126x_stacks[i],
+                                  SX126X_STACKSIZE, SX126X_PRIO,
+                                  "sx126x", &sx126x_devs[i].netdev);
+        }
+    }
+#endif
 }
 /** @} */

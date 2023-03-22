@@ -34,6 +34,8 @@
 #define ENABLE_DEBUG 0
 #include "debug.h"
 
+#if !IS_ACTIVE(CONFIG_SX126X_HAL)
+
 const uint8_t llcc68_max_sf = LORA_SF11;
 const uint8_t sx126x_max_sf = LORA_SF12;
 
@@ -483,3 +485,5 @@ const netdev_driver_t sx126x_driver = {
     .get = _get,
     .set = _set,
 };
+
+#endif /* CONFIG_SX126X_HAL */
