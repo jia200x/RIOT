@@ -334,7 +334,7 @@ static int _set_state(sx126x_t *dev, netopt_state_t state)
         else {
             /* Set RX Continuous */
             /* HACK! */
-            sx126x_set_rx(dev, 0xFFFFFF);
+            sx126x_set_rx(dev, SX126X_RX_SINGLE_MODE);
         }
         break;
 
