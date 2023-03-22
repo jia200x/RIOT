@@ -27,7 +27,7 @@
 
 #include "net/netdev.h"
 
-#if IS_ACTIVE(CONFIG_SX126X_HAL)
+#if IS_ACTIVE(MODULE_SX126X_HAL)
 #include "net/ieee802154/radio.h"
 #include "kernel_defines.h"
 #include "event.h"
@@ -86,7 +86,7 @@ typedef enum {
     SX126X_TYPE_STM32WL,
 } sx126x_type_t;
 
-#if IS_ACTIVE(CONFIG_SX126X_HAL)
+#if IS_ACTIVE(MODULE_SX126X_HAL)
 typedef enum {
     STATE_IDLE,
     STATE_TX,
@@ -129,7 +129,7 @@ struct sx126x {
     uint32_t channel;                       /**< Current channel frequency (in Hz) */
     uint16_t rx_timeout;                    /**< Rx Timeout in terms of symbols */
     bool radio_sleep;                       /**< Radio sleep status */
-#if IS_ACTIVE(CONFIG_SX126X_HAL)
+#if IS_ACTIVE(MODULE_SX126X_HAL)
     sx126x_cad_params_t cad_params;         /**< Radio Channel Activity Detection parametres */
     bool cad_detected;                      /**< Channel Activity Detected Flag*/
 
@@ -141,7 +141,7 @@ struct sx126x {
 #endif
 };
 
-#if IS_ACTIVE(CONFIG_SX126X_HAL)
+#if IS_ACTIVE(MODULE_SX126X_HAL)
 
 void sx126x_setup(sx126x_t *dev, uint8_t index);
 

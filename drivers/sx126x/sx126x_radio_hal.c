@@ -21,7 +21,7 @@
 #include "kernel_defines.h"
 #include "event.h"
 
-#if IS_ACTIVE(CONFIG_SX126X_HAL)
+#if IS_ACTIVE(MODULE_SX126X_HAL)
 const uint8_t llcc68_max_sf = LORA_SF11;
 const uint8_t sx126x_max_sf = LORA_SF12;
 
@@ -523,4 +523,4 @@ static const ieee802154_radio_ops_t sx126x_ops = {
     .set_frame_filter_mode = _set_frame_filter_mode,
 };
 
-#endif /* CONFIG_SX126X_HAL */
+#endif /* MODULE_SX126X_HAL */

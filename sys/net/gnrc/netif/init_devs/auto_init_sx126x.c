@@ -55,7 +55,7 @@
 /**
  * @brief   Allocate memory for device descriptors, stacks, and GNRC adaption
  */
-#if IS_USED(CONFIG_SX126X_HAL)
+#if IS_USED(MODULE_SX126X_HAL)
 static ieee802154_dev_t sx126x_hal[SX126X_NUMOF];
 #endif
 static sx126x_t sx126x_devs[SX126X_NUMOF];
@@ -64,7 +64,7 @@ static gnrc_netif_t _netif[SX126X_NUMOF];
 
 void auto_init_sx126x(void)
 {
-#if IS_USED(CONFIG_SX126X_HAL)
+#if IS_USED(MODULE_SX126X_HAL)
     for (unsigned i = 0; i < SX126X_NUMOF; ++i) {
         LOG_DEBUG("[auto_init_netif] initializing sx126x #%u\n", i);
         

@@ -33,7 +33,7 @@ USEMODULE += gcoap
 USEMODULE += cord_ep_standalone
 USEMODULE += sx126x_stm32wl
 
-CFLAGS += -DCONFIG_SX126X_HAL
+USEMODULE += sx126x_hal
 
 # Optionally include DNS support. This includes resolution of names at an
 # upstream DNS server and the handling of RDNSS options in Router Advertisements
