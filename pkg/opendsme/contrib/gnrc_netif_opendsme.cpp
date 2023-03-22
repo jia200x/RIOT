@@ -132,6 +132,7 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
     network_uint16_t addr;
     gnrc_netif_acquire(netif);
     int res = gnrc_netif_set_ipv6_common(netif, opt);
+    msg_t msg;
     if (res != -ENOTSUP) {
         gnrc_netif_release(netif);
         return res;
@@ -158,6 +159,10 @@ static int _set(gnrc_netif_t *netif, const gnrc_netapi_opt_t *opt)
                 _pan_coord = false;
             }
             res = sizeof(netopt_enable_t);
+
+            msg.type = GNRC_IPV6_NIB_IFACE_UP;
+            msg.content.ptr = netif;
+            msg_send(&msg, gnrc_ipv6_pid);
             break;
 #if IS_ACTIVE(CONFIG_IEEE802154_DSME_STATIC_GTS)
         case NETOPT_GTS_ALLOC: {
