@@ -201,6 +201,8 @@ static void _config_radio(gnrc_lorawan_t *mac, uint32_t channel_freq,
 {
     netdev_t *dev = gnrc_lorawan_get_netdev(mac);
 
+    netopt_state_t state = NETOPT_STATE_STANDBY;
+    dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
     if (channel_freq != 0) {
         dev->driver->set(dev, NETOPT_CHANNEL_FREQUENCY, &channel_freq,
                          sizeof(channel_freq));
@@ -625,7 +627,7 @@ static void _process_rx_done(gnrc_lorawan_t *mac)
 static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev)
 {
     netdev_t *dev = gnrc_lorawan_get_netdev(mac);
-    netopt_state_t state = NETOPT_STATE_RX;
+    netopt_state_t state;
     switch(ev) {
         case GNRC_LORAWAN_EV_ENTRY:
             if (mac->rx_state == GNRC_LORAWAN_RXW_1) {
@@ -648,6 +650,9 @@ static gnrc_lorawan_fsm_status_t _state_rx_window(gnrc_lorawan_t *mac, gnrc_lora
                                  true);
             }
             /* Open RX Window */
+            //state = NETOPT_STATE_STANDBY;
+            //dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
+            state = NETOPT_STATE_RX;
             dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
             return GNRC_LORAWAN_FSM_HANDLED;
         case GNRC_LORAWAN_EV_EXIT:
@@ -714,7 +719,9 @@ static gnrc_lorawan_fsm_status_t _state_wait_rx_window(gnrc_lorawan_t *mac, gnrc
                 _configure_rx_window(mac, CONFIG_LORAMAC_DEFAULT_RX2_FREQ,
                                  mac->dl_settings &
                                  GNRC_LORAWAN_DL_RX2_DR_MASK, false);
-                netopt_state_t state = NETOPT_STATE_RX;
+                netopt_state_t state = NETOPT_STATE_STANDBY;
+                //dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
+                state = NETOPT_STATE_RX;
                 dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
             }
             else {
@@ -770,21 +777,26 @@ static gnrc_lorawan_fsm_status_t _state_tx(gnrc_lorawan_t *mac, gnrc_lorawan_eve
     return GNRC_LORAWAN_FSM_IGNORED;
 }
 
-static gnrc_lorawan_fsm_status_t _state_idle(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev)
+static void _set_idle(gnrc_lorawan_t *mac)
 {
     netdev_t *dev = gnrc_lorawan_get_netdev(mac);
+    if (IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C) && mac->mlme.activation != MLME_ACTIVATION_NONE) {
+        _configure_rx_window(mac, CONFIG_LORAMAC_DEFAULT_RX2_FREQ,
+                         mac->dl_settings &
+                         GNRC_LORAWAN_DL_RX2_DR_MASK, false);
+        netopt_state_t state = NETOPT_STATE_RX;
+        dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
+    }
+    else {
+        _sleep_radio(mac);
+    }
+}
+
+static gnrc_lorawan_fsm_status_t _state_idle(gnrc_lorawan_t *mac, gnrc_lorawan_event_t ev)
+{
     switch(ev) {
         case GNRC_LORAWAN_EV_ENTRY:
-            if (IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C) && mac->mlme.activation != MLME_ACTIVATION_NONE) {
-                _configure_rx_window(mac, CONFIG_LORAMAC_DEFAULT_RX2_FREQ,
-                                 mac->dl_settings &
-                                 GNRC_LORAWAN_DL_RX2_DR_MASK, false);
-                netopt_state_t state = NETOPT_STATE_RX;
-                dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
-            }
-            else {
-                _sleep_radio(mac);
-            }
+            _set_idle(mac);
             gnrc_lorawan_dispatch_event(mac, &mac->mac_fsm, GNRC_LORAWAN_EV_PHY_READY);
             return GNRC_LORAWAN_FSM_HANDLED;
         case GNRC_LORAWAN_EV_EXIT:
@@ -795,10 +807,12 @@ static gnrc_lorawan_fsm_status_t _state_idle(gnrc_lorawan_t *mac, gnrc_lorawan_e
         break;
         case GNRC_LORAWAN_EV_RX_ERROR:
             assert(IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C));
+            _set_idle(mac);
             return GNRC_LORAWAN_FSM_HANDLED;
         case GNRC_LORAWAN_EV_RX_DONE:
             assert(IS_ACTIVE(CONFIG_GNRC_LORAWAN_CLASS_C));
             _process_rx_done(mac);
+            _set_idle(mac);
             return GNRC_LORAWAN_FSM_HANDLED;
         default:
             assert(false);
