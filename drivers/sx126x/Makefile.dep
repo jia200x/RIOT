@@ -4,7 +4,7 @@ FEATURES_REQUIRED += periph_gpio_irq
 
 ifneq (,$(filter netdev,$(USEMODULE)))
 USEMODULE += netdev_legacy_api
-USEMODULE += netdev_ieee802154_submac
+#USEMODULE += netdev_ieee802154_submac
 USEMODULE += lora
 endif
 
