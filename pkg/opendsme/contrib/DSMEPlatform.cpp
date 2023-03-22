@@ -421,7 +421,7 @@ void DSMEPlatform::initialize(bool pan_coord)
     scanChannels.add(CONFIG_IEEE802154_DEFAULT_CHANNEL);
     if (IS_ACTIVE(CONFIG_IEEE802154_DSME_STATIC_GTS)) {
         StaticScheduling* staticScheduling = new StaticScheduling(this->dsmeAdaptionLayer);
-        staticScheduling->setNegotiateChannels(true);
+        staticScheduling->setNegotiateChannels(false);
         scheduling = staticScheduling;
     }
     else {
