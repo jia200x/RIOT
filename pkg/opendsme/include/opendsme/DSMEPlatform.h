@@ -270,7 +270,7 @@ protected:
     void translateMacAddress(uint16_t& from, IEEE802154MacAddress& to);
 
     event_queue_t *getEventQueue() {
-        return &this->netif->evq;
+        return &this->netif->evq[GNRC_NETIF_EVQ_INDEX_PRIO_LOW];
     }
 
     /* Holds the PHY Information Base */

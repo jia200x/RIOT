@@ -70,7 +70,7 @@ void auto_init_sx126x(void)
         
 
         sx126x_hal_setup(&sx126x_devs[i], &sx126x_hal[i]);
-        sx126x_init(&sx126x_devs[i], &sx126x_params[i], &_netif->evq);
+        sx126x_init(&sx126x_devs[i], &sx126x_params[i], &_netif->evq[GNRC_NETIF_EVQ_INDEX_PRIO_LOW]);
         sx126x_setup(&sx126x_devs[i], i);
         gnrc_netif_opendsme_create(&_netif[i], sx126x_stacks[i],
                                  SX126X_STACKSIZE,
