@@ -130,7 +130,6 @@ void gnrc_lorawan_mcps_indication(gnrc_lorawan_t *mac, mcps_indication_t *ind)
     }
 
     if (!gnrc_netapi_dispatch_receive(nettype, demux, pkt)) {
-        printf("%i %i\n", nettype, demux);
         puts("gnrc_lorawan_netif: unable to forward packet\n");
         goto release;
     }
