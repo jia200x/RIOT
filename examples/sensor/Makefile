@@ -84,6 +84,7 @@ export PKG_SOURCE_LOCAL_OPENDSME=/home/jialamos/Development/ipsn-dsme_lora/src/D
 CFLAGS += -DDEBUG_ASSERT_VERBOSE
 
 CFLAGS += -DISR_STACKSIZE=1024
+CFLAGS += -DCONFIG_IEEE802154_DEFAULT_TXPOWER=14
 
 # set the ZEP port for native
 ZEP_PORT_BASE ?= 17754
