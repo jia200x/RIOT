@@ -212,6 +212,7 @@ static int _write(ieee802154_dev_t *hal, const iolist_t *iolist){
     sx126x_t *dev = hal->priv;
     (void)dev;
     size_t pos = 0;
+    uint16_t chksum = 0;
     /* Full buffer used for Tx */
     sx126x_set_buffer_base_address(dev, 0x80, 0x00);
     /* Write payload buffer */
@@ -220,11 +221,16 @@ static int _write(ieee802154_dev_t *hal, const iolist_t *iolist){
             sx126x_write_buffer(dev, pos + 0x80, iol->iol_base, iol->iol_len);
             DEBUG("[sx126x] netdev: send: wrote data to payload buffer.\n");
             pos += iol->iol_len;
+            chksum = ucrc16_calc_le(iol->iol_base, iol->iol_len,
+                                UCRC16_CCITT_POLY_LE, chksum);
         }
     }
-
+    chksum = byteorder_htols(chksum).u16;
+    /* Include CRC */
+    sx126x_write_buffer(dev, pos + 0x80, (uint8_t*) &chksum, sizeof(chksum));
+    pos += 2;
     sx126x_set_lora_payload_length(dev, pos);
-    DEBUG("[sx126x] writing (size: %d).\n", (pos));
+    DEBUG("[sx126x] writing (size: %d).\n", pos);
     return 0;
 }
 
@@ -325,7 +331,8 @@ static int _len(ieee802154_dev_t *hal){
     sx126x_t *dev = hal->priv;
     sx126x_rx_buffer_status_t rx_buffer_status;
     sx126x_get_rx_buffer_status(dev, &rx_buffer_status);
-    dev->size = rx_buffer_status.pld_len_in_bytes;
+    /* Exclude CRC */
+    dev->size = rx_buffer_status.pld_len_in_bytes - 2;
     return dev->size;
 }
 
@@ -334,6 +341,8 @@ static int _read(ieee802154_dev_t *hal, void *buf, size_t max_size, ieee802154_r
     (void)hal;
     (void)buf;
     (void)info;
+    uint16_t chksum = 0;
+    uint16_t exp_chksum;
 
     DEBUG("[sx126x] _read\n");
     sx126x_t* dev = hal->priv;
@@ -344,7 +353,9 @@ static int _read(ieee802154_dev_t *hal, void *buf, size_t max_size, ieee802154_r
     sx126x_pkt_status_lora_t pkt_status;
     sx126x_get_rx_buffer_status(dev, &rx_buffer_status);
 
+    /* Size including CRC */
     dev->size = rx_buffer_status.pld_len_in_bytes;
+
     sx126x_get_lora_pkt_status(dev, &pkt_status);
     if (packet_info) {
         packet_info->snr = pkt_status.snr_pkt_in_db;
@@ -357,14 +368,26 @@ static int _read(ieee802154_dev_t *hal, void *buf, size_t max_size, ieee802154_r
         return dev->size;
     }
 
-    if (dev->size > max_size) {
+    /* Exclude CRC */
+    if (dev->size > max_size + 2) {
         return -ENOBUFS;
     }
 
     if (dev->size < 3) {
         return -EBADMSG;
     }
-    sx126x_read_buffer(dev, rx_buffer_status.buffer_start_pointer, (uint8_t*)buf, dev->size);
+    /* Copy to buffer */
+    sx126x_read_buffer(dev, rx_buffer_status.buffer_start_pointer, (uint8_t*)buf, dev->size-2);
+    sx126x_read_buffer(dev, rx_buffer_status.buffer_start_pointer + dev->size-2, (uint8_t*)&exp_chksum, sizeof(exp_chksum));
+    chksum = ucrc16_calc_le(buf, dev->size-2,
+                        UCRC16_CCITT_POLY_LE, chksum);
+    chksum = byteorder_htols(chksum).u16;
+    /* Validate checksum */
+    if (chksum != exp_chksum) {
+        puts("CRC_F");
+        return -EBADMSG;
+    }
+
     DEBUG("[sx126x] first 3 bytes of received packet: %d %d %d\n", *(uint8_t*)buf, *((uint8_t*)buf+1), *((uint8_t*)buf+2));
     return dev->size;
 }
